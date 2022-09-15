@@ -291,6 +291,14 @@ github.com/onsi/gomega v1.7.1/go.mod h1:XdKZgCCFLUoM/7CFJVPcG8C1xQ1AJ0vpAezJrB7J
 github.com/onsi/gomega v1.10.1/go.mod h1:iN09h71vgCQne3DLsj+A5owkum+a2tYe+TOCB1ybHNo=
 github.com/onsi/gomega v1.20.2 h1:8uQq0zMgLEfa0vRrrBgaJF2gyW9Da9BmfGV+OyUzfkY=
 github.com/onsi/gomega v1.20.2/go.mod h1:iYAIXgPSaDHak0LCMA+AWBpIKBr8WZicMxnE8luStNc=
+github.com/openshift/api v3.9.0+incompatible h1:fJ/KsefYuZAjmrr3+5U9yZIZbTOpVkDDLDLFresAeYs=
+github.com/openshift/api v3.9.0+incompatible/go.mod h1:dh9o4Fs58gpFXGSYfnVxGR9PnV53I8TW84pQaJDdGiY=
+github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20220919103248-dba326cd1413 h1:1Vdp7Srd699nCbWJb6WJKUWW+R4ckZgeT3lEJp+hXWU=
+github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20220919103248-dba326cd1413/go.mod h1:KWqK7l2ej+rIYngoNUrxE2YjKGlRAAgJXXM0uU2R6XY=
+github.com/openstack-k8s-operators/lib-common/modules/database v0.0.0-20220923094431-9fca0c85a9dc h1:87lUVT3MLRI4Vg0nHpupwPKXtykGX3hZzPl5k6Kcyng=
+github.com/openstack-k8s-operators/lib-common/modules/database v0.0.0-20220923094431-9fca0c85a9dc/go.mod h1:umGUqQO4JtgefAaIwZjP+TxfxsLMEEeK/6VNzk8ooaI=
+github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20220822131846-da454a446c65 h1:9Wwy2FainwQ/dAdESERvJUEV3mxSkrX0no+Y+2nk834=
+github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20220822131846-da454a446c65/go.mod h1:+NRN/SUi5vzj/qSAUFTOA0z9alAvFxJka1DpgyJRPVE=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
