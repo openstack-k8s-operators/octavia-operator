@@ -19,7 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
-	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,9 +47,9 @@ type OctaviaAPISpec struct {
 	DatabaseInstance string `json:"databaseInstance,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=keystone
-	// DatabaseUser - optional username used for keystone DB, defaults to keystone
-	// TODO: -> implement needs work in mariadb-operator, right now only keystone
+	// +kubebuilder:default=octavia
+	// DatabaseUser - optional username used for octavia DB, defaults to octavia
+	// TODO: -> implement needs work in mariadb-operator, right now only octavia
 	DatabaseUser string `json:"databaseUser"`
 
 	// +kubebuilder:validation:Optional
@@ -57,6 +57,7 @@ type OctaviaAPISpec struct {
 	// Region - optional region name for the keystone service
 	Region string `json:"region"`
 
+	// FIXME(tweining) Admin* stuff needed?
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=admin
 	// AdminProject - admin project name
@@ -73,18 +74,18 @@ type OctaviaAPISpec struct {
 	AdminUser string `json:"adminUser"`
 
 	// +kubebuilder:validation:Required
-	// Keystone Container Image URL
+	// Ooctavia Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1
 	// +kubebuilder:validation:Maximum=32
 	// +kubebuilder:validation:Minimum=0
-	// Replicas of keystone API to run
+	// Replicas of octavia API to run
 	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Required
-	// Secret containing OpenStack password information for keystone KeystoneDatabasePassword, AdminPassword
+	// Secret containing OpenStack password information for octavia OoctaviaDatabasePassword, AdminPassword
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -98,7 +99,7 @@ type OctaviaAPISpec struct {
 	// +kubebuilder:validation:Optional
 	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
 	// actual action pod gets started with sleep infinity
-	Debug OctaviaDebug `json:"debug,omitempty"`
+	Debug OctaviaAPIDebug `json:"debug,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
@@ -127,18 +128,18 @@ type OctaviaAPISpec struct {
 // PasswordSelector to identify the DB and AdminUser password from the Secret
 type PasswordSelector struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="KeystoneDatabasePassword"
-	// Database - Selector to get the keystone Database user password from the Secret
+	// +kubebuilder:default="OoctaviaDatabasePassword"
+	// Database - Selector to get the octavia Database user password from the Secret
 	// TODO: not used, need change in mariadb-operator
 	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="AdminPassword"
-	// Database - Selector to get the keystone Database user password from the Secret
+	// Database - Selector to get the octavia Database user password from the Secret
 	Admin string `json:"admin,omitempty"`
 }
 
-// OctaviaDebug defines the observed state of OctaviaAPI
-type OctaviaDebug struct {
+// OctaviaAPIDebug defines the observed state of OctaviaAPI
+type OctaviaAPIDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// DBSync enable debug
@@ -155,7 +156,7 @@ type OctaviaDebug struct {
 
 // OctaviaAPIStatus defines the observed state of OctaviaAPI
 type OctaviaAPIStatus struct {
-	// ReadyCount of keystone API instances
+	// ReadyCount of octavia API instances
 	ReadyCount int32 `json:"readyCount,omitempty"`
 
 	// Map of hashes to track e.g. job status
@@ -167,12 +168,14 @@ type OctaviaAPIStatus struct {
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
-	// Keystone Database Hostname
+	// Ooctavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
+//+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 
 // OctaviaAPI is the Schema for the octaviaapis API
 type OctaviaAPI struct {
@@ -196,7 +199,6 @@ func init() {
 	SchemeBuilder.Register(&OctaviaAPI{}, &OctaviaAPIList{})
 }
 
-
 // GetEndpoint - returns OpenStack endpoint url for type
 func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, error) {
 	if url, found := instance.Status.APIEndpoints[string(endpointType)]; found {
@@ -207,6 +209,7 @@ func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, 
 
 // IsReady - returns true if service is ready to server requests
 func (instance OctaviaAPI) IsReady() bool {
+	// TODO(tweining) do it like DesignateAPI?
 	return instance.Status.Conditions.IsTrue(condition.ExposeServiceReadyCondition) &&
 		instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
 }
