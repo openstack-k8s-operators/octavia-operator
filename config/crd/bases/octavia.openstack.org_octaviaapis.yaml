@@ -129,6 +129,10 @@ spec:
                 description: PreserveJobs - do not delete jobs after they finished
                   e.g. to check logs
                 type: boolean
+              region:
+                default: regionOne
+                description: Region - optional region name for the keystone service
+                type: string
               replicas:
                 default: 1
                 description: Replicas of octavia API to run

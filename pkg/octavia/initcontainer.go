@@ -30,6 +30,7 @@ type APIDetails struct {
 	OSPSecret            string
 	DBPasswordSelector   string
 	UserPasswordSelector string
+	VolumeMounts         []corev1.VolumeMount
 }
 
 const (
@@ -87,8 +88,9 @@ func initContainer(init APIDetails) []corev1.Container {
 			Command: []string{
 				"/bin/bash",
 			},
-			Args: args,
-			Env:  envs,
+			Args:         args,
+			Env:          envs,
+			VolumeMounts: getInitVolumeMounts(),
 		},
 	}
 }

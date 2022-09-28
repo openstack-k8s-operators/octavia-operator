@@ -1,7 +1,25 @@
 apiVersion: octavia.openstack.org/v1beta1
 kind: OctaviaAPI
 metadata:
-  name: octaviaapi-sample
+  name: octaviaapi-debug
 spec:
-  # TODO(user): Add fields here
+  # TODO(tweining): Add fields here
+  # databaseInstance: TODO
+  # databaseUser: TODO
+  region: regionOne
+  adminProject: admin
+  adminRole: admin
+  adminUser: admin
+  containerImage: "quay.io/tweining/octaviaapi:latest"
   replicas: 1
+  secret: octaviaapi-secret
+  # passwordSelectors: TODO
+  # nodeSelector: TODO
+  debug:
+    dbSync: false
+  preserveJobs: false
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  # defaultConfigOverwrite: TODO
+  # resources: TODO
