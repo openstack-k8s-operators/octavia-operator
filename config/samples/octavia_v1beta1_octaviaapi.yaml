@@ -4,13 +4,14 @@ metadata:
   name: octaviaapi-debug
 spec:
   # TODO(tweining): Add fields here
-  # databaseInstance: TODO
-  # databaseUser: TODO
+  databaseInstance: openstack
+  databaseUser: octavia
   region: regionOne
   adminProject: admin
   adminRole: admin
   adminUser: admin
-  containerImage: "quay.io/tweining/octaviaapi:latest"
+  # containerImage: "quay.io/tweining/octaviaapi:latest"
+  containerImage: quay.io/tripleotraincentos8/centos-binary-octavia-api:current-tripleo
   replicas: 1
   secret: octaviaapi-secret
   # passwordSelectors: TODO

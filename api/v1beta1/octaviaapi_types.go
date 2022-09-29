@@ -74,7 +74,7 @@ type OctaviaAPISpec struct {
 	AdminUser string `json:"adminUser"`
 
 	// +kubebuilder:validation:Required
-	// Ooctavia Container Image URL
+	// Octavia Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -85,7 +85,7 @@ type OctaviaAPISpec struct {
 	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Required
-	// Secret containing OpenStack password information for octavia OoctaviaDatabasePassword, AdminPassword
+	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Optional
@@ -128,12 +128,12 @@ type OctaviaAPISpec struct {
 // PasswordSelector to identify the DB and AdminUser password from the Secret
 type PasswordSelector struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="OoctaviaDatabasePassword"
+	// +kubebuilder:default="OctaviaDatabasePassword"
 	// Database - Selector to get the octavia Database user password from the Secret
 	// TODO: not used, need change in mariadb-operator
 	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="AdminPassword"
+	// +kubebuilder:default="OctaviaPassword"
 	// Database - Selector to get the octavia Database user password from the Secret
 	Admin string `json:"admin,omitempty"`
 }
@@ -168,7 +168,7 @@ type OctaviaAPIStatus struct {
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
-	// Ooctavia Database Hostname
+	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
 }
 

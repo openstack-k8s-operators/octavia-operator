@@ -58,7 +58,7 @@ spec:
                 description: AdminUser - admin user name
                 type: string
               containerImage:
-                description: Ooctavia Container Image URL
+                description: Octavia Container Image URL
                 type: string
               customServiceConfig:
                 default: '# add your customization here'
@@ -113,12 +113,12 @@ spec:
                   AdminUser password from the Secret
                 properties:
                   admin:
-                    default: AdminPassword
+                    default: OctaviaPassword
                     description: Database - Selector to get the octavia Database user
                       password from the Secret
                     type: string
                   database:
-                    default: OoctaviaDatabasePassword
+                    default: OctaviaDatabasePassword
                     description: 'Database - Selector to get the octavia Database
                       user password from the Secret TODO: not used, need change in
                       mariadb-operator'
@@ -169,7 +169,7 @@ spec:
                 type: object
               secret:
                 description: Secret containing OpenStack password information for
-                  octavia OoctaviaDatabasePassword, AdminPassword
+                  octavia OctaviaDatabasePassword, AdminPassword
                 type: string
             type: object
           status:
@@ -224,7 +224,7 @@ spec:
                   type: object
                 type: array
               databaseHostname:
-                description: Ooctavia Database Hostname
+                description: Octavia Database Hostname
                 type: string
               hash:
                 additionalProperties:

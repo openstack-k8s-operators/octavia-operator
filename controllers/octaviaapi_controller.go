@@ -205,6 +205,9 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
+	r.Log.Info(fmt.Sprintf("db name %s, user %s, secret %s, dbName %s",
+		instance.Name,
+		instance.Spec.DatabaseUser, instance.Spec.Secret, instance.Spec.DatabaseInstance))
 	db := database.NewDatabase(
 		instance.Name,
 		instance.Spec.DatabaseUser,
@@ -440,6 +443,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
+	r.Log.Info(fmt.Sprintf("reconcileNormal Secret: %s", instance.Spec.Secret))
 	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -684,6 +688,7 @@ func (r *OctaviaAPIReconciler) reconcileConfigMap(ctx context.Context, instance 
 		return err
 	}
 
+	r.Log.Info(fmt.Sprintf("reconcileConfigMap Secret: %s", instance.Spec.Secret))
 	octaviaSecret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Spec.Secret,
