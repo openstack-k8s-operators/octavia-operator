@@ -1,0 +1,11 @@
+{
+  "command": "usr/bin/octavia-worker --config-file /etc/octavia/octavia.conf --config-file /etc/octavia/post-deploy.conf --log-file /var/log/octavia/worker.log --config-dir /etc/octavia/conf.d/octavia-worker",
+  "config_files": [
+    {
+      "source": "/var/lib/config-data/merged/octavia.conf",
+      "dest": "/etc/octavia.conf",
+      "owner": "root:cinder",
+      "perm": "0640"
+    },
+  ]
+}

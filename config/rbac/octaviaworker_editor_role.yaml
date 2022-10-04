@@ -1,0 +1,24 @@
+# permissions for end users to edit octaviaworkers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: octaviaworker-editor-role
+rules:
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers/status
+  verbs:
+  - get

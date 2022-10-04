@@ -1,4 +1,5 @@
 ## Append samples you want in your CSV to this file as resources ##
 resources:
 - octavia_v1beta1_octaviaapi.yaml
+- octavia_v1beta1_octaviaworker.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

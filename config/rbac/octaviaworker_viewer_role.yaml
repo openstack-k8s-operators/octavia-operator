@@ -1,0 +1,20 @@
+# permissions for end users to view octaviaworkers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: octaviaworker-viewer-role
+rules:
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers/status
+  verbs:
+  - get
