@@ -1,7 +1,7 @@
 apiVersion: octavia.openstack.org/v1beta1
 kind: OctaviaAPI
 metadata:
-  name: octaviaapi-debug
+  name: octavia
 spec:
   # TODO(tweining): Add fields here
   databaseInstance: openstack
@@ -13,7 +13,7 @@ spec:
   # containerImage: "quay.io/tweining/octaviaapi:latest"
   containerImage: quay.io/tripleotraincentos8/centos-binary-octavia-api:current-tripleo
   replicas: 1
-  secret: octaviaapi-secret
+  secret: osp-secret
   # passwordSelectors: TODO
   # nodeSelector: TODO
   debug:

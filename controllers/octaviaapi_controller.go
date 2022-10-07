@@ -205,7 +205,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
-	r.Log.Info(fmt.Sprintf("db name %s, user %s, secret %s, dbName %s",
+	r.Log.Info(fmt.Sprintf("db name %s, user %s, secret %s, dbInstance %s",
 		instance.Name,
 		instance.Spec.DatabaseUser, instance.Spec.Secret, instance.Spec.DatabaseInstance))
 	db := database.NewDatabase(
