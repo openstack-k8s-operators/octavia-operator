@@ -240,7 +240,9 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	}
 
 	// wait for the DB to be setup
+	r.Log.Info("XXX before WaitForDBCreated")
 	ctrlResult, err = db.WaitForDBCreated(ctx, helper)
+	r.Log.Info(fmt.Sprintf("result %v, %s", ctrlResult, err))
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DBReadyCondition,
@@ -248,18 +250,22 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 			condition.SeverityWarning,
 			condition.DBReadyErrorMessage,
 			err.Error()))
+		r.Log.Info(fmt.Sprintf("returning %v, %s", ctrlResult, err))
 		return ctrlResult, err
 	}
 	if (ctrlResult != ctrl.Result{}) {
+		r.Log.Info("before Conditions.Set")
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DBReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
 			condition.DBReadyRunningMessage))
+		r.Log.Info(fmt.Sprintf("returning %v, %s", ctrlResult, err))
 		return ctrlResult, nil
 	}
 	// update Status.DatabaseHostname, used to bootstrap/config the service
 	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
+	r.Log.Info("MarkTrue DBReadyCondition")
 	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
 
 	// create service DB - end
@@ -280,6 +286,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		ctx,
 		helper,
 	)
+	r.Log.Info(fmt.Sprintf("dbSyncjob.DoJob result %v, %v", ctrlResult, err))
 	if (ctrlResult != ctrl.Result{}) {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DBSyncReadyCondition,
@@ -298,6 +305,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		return ctrl.Result{}, err
 	}
 	if dbSyncjob.HasChanged() {
+		r.Log.Info("dbSyncjob haschanged")
 		instance.Status.Hash[octaviav1.DbSyncHash] = dbSyncjob.GetHash()
 		if err := r.Client.Status().Update(ctx, instance); err != nil {
 			return ctrl.Result{}, err
