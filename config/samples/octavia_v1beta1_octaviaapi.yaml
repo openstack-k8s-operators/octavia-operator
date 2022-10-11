@@ -16,7 +16,7 @@ spec:
   # passwordSelectors: TODO
   # nodeSelector: TODO
   debug:
-    dbSync: true
+    dbSync: false
   preserveJobs: false
   customServiceConfig: |
     [DEFAULT]
