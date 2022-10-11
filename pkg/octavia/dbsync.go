@@ -36,6 +36,9 @@ func DbSyncJob(
 	labels map[string]string,
 ) *batchv1.Job {
 	runAsUser := int64(0)
+	initVolumeMounts := getInitVolumeMounts()
+	volumeMounts := getVolumeMounts()
+	volumes := getVolumes(instance.Name)
 
 	args := []string{"-c"}
 	if instance.Spec.Debug.DBSync {
@@ -45,7 +48,7 @@ func DbSyncJob(
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaConfig)
+	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaDbSyncConfig)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["KOLLA_BOOTSTRAP"] = env.SetValue("true")
 
@@ -72,15 +75,14 @@ func DbSyncJob(
 								RunAsUser: &runAsUser,
 							},
 							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: getVolumeMounts(),
+							VolumeMounts: volumeMounts,
 						},
 					},
+					Volumes: volumes,
 				},
 			},
 		},
 	}
-
-	job.Spec.Template.Spec.Volumes = getVolumes(ServiceName)
 
 	initContainerDetails := APIDetails{
 		ContainerImage:       instance.Spec.ContainerImage,
@@ -90,7 +92,7 @@ func DbSyncJob(
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Admin,
-		VolumeMounts:         getInitVolumeMounts(),
+		VolumeMounts:         initVolumeMounts,
 	}
 	job.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
 

@@ -147,7 +147,7 @@ type OctaviaAPIDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// ReadyCount enable debug
-	// Bootstrap bool `json:"bootstrap,omitempty"`
+	Bootstrap bool `json:"bootstrap,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// Service enable debug

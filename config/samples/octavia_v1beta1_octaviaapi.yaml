@@ -17,6 +17,7 @@ spec:
   # nodeSelector: TODO
   debug:
     dbSync: false
+    service: false
   preserveJobs: false
   customServiceConfig: |
     [DEFAULT]
