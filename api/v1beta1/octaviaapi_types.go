@@ -146,10 +146,6 @@ type OctaviaAPIDebug struct {
 	DBSync bool `json:"dbSync,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
-	// ReadyCount enable debug
-	Bootstrap bool `json:"bootstrap,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
 	// Service enable debug
 	Service bool `json:"service,omitempty"`
 }
@@ -209,7 +205,6 @@ func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, 
 
 // IsReady - returns true if service is ready to server requests
 func (instance OctaviaAPI) IsReady() bool {
-	// TODO(tweining) do it like DesignateAPI?
 	return instance.Status.Conditions.IsTrue(condition.ExposeServiceReadyCondition) &&
 		instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
 }
