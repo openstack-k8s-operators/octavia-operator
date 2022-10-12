@@ -6,10 +6,6 @@ spec:
   # TODO(tweining): Add fields here
   databaseInstance: openstack
   databaseUser: octavia
-  region: regionOne
-  adminProject: admin
-  adminRole: admin
-  adminUser: admin
   serviceUser: octavia
   containerImage: quay.io/tripleowallabycentos9/openstack-octavia-api:current-tripleo
   replicas: 1

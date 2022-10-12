@@ -50,7 +50,6 @@ func DbSyncJob(
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaDbSyncConfig)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
-	envVars["KOLLA_BOOTSTRAP"] = env.SetValue("true")
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
