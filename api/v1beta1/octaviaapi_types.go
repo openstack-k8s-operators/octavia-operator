@@ -73,6 +73,11 @@ type OctaviaAPISpec struct {
 	// AdminUser - admin user name
 	AdminUser string `json:"adminUser"`
 
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=admin
+	// AdminUser - admin user name
+	ServiceUser string `json:"serviceUser"`
+
 	// +kubebuilder:validation:Required
 	// Octavia Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
@@ -136,6 +141,10 @@ type PasswordSelector struct {
 	// +kubebuilder:default="OctaviaPassword"
 	// Database - Selector to get the octavia Database user password from the Secret
 	Admin string `json:"admin,omitempty"`
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default="OctaviaPassword"
+	// Service - Selector to get the service user password from the Secret
+	Service string `json:"service,omitempty"`
 }
 
 // OctaviaAPIDebug defines the observed state of OctaviaAPI
@@ -166,6 +175,9 @@ type OctaviaAPIStatus struct {
 
 	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// ServiceID - the ID of the registered service in keystone
+	ServiceID string `json:"serviceID,omitempty"`
 }
 
 //+kubebuilder:object:root=true
