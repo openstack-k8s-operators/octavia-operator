@@ -44,19 +44,6 @@ spec:
           spec:
             description: OctaviaAPISpec defines the desired state of OctaviaAPI
             properties:
-              adminProject:
-                default: admin
-                description: FIXME(tweining) Admin* stuff needed? AdminProject - admin
-                  project name
-                type: string
-              adminRole:
-                default: admin
-                description: AdminRole - admin role name
-                type: string
-              adminUser:
-                default: admin
-                description: AdminUser - admin user name
-                type: string
               containerImage:
                 description: Octavia Container Image URL
                 type: string
@@ -133,10 +120,6 @@ spec:
                 description: PreserveJobs - do not delete jobs after they finished
                   e.g. to check logs
                 type: boolean
-              region:
-                default: regionOne
-                description: Region - optional region name for the keystone service
-                type: string
               replicas:
                 default: 1
                 description: Replicas of octavia API to run
@@ -176,8 +159,8 @@ spec:
                   octavia OctaviaDatabasePassword, AdminPassword
                 type: string
               serviceUser:
-                default: admin
-                description: AdminUser - admin user name
+                default: octavia
+                description: ServiceUser - service user name
                 type: string
             type: object
           status:

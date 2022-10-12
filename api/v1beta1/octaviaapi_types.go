@@ -53,29 +53,8 @@ type OctaviaAPISpec struct {
 	DatabaseUser string `json:"databaseUser"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=regionOne
-	// Region - optional region name for the keystone service
-	Region string `json:"region"`
-
-	// FIXME(tweining) Admin* stuff needed?
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=admin
-	// AdminProject - admin project name
-	AdminProject string `json:"adminProject"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=admin
-	// AdminRole - admin role name
-	AdminRole string `json:"adminRole"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=admin
-	// AdminUser - admin user name
-	AdminUser string `json:"adminUser"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=admin
-	// AdminUser - admin user name
+	// +kubebuilder:default=octavia
+	// ServiceUser - service user name
 	ServiceUser string `json:"serviceUser"`
 
 	// +kubebuilder:validation:Required

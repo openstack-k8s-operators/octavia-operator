@@ -41,14 +41,11 @@ import (
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 
-	"gopkg.in/yaml.v2"
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -619,14 +616,6 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	}
 	// create Deployment - end
 
-	//
-	// create OpenStackClient config
-	//
-	err = r.reconcileConfigMap(ctx, instance)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
 	r.Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
 }
@@ -688,106 +677,6 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	}
 
 	return nil
-}
-
-//
-// reconcileConfigMap -  creates clouds.yaml
-// TODO: most likely should be part of the higher openstack operator
-//
-func (r *OctaviaAPIReconciler) reconcileConfigMap(ctx context.Context, instance *octaviav1.OctaviaAPI) error {
-
-	configMapName := "openstack-config"
-	var openStackConfig octavia.OpenStackConfig
-	authURL, err := instance.GetEndpoint(endpoint.EndpointPublic)
-	if err != nil {
-		return err
-	}
-	openStackConfig.Clouds.Default.Auth.AuthURL = authURL
-	openStackConfig.Clouds.Default.Auth.ProjectName = instance.Spec.AdminProject
-	openStackConfig.Clouds.Default.Auth.UserName = instance.Spec.AdminUser
-	openStackConfig.Clouds.Default.Auth.UserDomainName = "Default"
-	openStackConfig.Clouds.Default.Auth.ProjectDomainName = "Default"
-	openStackConfig.Clouds.Default.RegionName = instance.Spec.Region
-
-	cloudsYamlVal, err := yaml.Marshal(&openStackConfig)
-	if err != nil {
-		return err
-	}
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: instance.Namespace,
-		},
-	}
-
-	r.Log.Info("Reconciling ConfigMap", "ConfigMap.Namespace", instance.Namespace, "configMap.Name", configMapName)
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
-		cm.TypeMeta = metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		}
-		cm.ObjectMeta = metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: instance.Namespace,
-		}
-		cm.Data = map[string]string{
-			"clouds.yaml": string(cloudsYamlVal),
-			"OS_CLOUD":    "default",
-		}
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	r.Log.Info(fmt.Sprintf("reconcileConfigMap Secret: %s", instance.Spec.Secret))
-	octaviaSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      instance.Spec.Secret,
-			Namespace: instance.Namespace,
-		},
-		Type: "Opaque",
-	}
-
-	findMe := types.NamespacedName{
-		Name: octaviaSecret.Name, Namespace: instance.Namespace}
-	found := octaviaSecret
-	err = r.Client.Get(ctx, findMe, found)
-	if err != nil {
-		return err
-	}
-
-	secretName := "openstack-config-secret"
-	var openStackConfigSecret octavia.OpenStackConfigSecret
-	openStackConfigSecret.Clouds.Default.Auth.Password = string(octaviaSecret.Data[instance.Spec.PasswordSelectors.Admin])
-
-	secretVal, err := yaml.Marshal(&openStackConfigSecret)
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: instance.Namespace,
-		},
-	}
-	if err != nil {
-		return err
-	}
-
-	_, err = controllerutil.CreateOrUpdate(ctx, r.Client, secret, func() error {
-		secret.TypeMeta = metav1.TypeMeta{
-			APIVersion: "v1",
-			Kind:       "ConfigMap",
-		}
-		secret.ObjectMeta = metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: instance.Namespace,
-		}
-		secret.StringData = map[string]string{
-			"secure.yaml": string(secretVal),
-		}
-		return nil
-	})
-
-	return err
 }
 
 //
