@@ -33,5 +33,5 @@ const (
 	// KollaDbSyncConfig -
 	KollaDbSyncConfig = "/var/lib/config-data/merged/octavia-api-db-sync.json"
 	// KollaConfig -
-	KollaConfig       = "/var/lib/config-data/merged/octavia-api-config.json"
+	KollaConfig = "/var/lib/config-data/merged/octavia-api-config.json"
 )

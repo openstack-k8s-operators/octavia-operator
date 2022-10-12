@@ -16,10 +16,10 @@ limitations under the License.
 package octavia
 
 import (
-	common "github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-	octaviav1beta1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -34,22 +34,25 @@ const (
 
 // Deployment func
 func Deployment(
-	instance *octaviav1beta1.OctaviaAPI,
+	instance *octaviav1.OctaviaAPI,
 	configHash string,
 	labels map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
+	initVolumeMounts := getInitVolumeMounts()
+	volumeMounts := getVolumeMounts()
+	volumes := getVolumes(instance.Name)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
-		TimeoutSeconds:      5,
-		PeriodSeconds:       3,
+		TimeoutSeconds:      15,
+		PeriodSeconds:       13,
 		InitialDelaySeconds: 3,
 	}
 	readinessProbe := &corev1.Probe{
 		// TODO might need tuning
-		TimeoutSeconds:      5,
-		PeriodSeconds:       5,
+		TimeoutSeconds:      15,
+		PeriodSeconds:       15,
 		InitialDelaySeconds: 5,
 	}
 
@@ -74,11 +77,11 @@ func Deployment(
 		// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 		//
 		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: "/v3",
+			Path: "/healthcheck",
 			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(OctaviaPublicPort)},
 		}
 		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: "/v3",
+			Path: "/healthcheck",
 			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(OctaviaPublicPort)},
 		}
 	}
@@ -117,16 +120,17 @@ func Deployment(
 								RunAsUser: &runAsUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
 						},
 					},
+					Volumes: volumes,
 				},
 			},
 		},
 	}
-	deployment.Spec.Template.Spec.Volumes = getVolumes(instance.Name)
 	// If possible two pods of the same service should not
 	// run on the same worker node. If this is not possible
 	// the get still created on the same worker node.
@@ -149,7 +153,7 @@ func Deployment(
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Admin,
-		VolumeMounts:         getInitVolumeMounts(),
+		VolumeMounts:         initVolumeMounts,
 	}
 	deployment.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
 
