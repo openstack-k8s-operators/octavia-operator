@@ -98,11 +98,6 @@ spec:
                 description: PasswordSelectors - Selectors to identify the DB and
                   AdminUser password from the Secret
                 properties:
-                  admin:
-                    default: OctaviaPassword
-                    description: Database - Selector to get the octavia Database user
-                      password from the Secret
-                    type: string
                   database:
                     default: OctaviaDatabasePassword
                     description: 'Database - Selector to get the octavia Database

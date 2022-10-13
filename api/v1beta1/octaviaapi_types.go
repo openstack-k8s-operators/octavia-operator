@@ -118,10 +118,6 @@ type PasswordSelector struct {
 	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default="OctaviaPassword"
-	// Database - Selector to get the octavia Database user password from the Secret
-	Admin string `json:"admin,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="OctaviaPassword"
 	// Service - Selector to get the service user password from the Secret
 	Service string `json:"service,omitempty"`
 }

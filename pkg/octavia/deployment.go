@@ -152,7 +152,7 @@ func Deployment(
 		DatabaseName:         DatabaseName,
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Admin,
+		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
 		VolumeMounts:         initVolumeMounts,
 	}
 	deployment.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
