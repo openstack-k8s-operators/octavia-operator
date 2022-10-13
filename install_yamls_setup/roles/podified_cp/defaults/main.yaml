@@ -1,0 +1,19 @@
+---
+# All attributes that the ansible.builtin.git module supports may be used
+operators_git_repos:
+  - repo: https://github.com/weinimo/install_yamls.git
+    # don't change this path
+    dest: ~/install_yamls
+    version: octavia-integration
+  - repo: https://github.com/weinimo/octavia-operator.git
+    dest: ~/octavia-operator
+    version: initial-testing
+  # Optional repositories:
+  - repo: https://github.com/openstack-k8s-operators/keystone-operator.git
+    dest: ~/keystone-operator
+  - repo: https://github.com/openstack-k8s-operators/placement-operator.git
+    dest: ~/placement-operator
+  - repo: https://github.com/openstack-k8s-operators/neutron-operator.git
+    dest: ~/neutron-operator
+make_crc_cpus: 10
+make_crc_memory: 18000
