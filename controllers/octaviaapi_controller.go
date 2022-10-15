@@ -303,8 +303,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	dbSyncjob := job.NewJob(
 		jobDef,
 		octaviav1.DbSyncHash,
-		instance.Spec.PreserveJobs,
-		5,
+		time.Duration(5)*time.Second,
 		dbSyncHash,
 	)
 	ctrlResult, err = dbSyncjob.DoJob(
@@ -332,6 +331,12 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		instance.Status.Hash[octaviav1.DbSyncHash] = dbSyncjob.GetHash()
 		if err := r.Client.Status().Update(ctx, instance); err != nil {
 			return ctrl.Result{}, err
+		}
+	}
+	if !instance.Spec.PreserveJobs {
+		err = job.DeleteAllSucceededJobs(ctx, helper, []string{instance.Status.Hash[octaviav1.DbSyncHash]})
+		if err != nil {
+			return ctrlResult, err
 		}
 	}
 	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
