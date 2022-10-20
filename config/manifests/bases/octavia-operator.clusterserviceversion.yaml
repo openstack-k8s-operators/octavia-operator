@@ -16,6 +16,10 @@ spec:
       kind: OctaviaAPI
       name: octaviaapis.octavia.openstack.org
       version: v1beta1
+    - description: OctaviaWorker is the Schema for Octavia Workers
+      displayName: Octavia Worker
+      kind: OctaviaWorker
+      name: octaviaworkers.octavia.openstack.org
   description: Octavia Operator
   displayName: Octavia Operator
   icon:

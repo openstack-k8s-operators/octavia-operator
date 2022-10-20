@@ -20,39 +20,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // OctaviaWorkerSpec defines the desired state of OctaviaWorker
 type OctaviaWorkerSpec struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=octavia
-	// ServiceUser - optional username used for this service to register in cinder
-	ServiceUser string `json:"serviceUser"`
-
-	// +kubebuilder:validation:Optional
-	// ContainerImage - Octavia Worker Container Image URL
-	ContainerImage string `json:"containerImage,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1
-	// Replicas - Octavia Worker Replicas
-	Replicas int32 `json:"replicas"`
-
-	// +kubebuilder:validation:Optional
-	// NodeSelector to target subset of worker nodes running this service
-	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	AmphoraControllerBase `json:",inline"`
 }
 
 // OctaviaWorkerStatus defines the observed state of OctaviaWorker
 type OctaviaWorkerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// ReadyCount of octavia API instances
+	ReadyCount int32 `json:"readyCount,omitempty"`
+
+	// Map of hashes to track e.g. job status
+	Hash map[string]string `json:"hash,omitempty"`
+
+	// Conditions
+	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
-
+//+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
+//+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 // OctaviaWorker is the Schema for the octaviaworkers API
 type OctaviaWorker struct {
 	metav1.TypeMeta   `json:",inline"`
@@ -63,7 +51,6 @@ type OctaviaWorker struct {
 }
 
 //+kubebuilder:object:root=true
-
 // OctaviaWorkerList contains a list of OctaviaWorker
 type OctaviaWorkerList struct {
 	metav1.TypeMeta `json:",inline"`
@@ -73,4 +60,9 @@ type OctaviaWorkerList struct {
 
 func init() {
 	SchemeBuilder.Register(&OctaviaWorker{}, &OctaviaWorkerList{})
+}
+
+// IsReady - returns true if service is ready to work
+func (instance OctaviaWorker) IsReady() bool {
+	return instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
 }

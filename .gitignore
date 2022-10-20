@@ -9,6 +9,7 @@ bin
 testbin/*
 __debug_bin
 !/templates/octaviaapi/bin
+!/templates/octavia/bin
 
 # Test binary, build with `go test -c`
 *.test
