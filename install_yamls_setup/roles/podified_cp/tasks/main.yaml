@@ -62,11 +62,11 @@
       set +ex
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      make crc_storage 
+      make crc_storage
       make input
       for i in mariadb neutron keystone rabbitmq ; do \
         make $i
-        sleep 60 
+        sleep 60
         make ${i}_deploy
       done
       oc completion bash | sudo tee /etc/bash_completion.d/oc_completion
