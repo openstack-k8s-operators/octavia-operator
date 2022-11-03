@@ -4,8 +4,8 @@ developing Octavia Operator.
 
 ## Variables and Secrets
 
-See `install_yamls_setup/roles/podified_cp/defaults/main.yaml` for variables 
-and their default values. In addition to that these variables need to be 
+See `install_yamls_setup/roles/podified_cp/defaults/main.yaml` for variables
+and their default values. In addition to that these variables need to be
 defined:
 
     openshift_pull_secret: <pull secret from https://console.redhat.com/openshift/create/local >
