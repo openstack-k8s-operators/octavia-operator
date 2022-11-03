@@ -1,0 +1,11 @@
+clouds:
+  default:
+    auth:
+      auth_url: http://keystone-public-openstack.apps-crc.testing
+      password: 12345678
+      project_name: admin
+      username: admin
+      user_domain_name: Default
+      project_domain_name: Default
+    identity_api_version: '3'
+    region_name: regionOne

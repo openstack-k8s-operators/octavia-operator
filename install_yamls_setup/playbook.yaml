@@ -1,0 +1,5 @@
+---
+- name: Setup development environment using install_yamls
+  hosts: all
+  roles:
+    - role: podified_cp

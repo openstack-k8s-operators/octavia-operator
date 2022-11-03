@@ -1,0 +1,120 @@
+---
+- name: Upgrade all packages
+  ansible.builtin.dnf:
+    name: "*"
+    state: latest
+  become: yes
+  when: ansible_os_family == 'RedHat'
+  tags: install
+
+- name: Install required packages
+  ansible.builtin.package:
+    name:
+      - ansible-core
+      - gcc
+      - git-core
+      - make
+      - podman
+      - python3
+      - python3-pip
+      - vim
+    state: latest
+  become: yes
+  tags: install
+
+- name: Pip install openstack client packages as user
+  ansible.builtin.pip:
+    name:
+      - python-openstackclient
+      - python-octaviaclient
+    extra_args: --user
+  tags: install
+
+- name: Clone operators using Git
+  ansible.builtin.git: "{{ item }}"
+  with_items: "{{ operators_git_repos }}"
+  tags: git
+
+- name: Create ~/install_yamls/devsetup/pull-secret.txt
+  template:
+    src: pull-secret.txt.j2
+    dest: "~/install_yamls/devsetup/pull-secret.txt"
+  tags: [crc, pull-secret]
+
+- name: Create devsetup using make (may take 30 minutes or more)
+  shell:
+    cmd: "{{ item }}"
+    chdir: "~/install_yamls/devsetup"
+  with_items:
+    - "CPUS={{ make_crc_cpus }} MEMORY={{ make_crc_memory }} make crc"
+    - make download_tools
+
+- name: Create symbolic link for kubectl
+  file:
+    src: ~/.crc/bin/oc/oc
+    dest: ~/.crc/bin/oc/kubectl
+    state: link
+  tags: crc
+
+- name: Create devsetup using make
+  shell:
+    cmd: |
+      set +ex
+      eval $(crc oc-env)
+      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      make crc_storage 
+      make input
+      for i in mariadb neutron keystone rabbitmq ; do \
+        make $i
+        sleep 60 
+        make ${i}_deploy
+      done
+      oc completion bash | sudo tee /etc/bash_completion.d/oc_completion
+      openstack complete | sudo tee /etc/bash_completion.d/osc.bash_completion
+      exit 0
+    creates: "/etc/bash_completion.d/oc_completion"
+    chdir: "~/install_yamls"
+  tags: crc
+
+- name: Set up ~/.config/openstack/clouds.yaml
+  copy:
+    src: clouds.yaml
+    dest: ~/.config/openstack/clouds.yaml
+
+# FIXME: might fail because of interactive registry selection
+- name: Deploy CRD, build and push Octavia Operator image
+  shell:
+    cmd: |
+      set +ex
+      make generate
+      make manifests
+      go mod tidy
+      oc apply -f ~/octavia-operator/config/crd/bases/octavia.openstack.org_octaviaapis.yaml
+      podman rmi -f $(podman images --filter="reference=*octavia*" -q)
+      podman login -u {{ podman_dockerio_user }} -p \
+        {{ podman_dockerio_password }} docker.io
+      podman login -u {{ podman_quayio_user }} -p \
+        {{ podman_quayio_password }} quay.io
+      IMAGE_TAG_BASE=quay.io/tweining/octavia-operator VERSION=0.0.1 \
+        IMG=$IMAGE_TAG_BASE:v$VERSION make \
+        manifests build docker-build docker-push bundle bundle-build \
+        bundle-push catalog-build catalog-push
+    chdir: "~/octavia-operator"
+  tags: image
+
+- name: Prepare for running Octavia Operator locally
+  shell:
+    cmd: |
+      set +ex
+      eval $(crc oc-env)
+      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      OCTAVIA_IMG="quay.io/tweining/octavia-operator-index:v0.0.1" make octavia
+      sleep 10
+      OCTAVIAAPI_IMG="quay.io/tweining/octavia-operator:v0.0.1" make octavia_deploy
+      sleep 50
+      make octavia_cleanup
+    chdir: "~/install_yamls"
+  tags: octavia-prep
+
+# Now run the operator as a Go program locally (outside the Kubernetes cluster):
+# cd ~/octavia-operator; OPERATOR_TEMPLATES=./templates make install run
