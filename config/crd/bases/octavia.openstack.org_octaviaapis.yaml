@@ -95,8 +95,11 @@ spec:
                   this service
                 type: object
               passwordSelectors:
+                default:
+                  database: OctaviaDatabasePassword
+                  service: OctaviaPassword
                 description: PasswordSelectors - Selectors to identify the DB and
-                  AdminUser password from the Secret
+                  ServiceUser password from the Secret
                 properties:
                   database:
                     default: OctaviaDatabasePassword

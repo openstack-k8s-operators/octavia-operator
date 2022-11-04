@@ -73,7 +73,8 @@ type OctaviaAPISpec struct {
 	Secret string `json:"secret,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// PasswordSelectors - Selectors to identify the DB and AdminUser password from the Secret
+	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}
+	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
 	// +kubebuilder:validation:Optional
