@@ -18,6 +18,8 @@ package octavia
 const (
 	// ServiceName -
 	ServiceName = "octavia"
+	// ServiceType -
+	ServiceType = "load-balancer"
 	// ServiceAccount -
 	ServiceAccount = "octavia-operator-octavia"
 	// DatabaseName -

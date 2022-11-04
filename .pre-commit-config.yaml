@@ -27,7 +27,6 @@ repos:
     - id: go-fmt
     - id: go-vet
     - id: go-mod-tidy
-    - id: go-lint
 
 - repo: https://github.com/golangci/golangci-lint
   rev: v1.50.1

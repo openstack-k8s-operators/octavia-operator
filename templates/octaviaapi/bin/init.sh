@@ -19,6 +19,7 @@ set -ex
 # copies the result to the ephemeral /var/lib/config-data/merged volume.
 #
 # Secrets are obtained from ENV variables.
+export PASSWORD=${AdminPassword:?"Please specify a AdminPassword variable."}
 export DBHOST=${DatabaseHost:?"Please specify a DatabaseHost variable."}
 export DBUSER=${DatabaseUser:?"Please specify a DatabaseUser variable."}
 export DBPASSWORD=${DatabasePassword:?"Please specify a DatabasePassword variable."}
@@ -42,3 +43,4 @@ done
 
 # set secrets
 crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
+crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $PASSWORD
