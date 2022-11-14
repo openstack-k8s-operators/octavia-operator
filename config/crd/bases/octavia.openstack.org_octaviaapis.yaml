@@ -160,6 +160,10 @@ spec:
                 default: octavia
                 description: ServiceUser - service user name
                 type: string
+            required:
+            - containerImage
+            - databaseInstance
+            - secret
             type: object
           status:
             description: OctaviaAPIStatus defines the observed state of OctaviaAPI
