@@ -89,7 +89,20 @@
     - export OS_CLOUD=default
     - export OS_PASSWORD=12345678
 
-# FIXME: might fail because of interactive registry selection
+- name: Copy ~/.vscode/launch.json if it doesn't exist yet
+  copy:
+    src: launch.json
+    dest: ~/.vscode/launch.json
+    force: no
+
+- name: Export OS_CLOUD and OS_PASSWORD in .bashrc
+  lineinfile:
+    path: ~/.bashrc
+    line: "{{ item }}"
+  with_items:
+    - export OS_CLOUD=default
+    - export OS_PASSWORD=12345678
+
 - name: Deploy CRD, build and push Octavia Operator image
   shell:
     cmd: |
@@ -103,6 +116,7 @@
         {{ podman_dockerio_password }} docker.io
       podman login -u {{ podman_quayio_user }} -p \
         {{ podman_quayio_password }} quay.io
+      podman pull docker.io/library/golang:1.18
       IMAGE_TAG_BASE=quay.io/tweining/octavia-operator VERSION=0.0.1 \
         IMG=$IMAGE_TAG_BASE:v$VERSION make \
         manifests build docker-build docker-push bundle bundle-build \
