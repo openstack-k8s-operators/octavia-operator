@@ -36,3 +36,7 @@ CI_TOOLS_REPO
 # Ansible related
 secrets_file.enc
 /install_yamls_setup/hosts
+
+# generated workspace file
+go.work
+go.work.sum
