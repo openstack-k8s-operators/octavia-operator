@@ -114,7 +114,9 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
 			// right now we have no dedicated KeystoneServiceReadyInitMessage
-			condition.UnknownCondition(condition.KeystoneServiceReadyCondition, condition.InitReason, ""))
+			condition.UnknownCondition(condition.KeystoneServiceReadyCondition, condition.InitReason, ""),
+			condition.UnknownCondition(condition.KeystoneEndpointReadyCondition, condition.InitReason, ""),
+		)
 
 		instance.Status.Conditions.Init(&cl)
 
@@ -189,37 +191,41 @@ func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
-	// Remove the finalizer from our KeystoneEndpoint CR
-	keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-	if err != nil && !k8s_errors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
-
-	if err == nil {
-		controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
-		if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
+	// It's possible to get here before the endpoints have been set in the status, so check for this
+	if instance.Status.APIEndpoints != nil {
+		// Remove the finalizer from our KeystoneEndpoint CR
+		keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
+		if err != nil && !k8s_errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
-	}
 
-	// Remove the finalizer from our KeystoneService CR
-	keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-	if err != nil && !k8s_errors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
+		if err == nil {
+			controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
+			if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+			util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
+		}
 
-	if err == nil {
-		controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
-		if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
+		// Remove the finalizer from our KeystoneService CR
+		keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
+		if err != nil && !k8s_errors.IsNotFound(err) {
 			return ctrl.Result{}, err
 		}
-		util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
+
+		if err == nil {
+			controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
+			if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+			util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
+		}
 	}
 
 	// We did all the cleanup on the objects we created so we can remove the
 	// finalizer from ourselves to allow the deletion
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
+	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 	if err := r.Update(ctx, instance); err != nil && !k8s_errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
@@ -338,9 +344,11 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 
 	// run octavia db sync - end
 
-	r.Log.Info("Calling registerInKeystone")
 	ctrlResult, err = r.registerInKeystone(ctx, instance, helper, serviceLabels)
-	r.Log.Info(fmt.Sprintf("registerInKeystone result %v %v", ctrlResult, err))
+	if err != nil {
+		r.Log.Error(err, "registerInKeystone call failed", "ctrlResult",
+			ctrlResult)
+	}
 
 	//
 	// expose the service (create service, route and return the created endpoint URLs)
@@ -406,7 +414,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 	// create service and user in keystone - https://docs.openstack.org/octavia/latest/install/install-ubuntu.html#prerequisites
 	//
 	ksSvcSpec := keystonev1.KeystoneServiceSpec{
-		ServiceType:        octavia.ServiceName,
+		ServiceType:        octavia.ServiceType,
 		ServiceName:        octavia.ServiceName,
 		ServiceDescription: "Octavia Service",
 		Enabled:            true,
@@ -498,7 +506,6 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	r.Log.Info(fmt.Sprintf("reconcileNormal Secret: %s", instance.Spec.Secret))
 	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -654,7 +661,17 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		customData[key] = data
 	}
 
+	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
+	if err != nil {
+		return err
+	}
+	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
+	if err != nil {
+		return err
+	}
 	templateParameters := make(map[string]interface{})
+	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
+	templateParameters["KeystonePublicURL"] = authURL
 
 	cms := []util.Template{
 		// ScriptsConfigMap
@@ -677,7 +694,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 			Labels:        cmLabels,
 		},
 	}
-	err := configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 	if err != nil {
 		return nil
 	}
