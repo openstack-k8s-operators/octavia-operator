@@ -8,8 +8,9 @@
             "mode": "auto",
             "program": "${workspaceFolder}/octavia-operator/main.go",
             "cwd": "${fileDirname}",
+            "preLaunchTask": "Run make",
             "env": {
-                "OPERATOR_TEMPLATES": "./templates"
+                "OPERATOR_TEMPLATES": "${workspaceFolder}/octavia-operator/templates"
             }
         }
     ]

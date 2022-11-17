@@ -89,11 +89,14 @@
     - export OS_CLOUD=default
     - export OS_PASSWORD=12345678
 
-- name: Copy ~/.vscode/launch.json if it doesn't exist yet
+- name: Copy ~/.vscode jsons
   copy:
-    src: launch.json
-    dest: ~/.vscode/launch.json
+    src: "{{ item }}"
+    dest: ~/.vscode/
     force: no
+  with_items:
+    - launch.json
+    - tasks.json
 
 - name: Export OS_CLOUD and OS_PASSWORD in .bashrc
   lineinfile:
