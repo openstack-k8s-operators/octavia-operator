@@ -7,12 +7,14 @@ operators_git_repos:
     version: main
   - repo: https://github.com/weinimo/octavia-operator.git
     dest: ~/octavia-operator
-    version: initial-testing
+    version: main
   # Optional repositories:
   - repo: https://github.com/openstack-k8s-operators/keystone-operator.git
     dest: ~/keystone-operator
+    depth: 10
   - repo: https://github.com/openstack-k8s-operators/placement-operator.git
     dest: ~/placement-operator
+    depth: 10
   - repo: https://github.com/openstack-k8s-operators/neutron-operator.git
     dest: ~/neutron-operator
   - repo: https://github.com/openstack-k8s-operators/lib-common.git

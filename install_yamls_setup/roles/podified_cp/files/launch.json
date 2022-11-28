@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch Octavia Operator",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/octavia-operator/main.go",
+            "cwd": "${fileDirname}",
+            "preLaunchTask": "Run make",
+            "env": {
+                "OPERATOR_TEMPLATES": "${workspaceFolder}/octavia-operator/templates"
+            }
+        }
+    ]
+}
