@@ -113,7 +113,7 @@ func Deployment(
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: &octaviaUser,
-								RunAsGroup: &octaviaGroup
+								RunAsGroup: &octaviaGroup,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:   volumeMounts,

@@ -267,3 +267,6 @@ func (in *OctaviaWorkerStatus) DeepCopy() *OctaviaWorkerStatus {
 		return nil
 	}
 	out := new(OctaviaWorkerStatus)
+	in.DeepCopy(out)
+	return out
+}
