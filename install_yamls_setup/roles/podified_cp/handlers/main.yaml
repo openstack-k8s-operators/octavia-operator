@@ -1,0 +1,4 @@
+--
+- name: "Apply sysctl"
+  become: yes
+  command: sysctl -p
