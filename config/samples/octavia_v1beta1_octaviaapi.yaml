@@ -1,7 +1,7 @@
 apiVersion: octavia.openstack.org/v1beta1
 kind: OctaviaAPI
 metadata:
-  name: octaviaapi
+  name: octavia
 spec:
   # TODO(tweining): Add fields here
   databaseInstance: openstack
