@@ -64,7 +64,8 @@
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make crc_storage
       make input
-      for i in mariadb neutron keystone rabbitmq ; do \
+      make openstack
+      for i in mariadb keystone ovn neutron rabbitmq ; do \
         make $i
         sleep 60
         make ${i}_deploy
