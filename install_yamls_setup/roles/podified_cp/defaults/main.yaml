@@ -1,11 +1,10 @@
 ---
 # All attributes that the ansible.builtin.git module supports may be used
 operators_git_repos:
-  - repo: https://github.com/weinimo/install_yamls.git
+  - repo: https://github.com/openstack-k8s-operators/install_yamls.git
     # don't change this path
     dest: ~/install_yamls
-    version: main
-  - repo: https://github.com/weinimo/octavia-operator.git
+  - repo: https://github.com/openstack-k8s-operators/octavia-operator.git
     dest: ~/octavia-operator
     version: main
   # Optional repositories:
