@@ -1,4 +1,4 @@
- /*
+/*
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,6 @@ limitations under the License.
 package octaviaworker
 
 const (
-    // KollaConfig -
-    KollaConfig = "/var/lib/config-data/merged/octavia-worker-config.json"
+	// KollaConfig -
+	KollaConfig = "/var/lib/config-data/merged/octavia-worker-config.json"
 )

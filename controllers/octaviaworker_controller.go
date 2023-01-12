@@ -18,29 +18,40 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 
 	"github.com/go-logr/logr"
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviaworker"
 )
 
 // OctaviaWorkerReconciler reconciles a OctaviaWorker object
 type OctaviaWorkerReconciler struct {
 	client.Client
-	Kclient        kubernetes.Interface
-	Log            logr.Logger
- 	Scheme *runtime.Scheme
+	Kclient kubernetes.Interface
+	Log     logr.Logger
+	Scheme  *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaworkers,verbs=get;list;watch;create;update;patch;delete
@@ -76,7 +87,7 @@ func (r *OctaviaWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		// Setup the initial conditions
 		instance.Status.Conditions = condition.Conditions{}
 		cl := condition.CreateList(
-			condition.UnknownCondition(condition.ExposeServiceReadCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
+			condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
 			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
@@ -102,7 +113,6 @@ func (r *OctaviaWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-
 
 	// Always patch the instance status when exiting this function so we can persist any changes.
 	defer func() {
@@ -172,7 +182,7 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 
 	// Handle config map
 	configMapVars := make(map[string]env.Setter)
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
+	err := r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -195,7 +205,7 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// Handle service update
-	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
+	ctrlResult, err := r.reconcileUpdate(ctx, instance, helper)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -214,9 +224,13 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 	// normal reconcile tasks
 	//
 
+	serviceLabels := map[string]string{
+		common.AppSelector: octavia.ServiceName,
+	}
+
 	// Define a new Deployment object
 	depl := deployment.NewDeployment(
-		octavia.Deployment(instance, inputHash, serviceLabels),
+		octaviaworker.Deployment(instance, inputHash, serviceLabels),
 		5,
 	)
 
@@ -243,7 +257,6 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 	}
 	// create Deployment - end
 
-
 	util.LogForObject(helper, "Reconciled Service successfully", instance)
 	return ctrl.Result{}, nil
 }
@@ -254,6 +267,30 @@ func (r *OctaviaWorkerReconciler) generateServiceConfigMaps(
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
+	customData := map[string]string{common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
+	for key, data := range instance.Spec.DefaultConfigOverwrite {
+		customData[key] = data
+	}
+	templateParameters := make(map[string]interface{})
+
+	// TODO(beagles): populate the template parameters
+	cms := []util.Template{
+		{
+			Name:          fmt.Sprintf("%s-config-data", instance.Name),
+			Namespace:     instance.Namespace,
+			Type:          util.TemplateTypeConfig,
+			InstanceType:  instance.Kind,
+			CustomData:    customData,
+			ConfigOptions: templateParameters,
+			Labels:        cmLabels,
+		},
+	}
+
+	err := configmap.EnsureConfigMaps(ctx, helper, instance, cms, envVars)
+	if err != nil {
+		return nil
+	}
 
 	return nil
 }
@@ -281,10 +318,12 @@ func (r *OctaviaWorkerReconciler) createHashOfInputHashes(
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *OctaviaWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	// TODO: OctaviaAPI contains db init code, might be better to put with a
+	// a common controller.
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaWorker{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
-		Owns(&octviav1.OctaviaApi{}),  // TODO: Contains db init code, might be better to place elsewhere
+		Owns(&octaviav1.OctaviaAPI{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).

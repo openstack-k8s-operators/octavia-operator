@@ -136,6 +136,32 @@ rules:
   - patch
   - update
 - apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaworkers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - route.openshift.io
   resources:
   - routes

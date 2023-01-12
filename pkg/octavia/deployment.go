@@ -39,9 +39,9 @@ func Deployment(
 	labels map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
-	initVolumeMounts := getInitVolumeMounts()
-	volumeMounts := getVolumeMounts()
-	volumes := getVolumes(instance.Name)
+	initVolumeMounts := GetInitVolumeMounts()
+	volumeMounts := GetVolumeMounts()
+	volumes := GetVolumes(instance.Name)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning

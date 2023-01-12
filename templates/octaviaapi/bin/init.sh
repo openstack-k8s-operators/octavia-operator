@@ -44,3 +44,7 @@ done
 # set secrets
 crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
 crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $PASSWORD
+
+
+# TODO(beagles): maybe this file should be in a "common" directory since it is shared by most
+# octavia services.

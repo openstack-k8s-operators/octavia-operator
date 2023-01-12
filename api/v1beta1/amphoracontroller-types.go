@@ -19,7 +19,7 @@ package v1beta1
 import (
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	corev1 "k8s.io/api/core/v1"
 )
 
 // AmphoraControllerBase defines common state for all Octavia Amphora Controllers
@@ -58,7 +58,7 @@ type AmphoraControllerBase struct {
 
 	// *kubebuilder:validation:Required
 	// Secret containing certs for securing communication with amphora based Load Balancers
-	LoadBalancerCerts string `json:"secret"`
+	LoadBalancerCerts string `json:"certssecret"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}

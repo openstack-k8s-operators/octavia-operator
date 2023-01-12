@@ -20,11 +20,11 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
 const (
@@ -39,11 +39,9 @@ func Deployment(
 	labels map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
-	octaviaUser := int64(42437)
-	octaviaGroup := int64(42437)
-	initVolumeMounts := octavia.getInitVolumeMounts()
-	volumeMounts := octavia.getVolumeMounts()
-	volumes := octavia.getVolumes(instance.Name)
+	volumeMounts := octavia.GetVolumeMounts()
+	volumes := octavia.GetVolumes(instance.Name)
+	serviceName := octavia.ServiceName + "-worker"
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -59,7 +57,7 @@ func Deployment(
 	}
 
 	args := []string{"-c"}
-	if instance.Spec.Debug.Service {
+	if instance.Spec.Debug {
 		args = append(args, common.DebugCommand)
 		livenessProbe.Exec = &corev1.ExecAction{
 			Command: []string{
@@ -89,7 +87,7 @@ func Deployment(
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ServiceName,
+			Name:      serviceName,
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -102,18 +100,17 @@ func Deployment(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: ServiceAccount,
+					ServiceAccountName: octavia.ServiceAccount,
 					Containers: []corev1.Container{
 						{
-							Name: ServiceName + "-worker",
+							Name: serviceName,
 							Command: []string{
 								"/bin/bash",
 							},
 							Args:  args,
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &octaviaUser,
-								RunAsGroup: &octaviaGroup,
+								RunAsUser: &runAsUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:   volumeMounts,
@@ -133,7 +130,7 @@ func Deployment(
 	deployment.Spec.Template.Spec.Affinity = affinity.DistributePods(
 		common.AppSelector,
 		[]string{
-			ServiceName,
+			serviceName,
 		},
 		corev1.LabelHostname,
 	)

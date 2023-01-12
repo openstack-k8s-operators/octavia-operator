@@ -36,9 +36,9 @@ func DbSyncJob(
 	labels map[string]string,
 ) *batchv1.Job {
 	runAsUser := int64(0)
-	initVolumeMounts := getInitVolumeMounts()
-	volumeMounts := getVolumeMounts()
-	volumes := getVolumes(instance.Name)
+	initVolumeMounts := GetInitVolumeMounts()
+	volumeMounts := GetVolumeMounts()
+	volumes := GetVolumes(instance.Name)
 
 	args := []string{"-c"}
 	if instance.Spec.Debug.DBSync {
