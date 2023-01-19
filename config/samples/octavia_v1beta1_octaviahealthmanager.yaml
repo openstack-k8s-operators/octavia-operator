@@ -1,12 +1,12 @@
 apiVersion: octavia.openstack.org/v1beta1
-kind: OctaviaWorker
+kind: OctaviaHealthManager
 metadata:
   name: octavia
 spec:
   databaseInstance: openstack
   databaseUser: octavia
   serviceUser: octavia
-  containerImage: quay.io/tripleowallabycentos9/openstack-octavia-worker:current-tripleo
+  containerImage: quay.io/tripleowallabycentos9/openstack-octavia-heatlh-manager:current-tripleo
   replicas: 1
   secret: osp-secret
   # passwordSelectors: TODO
