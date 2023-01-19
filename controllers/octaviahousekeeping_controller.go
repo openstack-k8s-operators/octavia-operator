@@ -46,31 +46,31 @@ import (
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
-// OctaviaWorkerReconciler reconciles a OctaviaWorker object
-type OctaviaWorkerReconciler struct {
+// OctaviaHousekeepingReconciler reconciles a OctaviaHousekeeping object
+type OctaviaHousekeepingReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
 	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaworkers,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaworkers/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaworkers/finalizers,verbs=update
+//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviahousekeepings,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviahousekeepings/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviahousekeepings/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the OctaviaWorker object against the actual cluster state, and then
+// the OctaviaHousekeeping object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.1/pkg/reconcile
-func (r *OctaviaWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("octaviaworker", req.NamespacedName)
+func (r *OctaviaHousekeepingReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	_ = r.Log.WithValues("octaviahousekeeping", req.NamespacedName)
 
-	instance := &octaviav1.OctaviaWorker{}
+	instance := &octaviav1.OctaviaHousekeeping{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -143,7 +143,7 @@ func (r *OctaviaWorkerReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	return r.reconcileNormal(ctx, instance, helper)
 }
 
-func (r *OctaviaWorkerReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaWorker, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaHousekeepingReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaHousekeeping, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
@@ -156,19 +156,19 @@ func (r *OctaviaWorkerReconciler) reconcileDelete(ctx context.Context, instance 
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaWorkerReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaWorker, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaHousekeepingReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaHousekeeping, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service update", instance)
 	util.LogForObject(helper, "Reconciled Service update successfully", instance)
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaWorkerReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaWorker, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaHousekeepingReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaHousekeeping, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service upgrade", instance)
 	util.LogForObject(helper, "Reconciled Service upgrade successfully", instance)
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaWorker, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaHousekeepingReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaHousekeeping, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service", instance)
 	if !controllerutil.ContainsFinalizer(instance, helper.GetFinalizer()) {
 		// If the service object doesn't have our finalizer, add it.
@@ -230,7 +230,7 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 
 	// Define a new Deployment object
 	depl := deployment.NewDeployment(
-		amphoracontrollers.AmphoraControllerDeployment(&instance.ObjectMeta, &instance.Spec.AmphoraControllerBaseSpec, inputHash, "worker", serviceLabels),
+		amphoracontrollers.AmphoraControllerDeployment(&instance.ObjectMeta, &instance.Spec.AmphoraControllerBaseSpec, inputHash, "housekeeping", serviceLabels),
 		5,
 	)
 
@@ -261,9 +261,9 @@ func (r *OctaviaWorkerReconciler) reconcileNormal(ctx context.Context, instance 
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaWorkerReconciler) generateServiceConfigMaps(
+func (r *OctaviaHousekeepingReconciler) generateServiceConfigMaps(
 	ctx context.Context,
-	instance *octaviav1.OctaviaWorker,
+	instance *octaviav1.OctaviaHousekeeping,
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
@@ -304,9 +304,9 @@ func (r *OctaviaWorkerReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-func (r *OctaviaWorkerReconciler) createHashOfInputHashes(
+func (r *OctaviaHousekeepingReconciler) createHashOfInputHashes(
 	ctx context.Context,
-	instance *octaviav1.OctaviaWorker,
+	instance *octaviav1.OctaviaHousekeeping,
 	envVars map[string]env.Setter,
 ) (string, error) {
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
@@ -326,11 +326,11 @@ func (r *OctaviaWorkerReconciler) createHashOfInputHashes(
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *OctaviaWorkerReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *OctaviaHousekeepingReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// TODO: OctaviaAPI contains db init code, might be better to put with a
 	// a common controller.
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&octaviav1.OctaviaWorker{}).
+		For(&octaviav1.OctaviaHousekeeping{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
 		Owns(&octaviav1.OctaviaAPI{}).
 		Owns(&corev1.Service{}).

@@ -23,7 +23,7 @@ import (
 )
 
 // AmphoraControllerBase defines common state for all Octavia Amphora Controllers
-type AmphoraControllerBase struct {
+type AmphoraControllerBaseSpec struct {
 	// +kubebuilder:validation:Required
 	// MariaDB instance name
 	// Right now required by the maridb-operator to get the credentials from the instance to create the DB
@@ -86,10 +86,6 @@ type AmphoraControllerBase struct {
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// Debug - enable debug for service deployment
-	Debug bool `json:"debug,omitempty"`
 }
 
 // AmphoraControllerStatus defines the observed state of the Octavia Amphora Controller

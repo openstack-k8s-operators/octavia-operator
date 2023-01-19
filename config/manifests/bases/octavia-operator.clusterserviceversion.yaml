@@ -20,6 +20,14 @@ spec:
       displayName: Octavia Worker
       kind: OctaviaWorker
       name: octaviaworkers.octavia.openstack.org
+    - description: OctaviaHealthManager is the Schema for Octavia Health Managers
+      displayName: Octavia Health Manager
+      kind: OctaviaHealthManager
+      name: octaviahealthmanagers.octavia.openstack.org
+    - description: OctaviaHousekeeping is the Schema for Octavia Housekeeping Services
+      displayName: Octavia Housekeeping
+      kind: OctaviaHousekeeping
+      name: octaviahousekeeping.octavia.openstack.org
   description: Octavia Operator
   displayName: Octavia Operator
   icon:

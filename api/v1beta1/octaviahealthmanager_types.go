@@ -21,13 +21,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// OctaviaWorkerSpec defines the desired state of OctaviaWorker
-type OctaviaWorkerSpec struct {
+// OctaviaHealthManagerSpec defines the desired state of OctaviaHealthManager
+type OctaviaHealthManagerSpec struct {
 	AmphoraControllerBaseSpec `json:",inline"`
 }
 
-// OctaviaWorkerStatus defines the observed state of OctaviaWorker
-type OctaviaWorkerStatus struct {
+// OctaviaHealthManagerStatus defines the observed state of OctaviaHealthManager
+type OctaviaHealthManagerStatus struct {
 	// ReadyCount of octavia API instances
 	ReadyCount int32 `json:"readyCount,omitempty"`
 
@@ -42,28 +42,28 @@ type OctaviaWorkerStatus struct {
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
-// OctaviaWorker is the Schema for the octaviaworkers API
-type OctaviaWorker struct {
+// OctaviaHealthManager is the Schema for the octaviaworkers API
+type OctaviaHealthManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OctaviaWorkerSpec   `json:"spec,omitempty"`
-	Status OctaviaWorkerStatus `json:"status,omitempty"`
+	Spec   OctaviaHealthManagerSpec   `json:"spec,omitempty"`
+	Status OctaviaHealthManagerStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
-// OctaviaWorkerList contains a list of OctaviaWorker
-type OctaviaWorkerList struct {
+// OctaviaHealthManagerList contains a list of OctaviaHealthManager
+type OctaviaHealthManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OctaviaWorker `json:"items"`
+	Items           []OctaviaHealthManager `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OctaviaWorker{}, &OctaviaWorkerList{})
+	SchemeBuilder.Register(&OctaviaHealthManager{}, &OctaviaHealthManagerList{})
 }
 
 // IsReady - returns true if service is ready to work
-func (instance OctaviaWorker) IsReady() bool {
+func (instance OctaviaHealthManager) IsReady() bool {
 	return instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
 }

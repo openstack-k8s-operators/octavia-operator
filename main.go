@@ -125,6 +125,20 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "OctaviaWorker")
 		os.Exit(1)
 	}
+	if err = (&controllers.OctaviaHousekeepingReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OctaviaHousekeeping")
+		os.Exit(1)
+	}
+	if err = (&controllers.OctaviaHealthManagerReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OctaviaHealthManager")
+		os.Exit(1)
+	}
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

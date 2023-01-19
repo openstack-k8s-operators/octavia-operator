@@ -4,6 +4,8 @@
 resources:
 - bases/octavia.openstack.org_octaviaapis.yaml
 - bases/octavia.openstack.org_octaviaworkers.yaml
+- bases/octavia.openstack.org_octaviahealthmanagers.yaml
+- bases/octavia.openstack.org_octaviahousekeepings.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

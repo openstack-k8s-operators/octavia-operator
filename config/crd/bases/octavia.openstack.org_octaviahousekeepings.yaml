@@ -5,14 +5,14 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.9.2
   creationTimestamp: null
-  name: octaviaworkers.octavia.openstack.org
+  name: octaviahousekeepings.octavia.openstack.org
 spec:
   group: octavia.openstack.org
   names:
-    kind: OctaviaWorker
-    listKind: OctaviaWorkerList
-    plural: octaviaworkers
-    singular: octaviaworker
+    kind: OctaviaHousekeeping
+    listKind: OctaviaHousekeepingList
+    plural: octaviahousekeepings
+    singular: octaviahousekeeping
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
@@ -27,7 +27,7 @@ spec:
     name: v1beta1
     schema:
       openAPIV3Schema:
-        description: OctaviaWorker is the Schema for the octaviaworkers API
+        description: OctaviaHousekeeping is the Schema for the octaviaworkers API
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -42,7 +42,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: OctaviaWorkerSpec defines the desired state of OctaviaWorker
+            description: OctaviaHousekeepingSpec defines the desired state of OctaviaHousekeeping
             properties:
               certssecret:
                 description: '*kubebuilder:validation:Required Secret containing certs
@@ -151,7 +151,7 @@ spec:
             - secret
             type: object
           status:
-            description: OctaviaWorkerStatus defines the observed state of OctaviaWorker
+            description: OctaviaHousekeepingStatus defines the observed state of OctaviaHousekeeping
             properties:
               conditions:
                 description: Conditions
