@@ -1,0 +1,28 @@
+#
+# Check for:
+#
+# - 1 OctaviaAPI CR
+# - 1 Pods for OctaviaAPI CR
+#
+
+apiVersion: octavia.openstack.org/v1beta1
+kind: OctaviaAPI
+metadata:
+  finalizers:
+  - OctaviaAPI
+  name: octavia
+  namespace: openstack
+spec:
+  replicas: 1
+status:
+  readyCount: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia
+  namespace: openstack
+spec:
+  replicas: 1
+status:
+  availableReplicas: 1

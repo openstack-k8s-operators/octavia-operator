@@ -1,0 +1,43 @@
+#
+# Check for:
+#
+# - 1 OctaviaAPI CR with 0 replicas
+# - Octavia Deployment with 0 Pods
+#
+
+apiVersion: octavia.openstack.org/v1beta1
+kind: OctaviaAPI
+metadata:
+  finalizers:
+  - OctaviaAPI
+  name: octavia
+  namespace: openstack
+spec:
+  containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  databaseInstance: openstack
+  databaseUser: octavia
+  debug:
+    dbSync: false
+    service: false
+  passwordSelectors:
+    service: OctaviaPassword
+    database: OctaviaDatabasePassword
+  preserveJobs: false
+  replicas: 0
+  resources:
+    requests:
+      cpu: "1.0"
+      memory: 500Mi
+  secret: osp-secret
+status:
+  databaseHostname: openstack
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia
+spec:
+  replicas: 0

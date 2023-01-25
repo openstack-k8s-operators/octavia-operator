@@ -1,0 +1,121 @@
+#
+# Check for:
+#
+# No OctaviaAPI CR
+# No Deployment for OctaviaAPI CR
+# No Pods in octavia Deployment
+# No Octavia Services
+# No Octavia Routes
+#
+apiVersion: octavia.openstack.org/v1beta1
+kind: OctaviaAPI
+metadata:
+  finalizers:
+  - OctaviaAPI
+  name: octavia
+  namespace: openstack
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia
+  namespace: openstack
+---
+# the openshift annotations can't be checked through the deployment above
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    openshift.io/scc: anyuid
+  labels:
+    service: octavia
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    admin: "true"
+    service: octavia
+  name: octavia-admin
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-admin
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    internal: "true"
+    service: octavia
+  name: octavia-internal
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-internal
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    public: "true"
+    service: octavia
+  name: octavia-public
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-public
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-admin
+  labels:
+    admin: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-admin
+  to:
+    kind: Service
+    name: octavia-admin
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-internal
+  labels:
+    internal: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-internal
+  to:
+    kind: Service
+    name: octavia-internal
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-public
+  labels:
+    public: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-public
+  to:
+    kind: Service
+    name: octavia-public

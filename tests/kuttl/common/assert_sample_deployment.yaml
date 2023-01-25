@@ -1,0 +1,251 @@
+#
+# Check for:
+#
+# - 1 OctaviaAPI CR
+# - Deployment with 1 Pod for OctaviaAPI CR
+# - Octavia-admin Service
+# - Octavia-internal Service
+# - Octavia-public Service
+# - Octavia-admin Route
+# - Octavia-internal Route
+# - Octavia-public Route
+
+apiVersion: octavia.openstack.org/v1beta1
+kind: OctaviaAPI
+metadata:
+  finalizers:
+  - OctaviaAPI
+  name: octavia
+  namespace: openstack
+spec:
+  containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  databaseInstance: openstack
+  databaseUser: octavia
+  debug:
+    dbSync: false
+    service: false
+  passwordSelectors:
+    service: OctaviaPassword
+    database: OctaviaDatabasePassword
+  preserveJobs: false
+  replicas: 1
+  resources:
+    requests:
+      cpu: "1.0"
+      memory: 500Mi
+  secret: osp-secret
+  serviceUser: octavia
+status:
+  databaseHostname: openstack
+  readyCount: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia
+  namespace: openstack
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        service: octavia
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: service
+                  operator: In
+                  values:
+                  - octavia
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - args:
+        - -c
+        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        command:
+        - /bin/bash
+        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthcheck
+            port: 9876
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 13
+          successThreshold: 1
+          timeoutSeconds: 15
+        name: octavia-api
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthcheck
+            port: 9876
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 15
+        resources:
+          requests:
+            cpu: "1"
+            memory: 500Mi
+      initContainers:
+      - args:
+        - -c
+        - /usr/local/bin/container-scripts/init.sh
+        command:
+        - /bin/bash
+        env:
+        - name: DatabasePassword
+          valueFrom:
+            secretKeyRef:
+              key: OctaviaDatabasePassword
+              name: osp-secret
+        - name: AdminPassword
+          valueFrom:
+            secretKeyRef:
+              key: OctaviaPassword
+              name: osp-secret
+        - name: DatabaseHost
+          value: openstack
+        - name: DatabaseName
+          value: octavia
+        - name: DatabaseUser
+          value: octavia
+        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        imagePullPolicy: IfNotPresent
+        name: init
+        resources: {}
+      restartPolicy: Always
+      serviceAccount: octavia-operator-octavia
+      serviceAccountName: octavia-operator-octavia
+status:
+  availableReplicas: 1
+  replicas: 1
+---
+# the openshift annotations can't be checked through the deployment above
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    openshift.io/scc: anyuid
+  labels:
+    service: octavia
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    admin: "true"
+    service: octavia
+  name: octavia-admin
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-admin
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    internal: "true"
+    service: octavia
+  name: octavia-internal
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-internal
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    public: "true"
+    service: octavia
+  name: octavia-public
+  namespace: openstack
+spec:
+  ports:
+    - name: octavia-public
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-admin
+  labels:
+    admin: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-admin
+  to:
+    kind: Service
+    name: octavia-admin
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-internal
+  labels:
+    internal: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-internal
+  to:
+    kind: Service
+    name: octavia-internal
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: octavia-public
+  labels:
+    public: "true"
+    service: octavia
+  namespace: openstack
+spec:
+  port:
+    targetPort: octavia-public
+  to:
+    kind: Service
+    name: octavia-public
+---
+# the actual addresses of the apiEndpoints are platform specific, so we can't rely on 
+# kuttl asserts to check them. This short script gathers the addresses and checks that
+# the three endpoints are defined and their addresses follow the default pattern
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+namespaced: true
+commands:
+  - script: |
+      template='{{.status.apiEndpoint.admin}}{{":"}}{{.status.apiEndpoint.internal}}{{":"}}{{.status.apiEndpoint.public}}{{"\n"}}'                                                        
+      regex="http:\/\/octavia-admin-openstack\.apps.*:http:\/\/octavia-internal-openstack\.apps.*:http:\/\/octavia-public-openstack\.apps.*"
+      apiEndpoints=$(oc get -n openstack OctaviaAPI octavia -o go-template="$template") 
+      matches=$(echo $apiEndpoints | sed -e "s?$regex??")
+      if [ -z "$matches" ]; then
+        exit 0
+      else
+        exit 1
+      fi
