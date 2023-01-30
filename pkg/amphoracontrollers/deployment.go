@@ -54,6 +54,20 @@ func AmphoraControllerDeployment(
 		InitialDelaySeconds: 5,
 	}
 
+	// XXX TODO(beagles): this isn't valid AT ALL, but putting in place until I can sort out a more
+	// reasonable option.
+	livenessProbe.Exec = &corev1.ExecAction{
+		Command: []string{
+			"/bin/true",
+		},
+	}
+
+	readinessProbe.Exec = &corev1.ExecAction{
+		Command: []string{
+			"/bin/true",
+		},
+	}
+
 	// TODO(beagles): the liveness and readiness probes are probably going to be
 	// core.v1.probe.exec objects so we need to figure out what those will actually be.
 

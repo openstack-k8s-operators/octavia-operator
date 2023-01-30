@@ -23,22 +23,22 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	routev1 "github.com/openshift/api/route/v1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	"github.com/openstack-k8s-operators/lib-common/modules/database"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
-	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviaapi"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -51,8 +51,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// OctaviaAPIReconciler reconciles a OctaviaAPI object
-type OctaviaAPIReconciler struct {
+// OctaviaReconciler reconciles an Octavia object
+type OctaviaReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
 	Log     logr.Logger
@@ -76,17 +76,17 @@ type OctaviaAPIReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 // TODO(user): Modify the Reconcile function to compare the state specified by
-// the OctaviaAPI object against the actual cluster state, and then
+// the Octavia object against the actual cluster state, and then
 // perform operations to make the cluster state reflect the state specified by
 // the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
-func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
+func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
 	_ = r.Log.WithValues("octaviaapi", req.NamespacedName)
 
-	// Fetch the OctaviaAPI instance
-	instance := &octaviav1.OctaviaAPI{}
+	// Fetch the Octavia instance
+	instance := &octaviav1.Octavia{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -169,21 +169,22 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&octaviav1.OctaviaAPI{}).
-		Owns(&keystonev1.KeystoneService{}).
-		Owns(&keystonev1.KeystoneEndpoint{}).
+		For(&octaviav1.Octavia{}).
+		Owns(&mariadbv1.MariaDBDatabase{}).
+		Owns(&octaviav1.OctaviaAPI{}).
+		Owns(&octaviav1.OctaviaWorker{}).
+		Owns(&octaviav1.OctaviaHousekeeping{}).
+		Owns(&octaviav1.OctaviaHealthManager{}).
 		Owns(&batchv1.Job{}).
-		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&routev1.Route{}).
 		Complete(r)
 }
 
-func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
 	// remove db finalizer first
@@ -238,138 +239,118 @@ func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *oc
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAPIReconciler) reconcileInit(
+func (r *OctaviaReconciler) reconcileInit(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAPI,
+	instance *octaviav1.Octavia,
 	helper *helper.Helper,
 	serviceLabels map[string]string,
 ) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service init")
 
-	ctrlResult, err := r.registerInKeystone(ctx, instance, helper, serviceLabels)
-	if err != nil {
-		r.Log.Error(err, "registerInKeystone call failed", "ctrlResult",
-			ctrlResult)
-	}
-
 	//
-	// expose the service (create service, route and return the created endpoint URLs)
+	// create service DB instance
 	//
-	var octaviaPorts = map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointAdmin: endpoint.Data{
-			Port: octavia.OctaviaAdminPort,
+	db := database.NewDatabase(
+		instance.Name,
+		instance.Spec.DatabaseUser,
+		instance.Spec.Secret,
+		map[string]string{
+			"dbName": instance.Spec.DatabaseInstance,
 		},
-		endpoint.EndpointPublic: endpoint.Data{
-			Port: octavia.OctaviaPublicPort,
-		},
-		endpoint.EndpointInternal: endpoint.Data{
-			Port: octavia.OctaviaInternalPort,
-		},
-	}
-
-	apiEndpoints, ctrlResult, err := endpoint.ExposeEndpoints(
+	)
+	// create or patch the DB
+	ctrlResult, err := db.CreateOrPatchDB(
 		ctx,
 		helper,
-		octavia.ServiceName,
-		serviceLabels,
-		octaviaPorts,
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
+			condition.DBReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
+			condition.DBReadyErrorMessage,
 			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrl.Result{}, err
+	}
+	if (ctrlResult != ctrl.Result{}) {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
+			condition.DBReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
+			condition.DBReadyRunningMessage))
 		return ctrlResult, nil
 	}
-	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 
-	//
-	// Update instance status with service endpoint url from route host information
-	//
-	// TODO: need to support https default here
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]string{}
+	// wait for the DB to be setup
+	ctrlResult, err = db.WaitForDBCreated(ctx, helper)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DBReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.DBReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, err
 	}
-	instance.Status.APIEndpoints = apiEndpoints
+	if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DBReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DBReadyRunningMessage))
+		return ctrlResult, nil
+	}
+	// update Status.DatabaseHostname, used to bootstrap/config the service
+	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
+	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
 
-	// expose service - end
+	// create service DB - end
+
+	//
+	// run octavia db sync
+	//
+	dbSyncHash := instance.Status.Hash[octaviav1.DbSyncHash]
+	jobDef := octavia.DbSyncJob(instance, serviceLabels)
+	dbSyncjob := job.NewJob(
+		jobDef,
+		octaviav1.DbSyncHash,
+		instance.Spec.PreserveJobs,
+		5,
+		dbSyncHash,
+	)
+	ctrlResult, err = dbSyncjob.DoJob(
+		ctx,
+		helper,
+	)
+	if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DBSyncReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DBSyncReadyRunningMessage))
+		return ctrlResult, nil
+	}
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DBSyncReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.DBSyncReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	if dbSyncjob.HasChanged() {
+		instance.Status.Hash[octaviav1.DbSyncHash] = dbSyncjob.GetHash()
+	}
+	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
+
+	// run octavia db sync - end
 
 	r.Log.Info("Reconciled Service init successfully")
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAPIReconciler) registerInKeystone(
-	ctx context.Context,
-	instance *octaviav1.OctaviaAPI,
-	helper *helper.Helper,
-	serviceLabels map[string]string) (ctrl.Result, error) {
-	//
-	// create service and user in keystone - https://docs.openstack.org/octavia/latest/install/install-ubuntu.html#prerequisites
-	//
-	ksSvcSpec := keystonev1.KeystoneServiceSpec{
-		ServiceType:        octavia.ServiceType,
-		ServiceName:        octavia.ServiceName,
-		ServiceDescription: "Octavia Service",
-		Enabled:            true,
-		ServiceUser:        instance.Spec.ServiceUser,
-		Secret:             instance.Spec.Secret,
-		PasswordSelector:   instance.Spec.PasswordSelectors.Service,
-	}
-	ksSvc := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, 10)
-	ctrlResult, err := ksSvc.CreateOrPatch(ctx, helper)
-	if err != nil {
-		return ctrlResult, err
-	}
-	// mirror the Status, Reason, Severity and Message of the latest keystoneservice condition
-	// into a local condition with the type condition.KeystoneServiceReadyCondition
-	c := ksSvc.GetConditions().Mirror(condition.KeystoneServiceReadyCondition)
-	if c != nil {
-		instance.Status.Conditions.Set(c)
-	}
-
-	if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	instance.Status.ServiceID = ksSvc.GetServiceID()
-
-	//
-	// register endpoints
-	//
-	ksEndptSpec := keystonev1.KeystoneEndpointSpec{
-		ServiceName: octavia.ServiceName,
-		Endpoints:   instance.Status.APIEndpoints,
-	}
-	ksEndpt := keystonev1.NewKeystoneEndpoint(
-		octavia.ServiceName,
-		instance.Namespace,
-		ksEndptSpec,
-		serviceLabels,
-		10)
-	ctrlResult, err = ksEndpt.CreateOrPatch(ctx, helper)
-	if err != nil {
-		return ctrlResult, err
-	}
-	// mirror the Status, Reason, Severity and Message of the latest keystoneendpoint condition
-	// into a local condition with the type condition.KeystoneEndpointReadyCondition
-	c = ksEndpt.GetConditions().Mirror(condition.KeystoneEndpointReadyCondition)
-	if c != nil {
-		instance.Status.Conditions.Set(c)
-	}
-
-	return ctrlResult, nil
-}
-
-func (r *OctaviaAPIReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service update")
 
 	// TODO: should have minor update tasks if required
@@ -379,7 +360,7 @@ func (r *OctaviaAPIReconciler) reconcileUpdate(ctx context.Context, instance *oc
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAPIReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service upgrade")
 
 	// TODO: should have major version upgrade tasks
@@ -390,7 +371,7 @@ func (r *OctaviaAPIReconciler) reconcileUpgrade(ctx context.Context, instance *o
 }
 
 // TODO(tweining): implement
-func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service")
 
 	// ConfigMap
@@ -444,19 +425,6 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		return ctrl.Result{}, err
 	}
 
-	//
-	// create hash over all the different input resources to identify if any those changed
-	// and a restart/recreate is required.
-	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
-	if err != nil {
-		return ctrl.Result{}, err
-	} else if hashChanged {
-		// Hash changed and instance status should be updated (which will be done by main defer func),
-		// so we need to return and reconcile again
-		return ctrl.Result{}, nil
-	}
-
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// Create ConfigMaps and Secrets - end
@@ -465,65 +433,87 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
 
-	serviceLabels := map[string]string{
-		common.AppSelector: octavia.ServiceName,
-	}
+	// serviceLabels := map[string]string{
+	// 	common.AppSelector: octavia.ServiceName,
+	// }
 
-	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	// Handle service update
-	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	// Handle service upgrade
-	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
-	if err != nil {
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		return ctrlResult, nil
-	}
-
-	//
-	// normal reconcile tasks
-	//
-
-	// Define a new Deployment object
-	depl := deployment.NewDeployment(
-		octaviaapi.Deployment(instance, inputHash, serviceLabels),
-		5,
-	)
-
-	ctrlResult, err = depl.CreateOrPatch(ctx, helper)
+	// TODO(beagles): look into adding condition types/messages in a common file
+	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DeploymentReadyCondition,
+			condition.ReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.DeploymentReadyErrorMessage,
+			"OctaviaAPI error occurred %s",
 			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
+	// Mirror CinderAPI status' APIEndpoints and ReadyCount to this parent CR
+	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
+	//
+	instance.Status.APIEndpoints = octaviaAPI.Status.APIEndpoints
+	instance.Status.ServiceID = octaviaAPI.Status.ServiceID
+	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
+	conditionStatus := octaviaAPI.Status.Conditions.Mirror(condition.ReadyCondition)
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	}
+
+	octaviaWorker, op, err := r.workerDeploymentCreateOrUpdate(instance)
+	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DeploymentReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.DeploymentReadyRunningMessage))
-		return ctrlResult, nil
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaWorker error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
 	}
-	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
-	if instance.Status.ReadyCount > 0 {
-		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
+	instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
+
+	// TODO(beagles): condition Status!
+
+	octaviaHousekeeping, op, err := r.housekeepingDeploymentCreateOrUpdate(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaHousekeeping error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
+
+	// TODO(beagles): condition Status!
+
+	octaviaHealthManager, op, err := r.healthManagerDeploymentCreateOrUpdate(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaHousekeeping error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+	instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
+
+	// TODO(beagles): condition Status!
+
 	// create Deployment - end
 
 	r.Log.Info("Reconciled Service successfully")
@@ -534,9 +524,9 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
 //
-func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
+func (r *OctaviaReconciler) generateServiceConfigMaps(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAPI,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
@@ -605,9 +595,9 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 //
 // returns the hash, whether the hash changed (as a bool) and any error
 //
-func (r *OctaviaAPIReconciler) createHashOfInputHashes(
+func (r *OctaviaReconciler) createHashOfInputHashes(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAPI,
+	instance *octaviav1.Octavia,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
 	var hashMap map[string]string
@@ -622,4 +612,112 @@ func (r *OctaviaAPIReconciler) createHashOfInputHashes(
 		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
+}
+
+func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octavia) (*octaviav1.OctaviaAPI, controllerutil.OperationResult, error) {
+	deployment := &octaviav1.OctaviaAPI{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-api", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		deployment.Spec = instance.Spec.OctaviaAPI
+		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.Secret = instance.Spec.Secret
+		if len(deployment.Spec.NodeSelector) == 0 {
+			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return deployment, op, err
+}
+
+func (r *OctaviaReconciler) workerDeploymentCreateOrUpdate(instance *octaviav1.Octavia) (*octaviav1.OctaviaWorker, controllerutil.OperationResult, error) {
+	deployment := &octaviav1.OctaviaWorker{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-worker", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		deployment.Spec = instance.Spec.OctaviaWorker
+		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.Secret = instance.Spec.Secret
+		if len(deployment.Spec.NodeSelector) == 0 {
+			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return deployment, op, err
+}
+
+func (r *OctaviaReconciler) housekeepingDeploymentCreateOrUpdate(instance *octaviav1.Octavia) (*octaviav1.OctaviaHousekeeping, controllerutil.OperationResult, error) {
+	deployment := &octaviav1.OctaviaHousekeeping{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-housekeeping", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		deployment.Spec = instance.Spec.OctaviaHousekeeping
+		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.Secret = instance.Spec.Secret
+		if len(deployment.Spec.NodeSelector) == 0 {
+			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return deployment, op, err
+}
+
+func (r *OctaviaReconciler) healthManagerDeploymentCreateOrUpdate(instance *octaviav1.Octavia) (*octaviav1.OctaviaHealthManager, controllerutil.OperationResult, error) {
+	deployment := &octaviav1.OctaviaHealthManager{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-health-manager", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		deployment.Spec = instance.Spec.OctaviaHealthManager
+		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.Secret = instance.Spec.Secret
+		if len(deployment.Spec.NodeSelector) == 0 {
+			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return deployment, op, err
 }

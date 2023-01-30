@@ -32,7 +32,7 @@ const (
 
 // DbSyncJob func
 func DbSyncJob(
-	instance *octaviav1.OctaviaAPI,
+	instance *octaviav1.Octavia,
 	labels map[string]string,
 ) *batchv1.Job {
 	runAsUser := int64(0)
@@ -69,7 +69,7 @@ func DbSyncJob(
 								"/bin/bash",
 							},
 							Args:  args,
-							Image: instance.Spec.ContainerImage,
+							Image: instance.Spec.OctaviaAPI.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: &runAsUser,
 							},
@@ -84,7 +84,7 @@ func DbSyncJob(
 	}
 
 	initContainerDetails := APIDetails{
-		ContainerImage:       instance.Spec.ContainerImage,
+		ContainerImage:       instance.Spec.OctaviaAPI.ContainerImage,
 		DatabaseHost:         instance.Status.DatabaseHostname,
 		DatabaseUser:         instance.Spec.DatabaseUser,
 		DatabaseName:         DatabaseName,
@@ -93,7 +93,7 @@ func DbSyncJob(
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
 		VolumeMounts:         initVolumeMounts,
 	}
-	job.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
+	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 
 	return job
 }

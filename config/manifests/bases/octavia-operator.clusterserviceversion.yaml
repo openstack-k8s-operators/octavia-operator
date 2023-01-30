@@ -11,23 +11,31 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - description: OctaviaWorker is the Schema for Octavia Workers
+      displayName: Octavia Worker
+      kind: OctaviaWorker
+      name: octaviaworkers.octavia.openstack.org
+      version: ""
+    - description: OctaviaHealthManager is the Schema for Octavia Health Managers
+      displayName: Octavia Health Manager
+      kind: OctaviaHealthManager
+      name: octaviahealthmanagers.octavia.openstack.org
+      version: ""
+    - description: OctaviaHousekeeping is the Schema for Octavia Housekeeping Services
+      displayName: Octavia Housekeeping
+      kind: OctaviaHousekeeping
+      name: octaviahousekeeping.octavia.openstack.org
+      version: ""
     - description: OctaviaAPI is the Schema for the octaviaapis API
       displayName: Octavia API
       kind: OctaviaAPI
       name: octaviaapis.octavia.openstack.org
       version: v1beta1
-    - description: OctaviaWorker is the Schema for Octavia Workers
+    - description: OctaviaWorker is the Schema for the octaviaworkers API
       displayName: Octavia Worker
       kind: OctaviaWorker
       name: octaviaworkers.octavia.openstack.org
-    - description: OctaviaHealthManager is the Schema for Octavia Health Managers
-      displayName: Octavia Health Manager
-      kind: OctaviaHealthManager
-      name: octaviahealthmanagers.octavia.openstack.org
-    - description: OctaviaHousekeeping is the Schema for Octavia Housekeeping Services
-      displayName: Octavia Housekeeping
-      kind: OctaviaHousekeeping
-      name: octaviahousekeeping.octavia.openstack.org
+      version: v1beta1
   description: Octavia Operator
   displayName: Octavia Operator
   icon:

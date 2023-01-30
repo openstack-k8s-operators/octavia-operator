@@ -39,7 +39,7 @@ const (
 )
 
 // initContainer - init container for octavia api pods
-func initContainer(init APIDetails) []corev1.Container {
+func InitContainer(init APIDetails) []corev1.Container {
 	runAsUser := int64(0)
 
 	args := []string{
