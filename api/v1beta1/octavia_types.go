@@ -21,22 +21,11 @@ import (
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	// DbSyncHash hash
-	DbSyncHash = "dbsync"
-
-	// DeploymentHash hash used to detect changes
-	DeploymentHash = "deployment"
-)
-
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// OctaviaAPISpec defines the desired state of OctaviaAPI
-type OctaviaAPISpec struct {
+// OctaviaSpec defines the desired state of Octavia
+type OctaviaSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -56,18 +45,6 @@ type OctaviaAPISpec struct {
 	// +kubebuilder:default=octavia
 	// ServiceUser - service user name
 	ServiceUser string `json:"serviceUser"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo"
-	// Octavia Container Image URL
-	ContainerImage string `json:"containerImage,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Maximum=32
-	// +kubebuilder:validation:Minimum=0
-	// Replicas of octavia API to run
-	Replicas int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Required
 	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
@@ -105,29 +82,26 @@ type OctaviaAPISpec struct {
 	// TODO: -> implement
 	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// Resources - Compute Resources required by this service (Limits/Requests).
-	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+	// +kubebuilder:validation:Required
+	// OctaviaAPI - Spec definition for the API service of the Octavia deployment
+	OctaviaAPI OctaviaAPISpec `json:"octaviaAPI"`
 }
 
-// OctaviaAPIDebug defines the observed state of OctaviaAPI
-// TODO (beagles): extract and rename to a common file?
-type OctaviaAPIDebug struct {
+// PasswordSelector to identify the DB and AdminUser password from the Secret
+type PasswordSelector struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// DBSync enable debug
-	DBSync bool `json:"dbSync,omitempty"`
+	// +kubebuilder:default="OctaviaDatabasePassword"
+	// Database - Selector to get the octavia Database user password from the Secret
+	// TODO: not used, need change in mariadb-operator
+	Database string `json:"database,omitempty"`
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// Service enable debug
-	Service bool `json:"service,omitempty"`
+	// +kubebuilder:default="OctaviaPassword"
+	// Service - Selector to get the service user password from the Secret
+	Service string `json:"service,omitempty"`
 }
 
-// OctaviaAPIStatus defines the observed state of OctaviaAPI
-type OctaviaAPIStatus struct {
-	// ReadyCount of octavia API instances
-	ReadyCount int32 `json:"readyCount,omitempty"`
+// OctaviaStatus defines the observed state of Octavia
+type OctaviaStatus struct {
 
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`
@@ -143,6 +117,18 @@ type OctaviaAPIStatus struct {
 
 	// ServiceID - the ID of the registered service in keystone
 	ServiceID string `json:"serviceID,omitempty"`
+
+	// ReadyCount of octavia API instances
+	OctaviaAPIReadyCount int32 `json:"apireadyCount,omitempty"`
+
+	// ReadyCount of octavia Worker instances
+	OctaviaWorkerReadyCount int32 `json:"workerreadyCount,omitempty"`
+
+	// ReadyCount of octavia Housekeeping instances
+	OctaviaHousekeepingReadyCount int32 `json:"housekeepingreadyCount,omitempty"`
+
+	// ReadyCount of octavia HealthManager instances
+	OctaviaHealthManagerReadyCount int32 `json:"healthmanagerreadyCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -150,30 +136,30 @@ type OctaviaAPIStatus struct {
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 
-// OctaviaAPI is the Schema for the octaviaapis API
-type OctaviaAPI struct {
+// Octavia is the Schema for the octavia API
+type Octavia struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   OctaviaAPISpec   `json:"spec,omitempty"`
-	Status OctaviaAPIStatus `json:"status,omitempty"`
+	Spec   OctaviaSpec   `json:"spec,omitempty"`
+	Status OctaviaStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// OctaviaAPIList contains a list of OctaviaAPI
-type OctaviaAPIList struct {
+// OctaviaList contains a list of Octavia
+type OctaviaList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []OctaviaAPI `json:"items"`
+	Items           []Octavia `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&OctaviaAPI{}, &OctaviaAPIList{})
+	SchemeBuilder.Register(&Octavia{}, &OctaviaList{})
 }
 
 // GetEndpoint - returns OpenStack endpoint url for type
-func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, error) {
+func (instance Octavia) GetEndpoint(endpointType endpoint.Endpoint) (string, error) {
 	if url, found := instance.Status.APIEndpoints[string(endpointType)]; found {
 		return url, nil
 	}
@@ -181,7 +167,8 @@ func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, 
 }
 
 // IsReady - returns true if service is ready to server requests
-func (instance OctaviaAPI) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.ExposeServiceReadyCondition) &&
-		instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
+func (instance Octavia) IsReady() bool {
+	ready := instance.Status.OctaviaAPIReadyCount > 0
+	// TODO: add other ready counts
+	return ready
 }
