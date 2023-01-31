@@ -28,7 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Deployment func
+// AmphoraControllerDeployment is the common deployment code for services that act as amphora
+// controllers.
 func AmphoraControllerDeployment(
 	instance *metav1.ObjectMeta,
 	spec *octaviav1.AmphoraControllerBaseSpec,
