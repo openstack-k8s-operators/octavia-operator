@@ -110,8 +110,8 @@ type OctaviaAPISpec struct {
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
 }
 
-// TODO (beagles): extract and rename to a common file?
 // OctaviaAPIDebug defines the observed state of OctaviaAPI
+// TODO (beagles): extract and rename to a common file?
 type OctaviaAPIDebug struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false

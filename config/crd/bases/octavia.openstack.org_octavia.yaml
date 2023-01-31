@@ -278,6 +278,7 @@ spec:
                     type: string
                 required:
                 - certssecret
+                - databaseInstance
                 - secret
                 type: object
               OctaviaHousekeeping:
@@ -389,6 +390,7 @@ spec:
                     type: string
                 required:
                 - certssecret
+                - databaseInstance
                 - secret
                 type: object
               OctaviaWorker:
@@ -500,6 +502,7 @@ spec:
                     type: string
                 required:
                 - certssecret
+                - databaseInstance
                 - secret
                 type: object
               customServiceConfig:

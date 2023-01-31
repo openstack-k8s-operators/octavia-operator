@@ -22,13 +22,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// AmphoraControllerBase defines common state for all Octavia Amphora Controllers
+// AmphoraControllerBaseSpec defines common state for all Octavia Amphora Controllers
 type AmphoraControllerBaseSpec struct {
 	// +kubebuilder:validation:Required
 	// MariaDB instance name
 	// Right now required by the maridb-operator to get the credentials from the instance to create the DB
 	// Might not be required in future
-	DatabaseInstance string `json:"databaseInstance,omitempty"`
+	DatabaseInstance string `json:"databaseInstance"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia

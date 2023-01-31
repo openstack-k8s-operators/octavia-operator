@@ -38,11 +38,11 @@ type OctaviaHousekeepingStatus struct {
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 }
 
+// OctaviaHousekeeping is the Schema for the octaviaworkers API
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
-// OctaviaHousekeeping is the Schema for the octaviaworkers API
 type OctaviaHousekeeping struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -51,8 +51,8 @@ type OctaviaHousekeeping struct {
 	Status OctaviaHousekeepingStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
 // OctaviaHousekeepingList contains a list of OctaviaHousekeeping
+//+kubebuilder:object:root=true
 type OctaviaHousekeepingList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

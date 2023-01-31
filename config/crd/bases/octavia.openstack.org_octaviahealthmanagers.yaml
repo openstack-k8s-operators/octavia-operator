@@ -148,6 +148,7 @@ spec:
                 type: string
             required:
             - certssecret
+            - databaseInstance
             - secret
             type: object
           status:

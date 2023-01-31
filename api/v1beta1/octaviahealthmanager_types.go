@@ -38,11 +38,11 @@ type OctaviaHealthManagerStatus struct {
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 }
 
+// OctaviaHealthManager is the Schema for the octaviaworkers API
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
-// OctaviaHealthManager is the Schema for the octaviaworkers API
 type OctaviaHealthManager struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -51,8 +51,8 @@ type OctaviaHealthManager struct {
 	Status OctaviaHealthManagerStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
 // OctaviaHealthManagerList contains a list of OctaviaHealthManager
+//+kubebuilder:object:root=true
 type OctaviaHealthManagerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

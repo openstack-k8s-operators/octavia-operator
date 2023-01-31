@@ -425,6 +425,19 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
+	//
+	// create hash over all the different input resources to identify if any those changed
+	// and a restart/recreate is required.
+	//
+	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if hashChanged {
+		// Hash changed and instance status should be updated (which will be done by main defer func),
+		// so we need to return and reconcile again
+		return ctrl.Result{}, nil
+	}
+
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// Create ConfigMaps and Secrets - end
@@ -433,9 +446,33 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
 	//
 
-	// serviceLabels := map[string]string{
-	// 	common.AppSelector: octavia.ServiceName,
-	// }
+	serviceLabels := map[string]string{
+		common.AppSelector: octavia.ServiceName,
+	}
+
+	// Handle service init
+	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels)
+	if err != nil {
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
+	}
+
+	// Handle service update
+	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
+	if err != nil {
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
+	}
+
+	// Handle service upgrade
+	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
+	if err != nil {
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
+	}
 
 	// TODO(beagles): look into adding condition types/messages in a common file
 	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
