@@ -5,10 +5,9 @@
 *.dll
 *.so
 *.dylib
-bin
+/bin
 testbin/*
 __debug_bin
-!/templates/octaviaapi/bin
 
 # Test binary, build with `go test -c`
 *.test
