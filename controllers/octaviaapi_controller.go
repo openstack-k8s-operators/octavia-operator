@@ -35,7 +35,6 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
-	"github.com/openstack-k8s-operators/lib-common/modules/database"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviaapi"
@@ -185,18 +184,6 @@ func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service delete", instance)
-
-	// remove db finalizer first
-	db, err := database.GetDatabaseByName(ctx, helper, instance.Name)
-	if err != nil && !k8s_errors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
-
-	if !k8s_errors.IsNotFound(err) {
-		if err := db.DeleteFinalizer(ctx, helper); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
 
 	// It's possible to get here before the endpoints have been set in the status, so check for this
 	if instance.Status.APIEndpoints != nil {

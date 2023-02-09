@@ -198,37 +198,6 @@ func (r *OctaviaReconciler) reconcileDelete(ctx context.Context, instance *octav
 		}
 	}
 
-	// It's possible to get here before the endpoints have been set in the status, so check for this
-	if instance.Status.APIEndpoints != nil {
-		// Remove the finalizer from our KeystoneEndpoint CR
-		keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-		if err != nil && !k8s_errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-
-		if err == nil {
-			controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
-			if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
-				return ctrl.Result{}, err
-			}
-			util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
-		}
-
-		// Remove the finalizer from our KeystoneService CR
-		keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-		if err != nil && !k8s_errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
-
-		if err == nil {
-			controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
-			if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
-				return ctrl.Result{}, err
-			}
-			util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
-		}
-	}
-
 	// We did all the cleanup on the objects we created so we can remove the
 	// finalizer from ourselves to allow the deletion
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
