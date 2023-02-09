@@ -53,6 +53,10 @@ type OctaviaAPISpec struct {
 	DatabaseUser string `json:"databaseUser"`
 
 	// +kubebuilder:validation:Optional
+	// DatabaseHostname - Octavia DB hostname
+	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
 	// ServiceUser - service user name
 	ServiceUser string `json:"serviceUser"`

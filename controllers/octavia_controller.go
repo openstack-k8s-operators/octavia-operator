@@ -467,6 +467,8 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrlResult, nil
 	}
 
+	r.Log.Info(fmt.Sprintf("Calling for deploy for API with %s", instance.Status.DatabaseHostname))
+
 	// TODO(beagles): look into adding condition types/messages in a common file
 	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
 	if err != nil {
@@ -604,6 +606,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.Secret = instance.Spec.Secret
