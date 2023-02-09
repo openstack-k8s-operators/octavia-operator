@@ -316,7 +316,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		jobDef,
 		octaviav1.DbSyncHash,
 		instance.Spec.PreserveJobs,
-		5,
+		time.Duration(5)*time.Second,
 		dbSyncHash,
 	)
 	ctrlResult, err = dbSyncjob.DoJob(
@@ -374,6 +374,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		octavia.ServiceName,
 		serviceLabels,
 		octaviaPorts,
+		time.Duration(5)*time.Second,
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -425,7 +426,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 		Secret:             instance.Spec.Secret,
 		PasswordSelector:   instance.Spec.PasswordSelectors.Service,
 	}
-	ksSvc := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, 10)
+	ksSvc := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, time.Duration(10)*time.Second)
 	ctrlResult, err := ksSvc.CreateOrPatch(ctx, helper)
 	if err != nil {
 		return ctrlResult, err
@@ -455,7 +456,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 		instance.Namespace,
 		ksEndptSpec,
 		serviceLabels,
-		10)
+		time.Duration(10)*time.Second)
 	ctrlResult, err = ksEndpt.CreateOrPatch(ctx, helper)
 	if err != nil {
 		return ctrlResult, err
@@ -508,7 +509,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -601,7 +602,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// Define a new Deployment object
 	depl := deployment.NewDeployment(
 		octavia.Deployment(instance, inputHash, serviceLabels),
-		5,
+		time.Duration(5)*time.Second,
 	)
 
 	ctrlResult, err = depl.CreateOrPatch(ctx, helper)
@@ -631,10 +632,8 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-//
 func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	instance *octaviav1.OctaviaAPI,
@@ -705,12 +704,10 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
 //
 // returns the hash, whether the hash changed (as a bool) and any error
-//
 func (r *OctaviaAPIReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *octaviav1.OctaviaAPI,
