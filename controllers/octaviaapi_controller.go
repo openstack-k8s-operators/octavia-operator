@@ -539,6 +539,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
+	r.Log.Info("Generating service config map")
 	//
 	// create Configmap/Secret required for octavia input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
@@ -596,6 +597,8 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		},
 	}
 	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+
+	r.Log.Info("Service config map generated")
 	if err != nil {
 		return nil
 	}
