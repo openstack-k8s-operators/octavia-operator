@@ -1,8 +1,8 @@
 #
 # Check for:
 #
-# - 1 OctaviaAPI CR
-# - Deployment with 1 Pod for OctaviaAPI CR
+# - 1 Octavia CR
+# - Deployment with 1 Pod for Octavia CR
 # - Octavia-admin Service
 # - Octavia-internal Service
 # - Octavia-public Service
@@ -11,14 +11,13 @@
 # - Octavia-public Route
 
 apiVersion: octavia.openstack.org/v1beta1
-kind: OctaviaAPI
+kind: Octavia
 metadata:
   finalizers:
-  - OctaviaAPI
+  - Octavia
   name: octavia
   namespace: openstack
 spec:
-  containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
   customServiceConfig: |
     [DEFAULT]
     debug = true
@@ -38,6 +37,27 @@ spec:
       memory: 500Mi
   secret: osp-secret
   serviceUser: octavia
+  octaviaAPI:
+    containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+    databaseInstance: openstack
+    databaseUser: octavia
+    debug:
+      dbSync: false
+      service: false
+    passwordSelectors:
+      service: OctaviaPassword
+      database: OctaviaDatabasePassword
+    preserveJobs: false
+    replicas: 1
+    resources:
+      requests:
+        cpu: "1.0"
+        memory: 500Mi
+    secret: osp-secret
+    serviceUser: octavia
 status:
   databaseHostname: openstack
   readyCount: 1
@@ -242,7 +262,7 @@ commands:
   - script: |
       template='{{.status.apiEndpoint.admin}}{{":"}}{{.status.apiEndpoint.internal}}{{":"}}{{.status.apiEndpoint.public}}{{"\n"}}'
       regex="http:\/\/octavia-admin-openstack\.apps.*:http:\/\/octavia-internal-openstack\.apps.*:http:\/\/octavia-public-openstack\.apps.*"
-      apiEndpoints=$(oc get -n openstack OctaviaAPI octavia -o go-template="$template")
+      apiEndpoints=$(oc get -n openstack octavia octavia -o go-template="$template")
       matches=$(echo $apiEndpoints | sed -e "s?$regex??")
       if [ -z "$matches" ]; then
         exit 0
