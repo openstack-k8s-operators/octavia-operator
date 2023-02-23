@@ -587,7 +587,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 
 	r.Log.Info("Service config map generated")
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil

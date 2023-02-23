@@ -533,7 +533,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 	}
 	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
