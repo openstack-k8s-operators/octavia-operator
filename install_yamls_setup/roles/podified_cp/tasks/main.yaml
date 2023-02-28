@@ -131,7 +131,7 @@
   shell:
     cmd: |
       set +ex
-      eval $(crc oc-env) 
+      eval $(crc oc-env)
       make generate
       make manifests
       go mod tidy
