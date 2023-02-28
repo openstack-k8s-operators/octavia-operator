@@ -102,6 +102,18 @@ vet: gowork ## Run go vet against code.
 	go vet ./...
 	go vet ./api/...
 
+.PHONY: tidy
+tide: vet
+	go mod tidy; \
+	cd "$(LOCALBIN)/../api"; \
+	go mod tidy; \
+	popd
+
+.PHONY: golangci-lint
+golangci-lint: vet
+	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.51.2
+	$(LOCALBIN)/golangci-lint run --fix
+
 .PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... ./api/... -coverprofile cover.out
