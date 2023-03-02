@@ -85,7 +85,7 @@ type OctaviaReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
-	_ = r.Log.WithValues("octaviaapi", req.NamespacedName)
+	_ = r.Log.WithValues("octavia", req.NamespacedName)
 
 	// Fetch the Octavia instance
 	instance := &octaviav1.Octavia{}
@@ -279,6 +279,7 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	dbSyncHash := instance.Status.Hash[octaviav1.DbSyncHash]
 	jobDef := octavia.DbSyncJob(instance, serviceLabels)
+	r.Log.Info("Initializing db sync job")
 	dbSyncjob := job.NewJob(
 		jobDef,
 		octaviav1.DbSyncHash,

@@ -232,13 +232,6 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	serviceLabels map[string]string,
 ) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service init")
-
-	ctrlResult, err := r.registerInKeystone(ctx, instance, helper, serviceLabels)
-	if err != nil {
-		r.Log.Error(err, "registerInKeystone call failed", "ctrlResult",
-			ctrlResult)
-	}
-
 	//
 	// expose the service (create service, route and return the created endpoint URLs)
 	//
@@ -289,6 +282,13 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	}
 	instance.Status.APIEndpoints = apiEndpoints
 
+	ctrlResult, err = r.registerInKeystone(ctx, instance, helper, serviceLabels)
+	if err != nil {
+		r.Log.Error(err, "registerInKeystone call failed", "ctrlResult",
+			ctrlResult)
+		return ctrl.Result{}, err
+	}
+
 	// expose service - end
 
 	r.Log.Info("Reconciled Service init successfully")
@@ -317,6 +317,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 	if err != nil {
 		return ctrlResult, err
 	}
+
 	// mirror the Status, Reason, Severity and Message of the latest keystoneservice condition
 	// into a local condition with the type condition.KeystoneServiceReadyCondition
 	c := ksSvc.GetConditions().Mirror(condition.KeystoneServiceReadyCondition)
