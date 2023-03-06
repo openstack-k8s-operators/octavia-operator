@@ -33,7 +33,7 @@ const (
 	OctaviaInternalPort int32 = 9876
 
 	// KollaDbSyncConfig -
-	KollaDbSyncConfig = "/var/lib/config-data/merged/octavia-api-db-sync.json"
+	KollaDbSyncConfig = "/var/lib/config-data/merged/octavia-db-sync.json"
 	// KollaConfig -
 	KollaConfig = "/var/lib/config-data/merged/octavia-api-config.json"
 )

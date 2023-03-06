@@ -8,10 +8,10 @@
 # No Octavia Routes
 #
 apiVersion: octavia.openstack.org/v1beta1
-kind: OctaviaAPI
+kind: Octavia
 metadata:
   finalizers:
-  - OctaviaAPI
+  - Octavia
   name: octavia
   namespace: openstack
 ---

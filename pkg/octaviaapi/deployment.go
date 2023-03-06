@@ -13,13 +13,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package octavia
+package octaviaapi
 
 import (
+	"fmt"
+
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -39,9 +42,9 @@ func Deployment(
 	labels map[string]string,
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
-	initVolumeMounts := getInitVolumeMounts()
-	volumeMounts := getVolumeMounts()
-	volumes := getVolumes(instance.Name)
+	initVolumeMounts := octavia.GetInitVolumeMounts()
+	volumeMounts := octavia.GetVolumeMounts()
+	volumes := octavia.GetVolumes(instance.Name)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -78,23 +81,25 @@ func Deployment(
 		//
 		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
 			Path: "/healthcheck",
-			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(OctaviaPublicPort)},
+			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
 		}
 		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
 			Path: "/healthcheck",
-			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(OctaviaPublicPort)},
+			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
 		}
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaConfig)
+	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(octavia.KollaConfig)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
+
+	serviceName := fmt.Sprintf("%s-api", octavia.ServiceName)
 
 	// TODO(tweining): Implement container deployment
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ServiceName,
+			Name:      serviceName,
 			Namespace: instance.Namespace,
 		},
 		Spec: appsv1.DeploymentSpec{
@@ -107,10 +112,10 @@ func Deployment(
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: ServiceAccount,
+					ServiceAccountName: octavia.ServiceAccount,
 					Containers: []corev1.Container{
 						{
-							Name: ServiceName + "-api",
+							Name: serviceName,
 							Command: []string{
 								"/bin/bash",
 							},
@@ -137,7 +142,7 @@ func Deployment(
 	deployment.Spec.Template.Spec.Affinity = affinity.DistributePods(
 		common.AppSelector,
 		[]string{
-			ServiceName,
+			serviceName,
 		},
 		corev1.LabelHostname,
 	)
@@ -145,17 +150,17 @@ func Deployment(
 		deployment.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
 
-	initContainerDetails := APIDetails{
+	initContainerDetails := octavia.APIDetails{
 		ContainerImage:       instance.Spec.ContainerImage,
-		DatabaseHost:         instance.Status.DatabaseHostname,
+		DatabaseHost:         instance.Spec.DatabaseHostname,
 		DatabaseUser:         instance.Spec.DatabaseUser,
-		DatabaseName:         DatabaseName,
+		DatabaseName:         octavia.DatabaseName,
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,
 		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
 		VolumeMounts:         initVolumeMounts,
 	}
-	deployment.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
+	deployment.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 
 	return deployment
 }

@@ -45,6 +45,7 @@ spec:
             description: OctaviaAPISpec defines the desired state of OctaviaAPI
             properties:
               containerImage:
+                default: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
                 description: Octavia Container Image URL
                 type: string
               customServiceConfig:
@@ -54,6 +55,9 @@ spec:
                   information using raw OpenStack config format. The content gets
                   added to to /etc/<service>/<service>.conf.d directory as custom.conf
                   file.
+                type: string
+              databaseHostname:
+                description: DatabaseHostname - Octavia DB hostname
                 type: string
               databaseInstance:
                 description: MariaDB instance name Right now required by the maridb-operator
@@ -129,6 +133,26 @@ spec:
                 description: Resources - Compute Resources required by this service
                   (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                 properties:
+                  claims:
+                    description: "Claims lists the names of resources, defined in
+                      spec.resourceClaims, that are used by this container. \n This
+                      is an alpha field and requires enabling the DynamicResourceAllocation
+                      feature gate. \n This field is immutable."
+                    items:
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: Name must match the name of one entry in pod.spec.resourceClaims
+                            of the Pod where this field is used. It makes that resource
+                            available inside a container.
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    type: array
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
                   limits:
                     additionalProperties:
                       anyOf:
@@ -161,7 +185,6 @@ spec:
                 description: ServiceUser - service user name
                 type: string
             required:
-            - containerImage
             - databaseInstance
             - secret
             type: object
