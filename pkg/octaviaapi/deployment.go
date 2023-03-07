@@ -43,8 +43,24 @@ func Deployment(
 ) *appsv1.Deployment {
 	runAsUser := int64(0)
 	initVolumeMounts := octavia.GetInitVolumeMounts()
-	volumeMounts := octavia.GetVolumeMounts()
-	volumes := octavia.GetVolumes(instance.Name)
+
+	// The API pod has an extra volume so the API and the provider agent can
+	// communicate with each other.
+	volumes := append(octavia.GetVolumes(instance.Name),
+		corev1.Volume{
+			Name: "octavia-run",
+			VolumeSource: corev1.VolumeSource{
+				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
+			},
+		},
+	)
+	volumeMounts := append(octavia.GetVolumeMounts(),
+		corev1.VolumeMount{
+			Name:      "octavia-run",
+			MountPath: "/run/octavia",
+			ReadOnly:  false,
+		},
+	)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -94,9 +110,14 @@ func Deployment(
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
+	// TODO: reduce code duplication.
+	agentEnvVars := map[string]env.Setter{}
+	agentEnvVars["KOLLA_CONFIG_FILE"] = env.SetValue("/var/lib/config-data/merged/octavia-driver-agent.json")
+	agentEnvVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
+	agentEnvVars["CONFIG_HASH"] = env.SetValue(configHash)
+
 	serviceName := fmt.Sprintf("%s-api", octavia.ServiceName)
 
-	// TODO(tweining): Implement container deployment
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -125,6 +146,15 @@ func Deployment(
 								RunAsUser: &runAsUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:   volumeMounts,
+							Resources:      instance.Spec.Resources,
+							ReadinessProbe: readinessProbe,
+							LivenessProbe:  livenessProbe,
+						},
+						{
+							Name:           fmt.Sprintf("%s-provider-agent", serviceName),
+							Image:          instance.Spec.ContainerImage,
+							Env:            env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
 							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
