@@ -13,14 +13,15 @@ metadata:
   name: octavia
   namespace: openstack
 spec:
-  replicas: 3
+  octaviaAPI:
+    replicas: 3
 status:
-  readyCount: 3
+  apireadyCount: 3
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octavia
+  name: octavia-api
 spec:
   replicas: 3
 status:
