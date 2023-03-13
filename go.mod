@@ -4,15 +4,15 @@ go 1.18
 
 require (
 	github.com/go-logr/logr v1.2.3
-	github.com/onsi/ginkgo/v2 v2.8.4
-	github.com/onsi/gomega v1.27.1
+	github.com/onsi/ginkgo/v2 v2.9.0
+	github.com/onsi/gomega v1.27.3
 	github.com/openshift/api v3.9.0+incompatible
 	github.com/openstack-k8s-operators/keystone-operator/api v0.0.0-20230208150008-87df8c2f32cb
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.0.0-20230208113903-f7b52e2a2ccb
 	github.com/openstack-k8s-operators/lib-common/modules/database v0.0.0-20221201135101-4ec1006d9216
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.0.0-20221128124656-71e59ad7384d
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-        github.com/openstack-k8s-operators/ovn-operator/api v0.0.0-20230119070807-ae18fe5d848f
+	github.com/openstack-k8s-operators/ovn-operator/api v0.0.0-20230119070807-ae18fe5d848f
 	go.uber.org/zap v1.24.0
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
@@ -34,7 +34,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20210107165309-348f09dbbbc0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/google/gnostic v0.6.9 // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
