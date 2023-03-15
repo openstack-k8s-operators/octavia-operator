@@ -18,7 +18,7 @@ metadata:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octavia
+  name: octavia-api
   namespace: openstack
 ---
 # the openshift annotations can't be checked through the deployment above

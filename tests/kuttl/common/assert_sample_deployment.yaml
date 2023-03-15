@@ -30,11 +30,6 @@ spec:
     service: OctaviaPassword
     database: OctaviaDatabasePassword
   preserveJobs: false
-  replicas: 1
-  resources:
-    requests:
-      cpu: "1.0"
-      memory: 500Mi
   secret: osp-secret
   serviceUser: octavia
   octaviaAPI:
@@ -60,12 +55,12 @@ spec:
     serviceUser: octavia
 status:
   databaseHostname: openstack
-  readyCount: 1
+  apireadyCount: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octavia
+  name: octavia-api
   namespace: openstack
 spec:
   replicas: 1
@@ -83,7 +78,7 @@ spec:
                 - key: service
                   operator: In
                   values:
-                  - octavia
+                  - octavia-api
               topologyKey: kubernetes.io/hostname
             weight: 1
       containers:
@@ -105,6 +100,37 @@ spec:
           successThreshold: 1
           timeoutSeconds: 15
         name: octavia-api
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthcheck
+            port: 9876
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 15
+        resources:
+          requests:
+            cpu: "1"
+            memory: 500Mi
+      - env: 
+        - name: CONFIG_HASH
+        - name: KOLLA_CONFIG_FILE
+        - name: KOLLA_CONFIG_STRATEGY
+        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /healthcheck
+            port: 9876
+            scheme: HTTP
+          initialDelaySeconds: 3
+          periodSeconds: 13
+          successThreshold: 1
+          timeoutSeconds: 15
+        name: octavia-api-provider-agent
         readinessProbe:
           failureThreshold: 3
           httpGet:

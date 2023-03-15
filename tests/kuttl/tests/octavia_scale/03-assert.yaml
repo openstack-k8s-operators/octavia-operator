@@ -6,21 +6,22 @@
 #
 
 apiVersion: octavia.openstack.org/v1beta1
-kind: OctaviaAPI
+kind: Octavia
 metadata:
   finalizers:
-  - OctaviaAPI
+  - Octavia
   name: octavia
   namespace: openstack
 spec:
-  replicas: 1
+  octaviaAPI:
+    replicas: 1
 status:
-  readyCount: 1
+  apireadyCount: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: octavia
+  name: octavia-api
   namespace: openstack
 spec:
   replicas: 1
