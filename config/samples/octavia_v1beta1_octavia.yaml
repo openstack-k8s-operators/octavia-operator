@@ -18,10 +18,6 @@ spec:
   customServiceConfig: |
     [DEFAULT]
     debug = true
-  resources:
-    requests:
-      memory: "500Mi"
-      cpu: "1.0"
   octaviaAPI:
     databaseInstance: openstack
     databaseUser: octavia
@@ -38,8 +34,3 @@ spec:
     customServiceConfig: |
       [DEFAULT]
       debug = true
-    resources:
-      requests:
-        memory: "500Mi"
-        cpu: "1.0"
-
