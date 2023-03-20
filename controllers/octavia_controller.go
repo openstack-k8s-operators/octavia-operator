@@ -471,10 +471,8 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	return ctrl.Result{}, nil
 }
 
-//
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-//
 func (r *OctaviaReconciler) generateServiceConfigMaps(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
@@ -540,12 +538,10 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 	return nil
 }
 
-//
 // createHashOfInputHashes - creates a hash of hashes which gets added to the resources which requires a restart
 // if any of the input resources change, like configs, passwords, ...
 //
 // returns the hash, whether the hash changed (as a bool) and any error
-//
 func (r *OctaviaReconciler) createHashOfInputHashes(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
