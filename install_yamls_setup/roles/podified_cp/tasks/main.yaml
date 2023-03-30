@@ -141,7 +141,7 @@
         {{ podman_dockerio_password }} docker.io
       podman login -u {{ podman_quayio_user }} -p \
         {{ podman_quayio_password }} quay.io
-      podman pull docker.io/library/golang:1.18
+      podman pull docker.io/library/golang:1.19
       IMAGE_TAG_BASE=quay.io/tweining/octavia-operator VERSION=0.0.1 \
         IMG=$IMAGE_TAG_BASE:v$VERSION make \
         manifests build docker-build docker-push bundle bundle-build \

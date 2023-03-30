@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.9.2
+    controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
   name: octaviaapis.octavia.openstack.org
 spec:
@@ -45,7 +45,6 @@ spec:
             description: OctaviaAPISpec defines the desired state of OctaviaAPI
             properties:
               containerImage:
-                default: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
                 description: Octavia Container Image URL
                 type: string
               customServiceConfig:
@@ -185,6 +184,7 @@ spec:
                 description: ServiceUser - service user name
                 type: string
             required:
+            - containerImage
             - databaseInstance
             - secret
             type: object

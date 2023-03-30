@@ -61,10 +61,9 @@ type OctaviaAPISpec struct {
 	// ServiceUser - service user name
 	ServiceUser string `json:"serviceUser"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo"
+	// +kubebuilder:validation:Required
 	// Octavia Container Image URL
-	ContainerImage string `json:"containerImage,omitempty"`
+	ContainerImage string `json:"containerImage"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1

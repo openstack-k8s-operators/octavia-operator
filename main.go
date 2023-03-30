@@ -19,6 +19,7 @@ package main
 import (
 	"flag"
 	"os"
+	"strings"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -37,9 +38,10 @@ import (
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
+	ovn1beta1 "github.com/openstack-k8s-operators/ovn-operator/api/v1beta1"
+
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/controllers"
-	ovn1beta1 "github.com/openstack-k8s-operators/ovn-operator/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -130,6 +132,22 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "Octavia")
 		os.Exit(1)
 	}
+
+	// Acquire environmental defaults and initialize Octavia defaults with them
+	octaviaDefaults := octaviav1.OctaviaDefaults{
+		ContainerImageURL: os.Getenv("OCTAVIA_API_IMAGE_URL_DEFAULT"),
+	}
+
+	octaviav1.SetupOctaviaDefaults(octaviaDefaults)
+
+	// Setup webhooks if requested
+	if strings.ToLower(os.Getenv("ENABLE_WEBHOOKS")) != "false" {
+		if err = (&octaviav1.Octavia{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "Octavia")
+			os.Exit(1)
+		}
+	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
