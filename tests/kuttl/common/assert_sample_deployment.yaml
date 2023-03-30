@@ -224,36 +224,6 @@ spec:
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: octavia-admin
-  labels:
-    admin: "true"
-    service: octavia
-  namespace: openstack
-spec:
-  port:
-    targetPort: octavia-admin
-  to:
-    kind: Service
-    name: octavia-admin
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: octavia-internal
-  labels:
-    internal: "true"
-    service: octavia
-  namespace: openstack
-spec:
-  port:
-    targetPort: octavia-internal
-  to:
-    kind: Service
-    name: octavia-internal
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
   name: octavia-public
   labels:
     public: "true"
@@ -274,8 +244,8 @@ kind: TestAssert
 namespaced: true
 commands:
   - script: |
-      template='{{.status.apiEndpoint.admin}}{{":"}}{{.status.apiEndpoint.internal}}{{":"}}{{.status.apiEndpoint.public}}{{"\n"}}'
-      regex="http:\/\/octavia-admin-openstack\.apps.*:http:\/\/octavia-internal-openstack\.apps.*:http:\/\/octavia-public-openstack\.apps.*"
+      template='{{.status.apiEndpoint.public}}{{"\n"}}'
+      regex="http:\/\/octavia-public-openstack\.apps.*"
       apiEndpoints=$(oc get -n openstack octavia octavia -o go-template="$template")
       matches=$(echo $apiEndpoints | sed -e "s?$regex??")
       if [ -z "$matches" ]; then
