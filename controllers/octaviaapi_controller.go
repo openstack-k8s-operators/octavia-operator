@@ -573,8 +573,8 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
-	templateParameters["NBConnection"] = ovnMap["NB"]
-	templateParameters["SBConnection"] = ovnMap["SB"]
+	templateParameters["NBConnection"] = ovnMap["internal-NB"]
+	templateParameters["SBConnection"] = ovnMap["internal-SB"]
 
 	cms := []util.Template{
 		// ScriptsConfigMap
