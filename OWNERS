@@ -1,21 +1,10 @@
+# See the OWNERS docs at https://go.k8s.io/owners
 approvers:
-  - abays
-  - beagles
-  - dprince
-  - olliewalsh
-  - Sandeepyadav93
-  - stuggi
-  - viroel
-  - weinimo
-  - gibizer
+  - ci-approvers
+  - network-approvers
+  - openstack-approvers
 
 reviewers:
-  - abays
-  - beagles
-  - dprince
-  - olliewalsh
-  - Sandeepyadav93
-  - stuggi
-  - viroel
-  - weinimo
-  - gibizer
+  - ci-approvers
+  - network-approvers
+  - openstack-approvers
