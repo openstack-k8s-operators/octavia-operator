@@ -104,11 +104,9 @@ vet: gowork ## Run go vet against code.
 	go vet ./api/...
 
 .PHONY: tidy
-tide: vet
-	go mod tidy; \
-	cd "$(LOCALBIN)/../api"; \
-	go mod tidy; \
-	popd
+tidy: ## Run go mod tidy on every mod file in the repo
+	go mod tidy
+	cd ./api && go mod tidy
 
 .PHONY: golangci-lint
 golangci-lint: vet
@@ -293,6 +291,7 @@ gowork: ## Generate go.work file to support our multi module repository
 	test -f go.work || go work init
 	go work use .
 	go work use ./api
+	go work sync
 
 .PHONY: operator-lint
 operator-lint: gowork ## Runs operator-lint
