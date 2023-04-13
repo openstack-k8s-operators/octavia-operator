@@ -1,6 +1,7 @@
 apiVersion: kuttl.dev/v1beta1
 kind: TestStep
-commands:
-  - script: |
-      PWD=$INSTALL_YAMLS
-      make -C $INSTALL_YAMLS octavia_deploy_cleanup
+delete:
+- apiVersion: octavia.openstack.org/v1beta1
+  kind: Octavia
+  name: octavia
+  namespace: openstack
