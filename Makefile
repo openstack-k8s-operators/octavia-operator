@@ -307,7 +307,7 @@ operator-lint: gowork ## Runs operator-lint
 # $oc delete -n openstack mutatingwebhookconfiguration/moctavia.kb.io
 SKIP_CERT ?=false
 .PHONY: run-with-webhook
-run-with-webhook: export OCTAVIA_API_IMAGE_URL_DEFAULT=quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+run-with-webhook: export OCTAVIA_API_IMAGE_URL_DEFAULT=quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
 run-with-webhook: manifests generate fmt vet ## Run a controller from your host.
 	/bin/bash hack/configure_local_webhook.sh
 	go run ./main.go
