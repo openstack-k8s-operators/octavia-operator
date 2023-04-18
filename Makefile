@@ -87,7 +87,8 @@ help: ## Display this help.
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases && \
+	rm -f api/bases/* && cp -a config/crd/bases api/
 
 .PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
@@ -103,11 +104,9 @@ vet: gowork ## Run go vet against code.
 	go vet ./api/...
 
 .PHONY: tidy
-tide: vet
-	go mod tidy; \
-	cd "$(LOCALBIN)/../api"; \
-	go mod tidy; \
-	popd
+tidy: ## Run go mod tidy on every mod file in the repo
+	go mod tidy
+	cd ./api && go mod tidy
 
 .PHONY: golangci-lint
 golangci-lint: vet

@@ -2,18 +2,6 @@ repos:
 
 - repo: local
   hooks:
-    - id: gofmt
-      name: gofmt
-      language: system
-      entry: make
-      args: ["fmt"]
-      pass_filenames: false
-    - id: govet
-      name: govet
-      language: system
-      entry: make
-      args: ["vet"]
-      pass_filenames: false
     - id: gotidy
       name: gotidy
       language: system
