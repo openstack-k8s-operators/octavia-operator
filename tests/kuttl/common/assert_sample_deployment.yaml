@@ -33,7 +33,7 @@ spec:
   secret: osp-secret
   serviceUser: octavia
   octaviaAPI:
-    containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
     customServiceConfig: |
       [DEFAULT]
       debug = true
@@ -83,7 +83,7 @@ spec:
         - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
         command:
         - /bin/bash
-        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        image: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -110,7 +110,7 @@ spec:
         - name: CONFIG_HASH
         - name: KOLLA_CONFIG_FILE
         - name: KOLLA_CONFIG_STRATEGY
-        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        image: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -156,7 +156,7 @@ spec:
           value: octavia
         - name: DatabaseUser
           value: octavia
-        image: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+        image: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
         imagePullPolicy: IfNotPresent
         name: init
         resources: {}

@@ -22,7 +22,7 @@ spec:
     databaseInstance: openstack
     databaseUser: octavia
     serviceUser: octavia
-    containerImage: quay.io/tripleozedcentos9/openstack-octavia-api:current-tripleo
+    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
     replicas: 1
     secret: osp-secret
     # passwordSelectors: TODO
