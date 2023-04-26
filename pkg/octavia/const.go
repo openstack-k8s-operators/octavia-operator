@@ -25,8 +25,6 @@ const (
 	// DatabaseName -
 	DatabaseName = "octavia"
 
-	// OctaviaAdminPort -
-	OctaviaAdminPort int32 = 9876
 	// OctaviaPublicPort -
 	OctaviaPublicPort int32 = 9876
 	// OctaviaInternalPort -
