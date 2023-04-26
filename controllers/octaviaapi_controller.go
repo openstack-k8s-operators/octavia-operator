@@ -242,9 +242,6 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	// expose the service (create service, route and return the created endpoint URLs)
 	//
 	var octaviaPorts = map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointAdmin: {
-			Port: octavia.OctaviaAdminPort,
-		},
 		endpoint.EndpointPublic: {
 			Port: octavia.OctaviaPublicPort,
 		},
