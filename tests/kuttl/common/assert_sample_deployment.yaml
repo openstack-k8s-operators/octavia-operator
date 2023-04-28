@@ -3,10 +3,8 @@
 #
 # - 1 Octavia CR
 # - Deployment with 1 Pod for Octavia CR
-# - Octavia-admin Service
 # - Octavia-internal Service
 # - Octavia-public Service
-# - Octavia-admin Route
 # - Octavia-internal Route
 # - Octavia-public Route
 
@@ -175,21 +173,6 @@ metadata:
     openshift.io/scc: anyuid
   labels:
     service: octavia
----
-apiVersion: v1
-kind: Service
-metadata:
-  labels:
-    admin: "true"
-    service: octavia
-  name: octavia-admin
-  namespace: openstack
-spec:
-  ports:
-    - name: octavia-admin
-  selector:
-    service: octavia
-  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service
