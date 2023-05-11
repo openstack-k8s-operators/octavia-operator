@@ -21,7 +21,15 @@ import (
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	// Container image fall-back defaults
+
+	// OctaviaAPIContainerImage is the fall-back container image for OctaviaAPI
+	OctaviaAPIContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified"
 )
 
 // OctaviaSpec defines the desired state of Octavia
@@ -171,4 +179,14 @@ func (instance Octavia) IsReady() bool {
 	ready := instance.Status.OctaviaAPIReadyCount > 0
 	// TODO: add other ready counts
 	return ready
+}
+
+// SetupDefaults - initializes any CRD field defaults based on environment variables (the defaulting mechanism itself is implemented via webhooks)
+func SetupDefaults() {
+	// Acquire environmental defaults and initialize Octavia defaults with them
+	octaviaDefaults := OctaviaDefaults{
+		ContainerImageURL: util.GetEnvVar("OCTAVIA_API_IMAGE_URL_DEFAULT", OctaviaAPIContainerImage),
+	}
+
+	SetupOctaviaDefaults(octaviaDefaults)
 }

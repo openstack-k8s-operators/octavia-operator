@@ -133,12 +133,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Acquire environmental defaults and initialize Octavia defaults with them
-	octaviaDefaults := octaviav1.OctaviaDefaults{
-		ContainerImageURL: os.Getenv("OCTAVIA_API_IMAGE_URL_DEFAULT"),
-	}
-
-	octaviav1.SetupOctaviaDefaults(octaviaDefaults)
+	// Acquire environmental defaults and initialize operator defaults with them
+	octaviav1.SetupDefaults()
 
 	// Setup webhooks if requested
 	if strings.ToLower(os.Getenv("ENABLE_WEBHOOKS")) != "false" {
