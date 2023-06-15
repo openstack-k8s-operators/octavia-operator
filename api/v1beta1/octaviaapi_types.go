@@ -62,6 +62,10 @@ type OctaviaAPISpec struct {
 	ServiceUser string `json:"serviceUser"`
 
 	// +kubebuilder:validation:Required
+	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
+    ServiceAccount string `json:"serviceAccount"`
+
+	// +kubebuilder:validation:Required
 	// Octavia Container Image URL
 	ContainerImage string `json:"containerImage"`
 
@@ -136,7 +140,7 @@ type OctaviaAPIStatus struct {
 	Hash map[string]string `json:"hash,omitempty"`
 
 	// API endpoint
-	APIEndpoints map[string]string `json:"apiEndpoint,omitempty"`
+	APIEndpoints map[string]string `json:"apiEndpoints,omitempty"`
 
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`

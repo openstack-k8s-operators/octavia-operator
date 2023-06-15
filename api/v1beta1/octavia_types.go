@@ -115,7 +115,7 @@ type OctaviaStatus struct {
 	Hash map[string]string `json:"hash,omitempty"`
 
 	// API endpoint
-	APIEndpoints map[string]string `json:"apiEndpoint,omitempty"`
+	APIEndpoints map[string]string `json:"apiEndpoints,omitempty"`
 
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
@@ -189,4 +189,20 @@ func SetupDefaults() {
 	}
 
 	SetupOctaviaDefaults(octaviaDefaults)
+}
+
+
+// RbacConditionsSet - set the conditions for the rbac object
+func (instance Octavia) RbacConditionsSet(c *condition.Condition) {
+	instance.Status.Conditions.Set(c)
+}
+
+// RbacNamespace - return the namespace
+func (instance Octavia) RbacNamespace() string {
+	return instance.Namespace
+}
+
+// RbacResourceName - return the name to be used for rbac objects (serviceaccount, role, rolebinding)
+func (instance Octavia) RbacResourceName() string {
+	return "octavia-" + instance.Name
 }

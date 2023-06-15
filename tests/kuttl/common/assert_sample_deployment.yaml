@@ -159,8 +159,8 @@ spec:
         name: init
         resources: {}
       restartPolicy: Always
-      serviceAccount: octavia-operator-octavia
-      serviceAccountName: octavia-operator-octavia
+      serviceAccount: octavia-octavia
+      serviceAccountName: octavia-octavia
 status:
   availableReplicas: 1
   replicas: 1
@@ -227,7 +227,7 @@ kind: TestAssert
 namespaced: true
 commands:
   - script: |
-      template='{{.status.apiEndpoint.public}}{{"\n"}}'
+      template='{{.status.apiEndpoints.public}}{{"\n"}}'
       regex="http:\/\/octavia-public-openstack\.apps.*"
       apiEndpoints=$(oc get -n openstack octavia octavia -o go-template="$template")
       matches=$(echo $apiEndpoints | sed -e "s?$regex??")

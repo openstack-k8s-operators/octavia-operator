@@ -53,7 +53,7 @@ func DbSyncJob(
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      ServiceName + "-db-sync",
+			Name:      instance.Name + "-db-sync",
 			Namespace: instance.Namespace,
 			Labels:    labels,
 		},
@@ -61,7 +61,7 @@ func DbSyncJob(
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: ServiceAccount,
+					ServiceAccountName: instance.RbacResourceName(),
 					Containers: []corev1.Container{
 						{
 							Name: ServiceName + "-db-sync",

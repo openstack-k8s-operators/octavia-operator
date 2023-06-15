@@ -180,6 +180,10 @@ spec:
                 description: Secret containing OpenStack password information for
                   octavia OctaviaDatabasePassword, AdminPassword
                 type: string
+              serviceAccount:
+                description: ServiceAccount - service account name used internally
+                  to provide Octavia services the default SA name
+                type: string
               serviceUser:
                 default: octavia
                 description: ServiceUser - service user name
@@ -188,11 +192,12 @@ spec:
             - containerImage
             - databaseInstance
             - secret
+            - serviceAccount
             type: object
           status:
             description: OctaviaAPIStatus defines the observed state of OctaviaAPI
             properties:
-              apiEndpoint:
+              apiEndpoints:
                 additionalProperties:
                   type: string
                 description: API endpoint
