@@ -12,6 +12,10 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
+    - displayName: Octavia Amphora Controller
+      kind: OctaviaAmphoraController
+      name: octaviaamphoracontrollers.octavia.openstack.org
+      version: v1beta1
     - description: OctaviaAPI is the Schema for the octaviaapis API
       displayName: Octavia API
       kind: OctaviaAPI

@@ -27,6 +27,7 @@ type APIDetails struct {
 	DatabaseHost         string
 	DatabaseUser         string
 	DatabaseName         string
+	TransportURLSecret   string
 	OSPSecret            string
 	DBPasswordSelector   string
 	UserPasswordSelector string
@@ -75,6 +76,23 @@ func InitContainer(init APIDetails) []corev1.Container {
 				},
 			},
 		},
+	}
+
+	// TODO(beagles): should this be conditional? It seems like it should be required.
+	if init.TransportURLSecret != "" {
+		envs = append(envs,
+			corev1.EnvVar{
+				Name: "TransportURL",
+				ValueFrom: &corev1.EnvVarSource{
+					SecretKeyRef: &corev1.SecretKeySelector{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: init.TransportURLSecret,
+						},
+						Key: "transport_url",
+					},
+				},
+			},
+		)
 	}
 	envs = env.MergeEnvs(envs, envVars)
 

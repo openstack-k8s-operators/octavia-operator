@@ -576,10 +576,11 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	}
 	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 
-	r.Log.Info("Service config map generated")
 	if err != nil {
+		r.Log.Error(err, "unable to process config map")
 		return err
 	}
+	r.Log.Info("Service config map generated")
 
 	return nil
 }

@@ -22,6 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
@@ -74,6 +75,7 @@ type OctaviaReconciler struct {
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch;
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneservices,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete;
+// +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 
 // service account, role, rolebinding
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update
@@ -186,6 +188,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Owns(&rabbitmqv1.TransportURL{}).
 		Complete(r)
 }
 
@@ -373,6 +376,52 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
 
+	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.InputReadyWaitingMessage))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
+	}
+
+	instance.Status.TransportURLSecret = transportURL.Status.SecretName
+
+	if instance.Status.TransportURLSecret == "" {
+		r.Log.Info(fmt.Sprintf("Waiting for the TransportURL %s secret to be created", transportURL.Name))
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.InputReadyWaitingMessage))
+		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
+	}
+
+	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Status.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("TransportURL secret %s not found", instance.Status.TransportURLSecret)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
@@ -490,6 +539,57 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(conditionStatus)
 	}
 
+	octaviaHousekeeping, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHousekeeping, "housekeeping")
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaHousekeeping error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
+	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
+
+	octaviaHealthManager, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHealthManager, "healthmanager")
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaHealthManager error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment of OctaviaHealthManager for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
+	instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
+
+	octaviaWorker, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaWorker, "worker")
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			"OctaviaWorker error occurred %s",
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		r.Log.Info(fmt.Sprintf("Deployment of OctaviaWorker for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
+	instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
+
 	// create Deployment - end
 
 	r.Log.Info("Reconciled Service successfully")
@@ -592,6 +692,62 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.Secret = instance.Spec.Secret
+		deployment.Spec.ServiceAccount = instance.RbacResourceName()
+		if len(deployment.Spec.NodeSelector) == 0 {
+			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return deployment, op, err
+}
+
+func (r *OctaviaReconciler) transportURLCreateOrUpdate(
+	instance *octaviav1.Octavia,
+) (*rabbitmqv1.TransportURL,
+	controllerutil.OperationResult, error) {
+	transportURL := &rabbitmqv1.TransportURL{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-octavia-transport", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
+		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
+		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
+		return err
+	})
+	return transportURL, op, err
+}
+
+func (r *OctaviaReconciler) amphoraControllerDeploymentCreateOrUpdate(
+	instance *octaviav1.Octavia,
+	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
+	role string,
+) (*octaviav1.OctaviaAmphoraController,
+	controllerutil.OperationResult, error) {
+
+	deployment := &octaviav1.OctaviaAmphoraController{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-%s", instance.Name, role),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		deployment.Spec = controllerSpec
+		deployment.Spec.Role = role
+		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
+		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.Secret = instance.Spec.Secret
+		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector

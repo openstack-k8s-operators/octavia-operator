@@ -25,7 +25,10 @@ import (
 
 // OctaviaDefaults -
 type OctaviaDefaults struct {
-	ContainerImageURL string
+	APIContainerImageURL string
+	HousekeepingContainerImageURL string
+	HealthManagerContainerImageURL string
+	WorkerContainerImageURL string
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -60,7 +63,16 @@ func (r *Octavia) Default() {
 // Default - set defaults for this Octavia spec
 func (spec *OctaviaSpec) Default() {
 	if spec.OctaviaAPI.ContainerImage == "" {
-		spec.OctaviaAPI.ContainerImage = octaviaDefaults.ContainerImageURL
+		spec.OctaviaAPI.ContainerImage = octaviaDefaults.APIContainerImageURL
+	}
+	if spec.OctaviaHousekeeping.ContainerImage == "" {
+		spec.OctaviaHousekeeping.ContainerImage = octaviaDefaults.HousekeepingContainerImageURL
+	}
+	if spec.OctaviaHealthManager.ContainerImage == "" {
+		spec.OctaviaHealthManager.ContainerImage = octaviaDefaults.HealthManagerContainerImageURL
+	}
+	if spec.OctaviaWorker.ContainerImage == "" {
+		spec.OctaviaWorker.ContainerImage = octaviaDefaults.WorkerContainerImageURL
 	}
 }
 

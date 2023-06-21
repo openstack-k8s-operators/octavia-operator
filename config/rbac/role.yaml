@@ -134,6 +134,32 @@ rules:
 - apiGroups:
   - octavia.openstack.org
   resources:
+  - octaviaamphoracontrollers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaamphoracontrollers/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviaamphoracontrollers/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
   - octaviaapis
   verbs:
   - create
@@ -190,6 +216,18 @@ rules:
   verbs:
   - get
   - list
+  - watch
+- apiGroups:
+  - rabbitmq.openstack.org
+  resources:
+  - transporturls
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - rbac.authorization.k8s.io

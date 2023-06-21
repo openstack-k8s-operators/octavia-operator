@@ -3,3 +3,6 @@ kind: TestStep
 commands:
   - script: |
       oc patch octavia -n $NAMESPACE octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaAPI/replicas", "value":0}]'
+      oc patch octavia -n $NAMESPACE octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaHousekeeping/replicas", "value":0}]'
+      oc patch octavia -n $NAMESPACE octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaWorker/replicas", "value":0}]'
+      oc patch octavia -n $NAMESPACE octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaHealthManager/replicas", "value":0}]'
