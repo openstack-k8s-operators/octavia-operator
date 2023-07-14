@@ -22,7 +22,6 @@ spec:
     databaseUser: octavia
     serviceUser: octavia
     serviceAccount: octavia
-    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
     secret: osp-secret
     # passwordSelectors: TODO
     # nodeSelector: TODO
