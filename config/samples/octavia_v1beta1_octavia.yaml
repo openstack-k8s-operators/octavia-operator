@@ -7,7 +7,6 @@ spec:
   databaseInstance: openstack
   databaseUser: octavia
   serviceUser: octavia
-  replicas: 1
   secret: osp-secret
   # passwordSelectors: TODO
   # nodeSelector: TODO
@@ -24,7 +23,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
-    replicas: 1
     secret: osp-secret
     # passwordSelectors: TODO
     # nodeSelector: TODO
