@@ -134,32 +134,6 @@ rules:
 - apiGroups:
   - octavia.openstack.org
   resources:
-  - octavia
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octavia/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octavia/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
   - octaviaapis
   verbs:
   - create
@@ -179,6 +153,32 @@ rules:
   - octavia.openstack.org
   resources:
   - octaviaapis/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octavias
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octavias/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octavias/status
   verbs:
   - get
   - patch

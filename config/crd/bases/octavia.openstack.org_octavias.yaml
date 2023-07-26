@@ -5,13 +5,13 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.10.0
   creationTimestamp: null
-  name: octavia.octavia.openstack.org
+  name: octavias.octavia.openstack.org
 spec:
   group: octavia.openstack.org
   names:
     kind: Octavia
     listKind: OctaviaList
-    plural: octavia
+    plural: octavias
     singular: octavia
   scope: Namespaced
   versions:
