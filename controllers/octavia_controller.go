@@ -163,9 +163,6 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]string{}
-	}
 
 	// Handle service delete
 	if !instance.DeletionTimestamp.IsZero() {
@@ -484,11 +481,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		r.Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
-	// Mirror CinderAPI status' APIEndpoints and ReadyCount to this parent CR
+	// Mirror OctaviaAPI status' ReadyCount to this parent CR
 	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
 	//
-	instance.Status.APIEndpoints = octaviaAPI.Status.APIEndpoints
-	instance.Status.ServiceID = octaviaAPI.Status.ServiceID
 	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
 	conditionStatus := octaviaAPI.Status.Conditions.Mirror(condition.ReadyCondition)
 	if conditionStatus != nil {

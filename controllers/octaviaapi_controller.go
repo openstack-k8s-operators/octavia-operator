@@ -156,9 +156,6 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
 	}
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]string{}
-	}
 
 	// Handle service delete
 	if !instance.DeletionTimestamp.IsZero() {
@@ -189,31 +186,32 @@ func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
-	// It's possible to get here before the endpoints have been set in the status, so check for this
-	if instance.Status.APIEndpoints != nil {
-		// Remove the finalizer from our KeystoneEndpoint CR
-		keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-		if err != nil && !k8s_errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
+	// Remove the finalizer from our KeystoneEndpoint CR
+	keystoneEndpoint, err := keystonev1.GetKeystoneEndpointWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
+	if err != nil && !k8s_errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
 
-		if err == nil {
-			controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer())
-			if err = helper.GetClient().Update(ctx, keystoneEndpoint); err != nil && !k8s_errors.IsNotFound(err) {
+	if err == nil {
+		if controllerutil.RemoveFinalizer(keystoneEndpoint, helper.GetFinalizer()) {
+			err = helper.GetClient().Update(ctx, keystoneEndpoint)
+			if err != nil && !k8s_errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
 			util.LogForObject(helper, "Removed finalizer from our KeystoneEndpoint", instance)
 		}
+	}
 
-		// Remove the finalizer from our KeystoneService CR
-		keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
-		if err != nil && !k8s_errors.IsNotFound(err) {
-			return ctrl.Result{}, err
-		}
+	// Remove the finalizer from our KeystoneService CR
+	keystoneService, err := keystonev1.GetKeystoneServiceWithName(ctx, helper, octavia.ServiceName, instance.Namespace)
+	if err != nil && !k8s_errors.IsNotFound(err) {
+		return ctrl.Result{}, err
+	}
 
-		if err == nil {
-			controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer())
-			if err = helper.GetClient().Update(ctx, keystoneService); err != nil && !k8s_errors.IsNotFound(err) {
+	if err == nil {
+		if controllerutil.RemoveFinalizer(keystoneService, helper.GetFinalizer()) {
+			err = helper.GetClient().Update(ctx, keystoneService)
+			if err != nil && !k8s_errors.IsNotFound(err) {
 				return ctrl.Result{}, err
 			}
 			util.LogForObject(helper, "Removed finalizer from our KeystoneService", instance)
@@ -273,34 +271,8 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		return ctrlResult, nil
 	}
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
-
-	//
-	// Update instance status with service endpoint url from route host information
-	//
-	// TODO: need to support https default here
-	if instance.Status.APIEndpoints == nil {
-		instance.Status.APIEndpoints = map[string]string{}
-	}
-	instance.Status.APIEndpoints = apiEndpoints
-
-	ctrlResult, err = r.registerInKeystone(ctx, instance, helper, serviceLabels)
-	if err != nil {
-		r.Log.Error(err, "registerInKeystone call failed", "ctrlResult",
-			ctrlResult)
-		return ctrl.Result{}, err
-	}
-
 	// expose service - end
 
-	r.Log.Info("Reconciled Service init successfully")
-	return ctrl.Result{}, nil
-}
-
-func (r *OctaviaAPIReconciler) registerInKeystone(
-	ctx context.Context,
-	instance *octaviav1.OctaviaAPI,
-	helper *helper.Helper,
-	serviceLabels map[string]string) (ctrl.Result, error) {
 	//
 	// create service and user in keystone - https://docs.openstack.org/octavia/latest/install/install-ubuntu.html#prerequisites
 	//
@@ -314,7 +286,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 		PasswordSelector:   instance.Spec.PasswordSelectors.Service,
 	}
 	ksSvc := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, time.Duration(10)*time.Second)
-	ctrlResult, err := ksSvc.CreateOrPatch(ctx, helper)
+	ctrlResult, err = ksSvc.CreateOrPatch(ctx, helper)
 	if err != nil {
 		return ctrlResult, err
 	}
@@ -330,14 +302,12 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 		return ctrlResult, nil
 	}
 
-	instance.Status.ServiceID = ksSvc.GetServiceID()
-
 	//
 	// register endpoints
 	//
 	ksEndptSpec := keystonev1.KeystoneEndpointSpec{
 		ServiceName: octavia.ServiceName,
-		Endpoints:   instance.Status.APIEndpoints,
+		Endpoints:   apiEndpoints,
 	}
 	ksEndpt := keystonev1.NewKeystoneEndpoint(
 		octavia.ServiceName,
@@ -356,6 +326,7 @@ func (r *OctaviaAPIReconciler) registerInKeystone(
 		instance.Status.Conditions.Set(c)
 	}
 
+	r.Log.Info("Reconciled Service init successfully")
 	return ctrlResult, nil
 }
 

@@ -221,9 +221,8 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
 commands:
   - script: |
-      template='{{.status.apiEndpoints.public}}{{"\n"}}'
-      regex="http:\/\/octavia-public-$NAMESPACE\.apps.*"
-      apiEndpoints=$(oc get -n $NAMESPACE octavia octavia -o go-template="$template")
+      regex="octavia-public-${NAMESPACE}\.apps.*"
+      apiEndpoints=$(oc get route -n $NAMESPACE octavia-public -o jsonpath='{.status.ingress[0].host}')
       matches=$(echo $apiEndpoints | sed -e "s?$regex??")
       if [ -z "$matches" ]; then
         exit 0
