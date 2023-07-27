@@ -51,7 +51,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - octavia
+    - octavias
     scope: '*'
   sideEffects: None
   timeoutSeconds: 10
@@ -79,7 +79,7 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - octavia
+    - octavias
     scope: '*'
   sideEffects: None
   timeoutSeconds: 10

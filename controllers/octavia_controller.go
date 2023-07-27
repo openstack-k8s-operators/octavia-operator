@@ -58,9 +58,9 @@ type OctaviaReconciler struct {
 	Scheme  *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavia,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavia/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavia/finalizers,verbs=update
+// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavias,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavias/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=octavia.openstack.org,resources=octavias/finalizers,verbs=update
 // +kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaapis,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaapis/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaapis/finalizers,verbs=update

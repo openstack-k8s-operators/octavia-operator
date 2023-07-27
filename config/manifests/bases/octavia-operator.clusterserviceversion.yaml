@@ -11,15 +11,15 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - description: Octavia is the Schema for the octavia API
-      displayName: Octavia
-      kind: Octavia
-      name: octavia.octavia.openstack.org
-      version: v1beta1
     - description: OctaviaAPI is the Schema for the octaviaapis API
       displayName: Octavia API
       kind: OctaviaAPI
       name: octaviaapis.octavia.openstack.org
+      version: v1beta1
+    - description: Octavia is the Schema for the octavia API
+      displayName: Octavia
+      kind: Octavia
+      name: octavias.octavia.openstack.org
       version: v1beta1
   description: Octavia Operator
   displayName: Octavia Operator
