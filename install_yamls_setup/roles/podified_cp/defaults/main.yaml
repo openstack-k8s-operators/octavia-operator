@@ -8,15 +8,11 @@ operators_git_repos:
     dest: ~/octavia-operator
     version: main
   # Optional repositories:
-  - repo: https://github.com/openstack-k8s-operators/keystone-operator.git
-    dest: ~/keystone-operator
-    depth: 10
-  - repo: https://github.com/openstack-k8s-operators/placement-operator.git
-    dest: ~/placement-operator
-    depth: 10
   - repo: https://github.com/openstack-k8s-operators/neutron-operator.git
     dest: ~/neutron-operator
+    depth: 10
   - repo: https://github.com/openstack-k8s-operators/lib-common.git
     dest: ~/lib-common
-make_crc_cpus: 10
-make_crc_memory: 18000
+make_crc_cpus: 20
+make_crc_memory: 40000
+make_crc_disk: 70
