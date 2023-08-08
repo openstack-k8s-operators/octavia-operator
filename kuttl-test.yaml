@@ -16,9 +16,9 @@
 
 apiVersion: kuttl.dev/v1beta1
 kind: TestSuite
+namespace: octavia-kuttl-tests
 reportFormat: JSON
 reportName: kuttl-test-octavia
-namespace: openstack
 timeout: 180
 parallel: 1
 suppress:

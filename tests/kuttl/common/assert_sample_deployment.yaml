@@ -14,7 +14,6 @@ metadata:
   finalizers:
   - Octavia
   name: octavia
-  namespace: openstack
 spec:
   customServiceConfig: |
     [DEFAULT]
@@ -55,7 +54,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: octavia-api
-  namespace: openstack
 spec:
   replicas: 1
   template:
@@ -181,7 +179,6 @@ metadata:
     internal: "true"
     service: octavia
   name: octavia-internal
-  namespace: openstack
 spec:
   ports:
     - name: octavia-internal
@@ -196,7 +193,6 @@ metadata:
     public: "true"
     service: octavia
   name: octavia-public
-  namespace: openstack
 spec:
   ports:
     - name: octavia-public
@@ -211,7 +207,6 @@ metadata:
   labels:
     public: "true"
     service: octavia
-  namespace: openstack
 spec:
   port:
     targetPort: octavia-public
@@ -224,12 +219,11 @@ spec:
 # the three endpoints are defined and their addresses follow the default pattern
 apiVersion: kuttl.dev/v1beta1
 kind: TestAssert
-namespaced: true
 commands:
   - script: |
       template='{{.status.apiEndpoints.public}}{{"\n"}}'
-      regex="http:\/\/octavia-public-openstack\.apps.*"
-      apiEndpoints=$(oc get -n openstack octavia octavia -o go-template="$template")
+      regex="http:\/\/octavia-public-$NAMESPACE\.apps.*"
+      apiEndpoints=$(oc get -n $NAMESPACE octavia octavia -o go-template="$template")
       matches=$(echo $apiEndpoints | sed -e "s?$regex??")
       if [ -z "$matches" ]; then
         exit 0

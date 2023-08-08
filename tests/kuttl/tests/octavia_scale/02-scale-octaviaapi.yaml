@@ -2,4 +2,4 @@ apiVersion: kuttl.dev/v1beta1
 kind: TestStep
 commands:
   - script: |
-      oc patch octavia -n openstack octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaAPI/replicas", "value":3}]'
+      oc patch octavia -n $NAMESPACE octavia --type='json' -p='[{"op": "replace", "path": "/spec/octaviaAPI/replicas", "value":3}]'
