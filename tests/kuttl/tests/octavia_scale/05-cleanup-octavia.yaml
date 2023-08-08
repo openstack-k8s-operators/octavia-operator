@@ -4,4 +4,3 @@ delete:
 - apiVersion: octavia.openstack.org/v1beta1
   kind: Octavia
   name: octavia
-  namespace: openstack

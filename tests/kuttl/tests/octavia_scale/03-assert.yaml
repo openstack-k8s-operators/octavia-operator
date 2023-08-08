@@ -11,7 +11,6 @@ metadata:
   finalizers:
   - Octavia
   name: octavia
-  namespace: openstack
 spec:
   octaviaAPI:
     replicas: 1
@@ -22,7 +21,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: octavia-api
-  namespace: openstack
 spec:
   replicas: 1
 status:
