@@ -17,10 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"fmt"
-
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -114,17 +111,11 @@ type OctaviaStatus struct {
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`
 
-	// API endpoint
-	APIEndpoints map[string]string `json:"apiEndpoints,omitempty"`
-
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
 	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
-
-	// ServiceID - the ID of the registered service in keystone
-	ServiceID string `json:"serviceID,omitempty"`
 
 	// ReadyCount of octavia API instances
 	OctaviaAPIReadyCount int32 `json:"apireadyCount,omitempty"`
@@ -165,14 +156,6 @@ type OctaviaList struct {
 
 func init() {
 	SchemeBuilder.Register(&Octavia{}, &OctaviaList{})
-}
-
-// GetEndpoint - returns OpenStack endpoint url for type
-func (instance Octavia) GetEndpoint(endpointType endpoint.Endpoint) (string, error) {
-	if url, found := instance.Status.APIEndpoints[string(endpointType)]; found {
-		return url, nil
-	}
-	return "", fmt.Errorf("%s endpoint not found", string(endpointType))
 }
 
 // IsReady - returns true if service is ready to server requests

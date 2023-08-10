@@ -286,11 +286,6 @@ spec:
           status:
             description: OctaviaStatus defines the observed state of Octavia
             properties:
-              apiEndpoints:
-                additionalProperties:
-                  type: string
-                description: API endpoint
-                type: object
               apireadyCount:
                 description: ReadyCount of octavia API instances
                 format: int32
@@ -354,9 +349,6 @@ spec:
                 description: ReadyCount of octavia Housekeeping instances
                 format: int32
                 type: integer
-              serviceID:
-                description: ServiceID - the ID of the registered service in keystone
-                type: string
               workerreadyCount:
                 description: ReadyCount of octavia Worker instances
                 format: int32

@@ -17,10 +17,7 @@ limitations under the License.
 package v1beta1
 
 import (
-	"fmt"
-
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -139,17 +136,11 @@ type OctaviaAPIStatus struct {
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`
 
-	// API endpoint
-	APIEndpoints map[string]string `json:"apiEndpoints,omitempty"`
-
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
 	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
-
-	// ServiceID - the ID of the registered service in keystone
-	ServiceID string `json:"serviceID,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -177,14 +168,6 @@ type OctaviaAPIList struct {
 
 func init() {
 	SchemeBuilder.Register(&OctaviaAPI{}, &OctaviaAPIList{})
-}
-
-// GetEndpoint - returns OpenStack endpoint url for type
-func (instance OctaviaAPI) GetEndpoint(endpointType endpoint.Endpoint) (string, error) {
-	if url, found := instance.Status.APIEndpoints[string(endpointType)]; found {
-		return url, nil
-	}
-	return "", fmt.Errorf("%s endpoint not found", string(endpointType))
 }
 
 // IsReady - returns true if service is ready to server requests
