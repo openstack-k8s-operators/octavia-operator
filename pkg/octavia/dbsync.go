@@ -37,7 +37,7 @@ func DbSyncJob(
 ) *batchv1.Job {
 	runAsUser := int64(0)
 	initVolumeMounts := GetInitVolumeMounts()
-	volumeMounts := GetVolumeMounts()
+	volumeMounts := GetDBSyncVolumeMounts()
 	volumes := GetVolumes(instance.Name)
 
 	args := []string{"-c"}
@@ -48,7 +48,6 @@ func DbSyncJob(
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(KollaDbSyncConfig)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 
 	job := &batchv1.Job{
