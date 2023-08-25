@@ -104,7 +104,6 @@ spec:
           timeoutSeconds: 15
       - env:
         - name: CONFIG_HASH
-        - name: KOLLA_CONFIG_FILE
         - name: KOLLA_CONFIG_STRATEGY
         image: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
         imagePullPolicy: IfNotPresent

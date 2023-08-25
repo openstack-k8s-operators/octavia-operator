@@ -44,24 +44,6 @@ func Deployment(
 	runAsUser := int64(0)
 	initVolumeMounts := octavia.GetInitVolumeMounts()
 
-	// The API pod has an extra volume so the API and the provider agent can
-	// communicate with each other.
-	volumes := append(octavia.GetVolumes(instance.Name),
-		corev1.Volume{
-			Name: "octavia-run",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
-			},
-		},
-	)
-	volumeMounts := append(octavia.GetVolumeMounts(),
-		corev1.VolumeMount{
-			Name:      "octavia-run",
-			MountPath: "/run/octavia",
-			ReadOnly:  false,
-		},
-	)
-
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
 		TimeoutSeconds:      15,
@@ -106,13 +88,11 @@ func Deployment(
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_FILE"] = env.SetValue(octavia.KollaConfig)
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
 	// TODO: reduce code duplication.
 	agentEnvVars := map[string]env.Setter{}
-	agentEnvVars["KOLLA_CONFIG_FILE"] = env.SetValue("/var/lib/config-data/merged/octavia-driver-agent.json")
 	agentEnvVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	agentEnvVars["CONFIG_HASH"] = env.SetValue(configHash)
 
@@ -146,7 +126,7 @@ func Deployment(
 								RunAsUser: &runAsUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   volumeMounts,
+							VolumeMounts:   getVolumeMounts("octavia-api"),
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
@@ -155,13 +135,13 @@ func Deployment(
 							Name:           fmt.Sprintf("%s-provider-agent", serviceName),
 							Image:          instance.Spec.ContainerImage,
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
-							VolumeMounts:   volumeMounts,
+							VolumeMounts:   getVolumeMounts("octavia-driver-agent"),
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
 						},
 					},
-					Volumes: volumes,
+					Volumes: getVolumes(instance.Name),
 				},
 			},
 		},
