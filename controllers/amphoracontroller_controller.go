@@ -46,6 +46,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // OctaviaAmphoraControllerReconciler reconciles an OctaviaAmmphoraController object
@@ -54,6 +55,11 @@ type OctaviaAmphoraControllerReconciler struct {
 	Kclient kubernetes.Interface
 	Log     logr.Logger
 	Scheme  *runtime.Scheme
+}
+
+// GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
+func (r *OctaviaAmphoraControllerReconciler) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName("OctaviaAmphoraController")
 }
 
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaamphoracontrollers,verbs=get;list;watch;create;update;patch;delete
@@ -65,7 +71,7 @@ type OctaviaAmphoraControllerReconciler struct {
 // controllers like the octavia housekeeper, worker and health manager
 // services
 func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = r.Log.WithValues("amphoracontroller", req.NamespacedName)
+	Log := r.GetLogger(ctx)
 
 	instance := &octaviav1.OctaviaAmphoraController{}
 	err := r.Client.Get(ctx, req.NamespacedName, instance)
@@ -110,7 +116,7 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 		r.Client,
 		r.Kclient,
 		r.Scheme,
-		r.Log,
+		Log,
 	)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -124,14 +130,14 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 		}
 
 		if err := helper.SetAfter(instance); err != nil {
-			util.LogErrorForObject(helper, err, "Set after and calc patch/diff", instance)
+			Log.Error(err, "Set after and calc patch/diff")
 		}
 
 		if changed := helper.GetChanges()["status"]; changed {
 			patch := client.MergeFrom(helper.GetBeforeObject())
 
 			if err := r.Status().Patch(ctx, instance, patch); err != nil && !k8s_errors.IsNotFound(err) {
-				util.LogErrorForObject(helper, err, "Update status", instance)
+				Log.Error(err, "Update status")
 			}
 		}
 	}()
@@ -147,7 +153,8 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
-	util.LogForObject(helper, "Reconciling Service delete", instance)
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service delete")
 
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 
@@ -155,28 +162,30 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileDelete(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	util.LogForObject(helper, "Reconciled Service delete successfully", instance)
+	Log.Info("Reconciled Service delete successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
-	util.LogForObject(helper, "Reconciling Service update", instance)
-	util.LogForObject(helper, "Reconciled Service update successfully", instance)
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service update")
+	Log.Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
-	util.LogForObject(helper, "Reconciling Service upgrade", instance)
-	util.LogForObject(helper, "Reconciled Service upgrade successfully", instance)
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service upgrade")
+	Log.Info("Reconciled Service upgrade successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
-
-	util.LogForObject(helper, "Reconciling Service", instance)
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service")
 	if !controllerutil.ContainsFinalizer(instance, helper.GetFinalizer()) {
 		// If the service object doesn't have our finalizer, add it.
 		controllerutil.AddFinalizer(instance, helper.GetFinalizer())
@@ -353,7 +362,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	// create Deployment - end
 
-	util.LogForObject(helper, "Reconciled Service successfully", instance)
+	Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
 }
 

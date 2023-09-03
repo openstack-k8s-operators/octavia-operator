@@ -51,6 +51,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -58,8 +59,12 @@ import (
 type OctaviaAPIReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
+}
+
+// GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
+func (r *OctaviaAPIReconciler) GetLogger(ctx context.Context) logr.Logger {
+	return log.FromContext(ctx).WithName("Controllers").WithName("OctaviaAPI")
 }
 
 // +kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaapis,verbs=get;list;watch;create;update;patch;delete
@@ -90,7 +95,7 @@ type OctaviaAPIReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.12.2/pkg/reconcile
 func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) (result ctrl.Result, _err error) {
-	_ = r.Log.WithValues("octaviaapi", req.NamespacedName)
+	Log := r.GetLogger(ctx)
 
 	// Fetch the OctaviaAPI instance
 	instance := &octaviav1.OctaviaAPI{}
@@ -111,7 +116,7 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		r.Client,
 		r.Kclient,
 		r.Scheme,
-		r.Log,
+		Log,
 	)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -172,7 +177,7 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Manager) error {
 	crs := &octaviav1.OctaviaAPIList{}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
@@ -183,11 +188,12 @@ func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Watches(&source.Kind{Type: &ovnclient.OVNDBCluster{}}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.Log))).
+		Watches(&source.Kind{Type: &ovnclient.OVNDBCluster{}}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.GetLogger(ctx)))).
 		Complete(r)
 }
 
 func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
+	Log := r.GetLogger(ctx)
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
 	// Remove the finalizer from our KeystoneEndpoint CR
@@ -225,7 +231,7 @@ func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *oc
 	// We did all the cleanup on the objects we created so we can remove the
 	// finalizer from ourselves to allow the deletion
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
-	r.Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
+	Log.Info(fmt.Sprintf("Reconciled Service '%s' delete successfully", instance.Name))
 
 	util.LogForObject(helper, "Reconciled Service delete successfully", instance)
 	return ctrl.Result{}, nil
@@ -237,7 +243,8 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	helper *helper.Helper,
 	serviceLabels map[string]string,
 ) (ctrl.Result, error) {
-	r.Log.Info("Reconciling Service init")
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service init")
 	//
 	// expose the service (create service and return the created endpoint URLs)
 	//
@@ -398,33 +405,36 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		instance.Status.Conditions.Set(c)
 	}
 
-	r.Log.Info("Reconciled Service init successfully")
+	Log.Info("Reconciled Service init successfully")
 	return ctrlResult, nil
 }
 
 func (r *OctaviaAPIReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info("Reconciling Service update")
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service update")
 
 	// TODO: should have minor update tasks if required
 	// - delete dbsync hash from status to rerun it?
 
-	r.Log.Info("Reconciled Service update successfully")
+	Log.Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAPIReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info("Reconciling Service upgrade")
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service upgrade")
 
 	// TODO: should have major version upgrade tasks
 	// -delete dbsync hash from status to rerun it?
 
-	r.Log.Info("Reconciled Service upgrade successfully")
+	Log.Info("Reconciled Service upgrade successfully")
 	return ctrl.Result{}, nil
 }
 
 // TODO(tweining): implement
 func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
-	r.Log.Info("Reconciling Service")
+	Log := r.GetLogger(ctx)
+	Log.Info("Reconciling Service")
 
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
@@ -640,7 +650,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	}
 	// create Deployment - end
 
-	r.Log.Info("Reconciled Service successfully")
+	Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
 }
 
@@ -652,7 +662,8 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	h *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
-	r.Log.Info("Generating service config map")
+	Log := r.GetLogger(ctx)
+	Log.Info("Generating service config map")
 	//
 	// create Configmap/Secret required for octavia input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
@@ -730,10 +741,10 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 
 	if err != nil {
-		r.Log.Error(err, "unable to process config map")
+		Log.Error(err, "unable to process config map")
 		return err
 	}
-	r.Log.Info("Service config map generated")
+	Log.Info("Service config map generated")
 
 	return nil
 }
@@ -747,6 +758,7 @@ func (r *OctaviaAPIReconciler) createHashOfInputHashes(
 	instance *octaviav1.OctaviaAPI,
 	envVars map[string]env.Setter,
 ) (string, bool, error) {
+	Log := r.GetLogger(ctx)
 	var hashMap map[string]string
 	changed := false
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
@@ -756,7 +768,7 @@ func (r *OctaviaAPIReconciler) createHashOfInputHashes(
 	}
 	if hashMap, changed = util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, changed, nil
 }
