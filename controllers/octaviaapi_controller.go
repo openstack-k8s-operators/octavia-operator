@@ -530,7 +530,11 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
-	ovnMap, err := ovnclient.GetDBEndpoints(ctx, h, instance.Namespace, map[string]string{})
+	nbCluster, err := ovnclient.GetDBClusterByType(ctx, h, instance.Namespace, map[string]string{}, ovnclient.NBDBType)
+	if err != nil {
+		return err
+	}
+	sbCluster, err := ovnclient.GetDBClusterByType(ctx, h, instance.Namespace, map[string]string{}, ovnclient.SBDBType)
 	if err != nil {
 		return err
 	}
@@ -539,8 +543,15 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
-	templateParameters["NBConnection"] = ovnMap["internal-NB"]
-	templateParameters["SBConnection"] = ovnMap["internal-SB"]
+	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
+	if err != nil {
+		return err
+	}
+
+	templateParameters["SBConnection"], err = sbCluster.GetInternalEndpoint()
+	if err != nil {
+		return err
+	}
 
 	cms := []util.Template{
 		// ScriptsConfigMap
