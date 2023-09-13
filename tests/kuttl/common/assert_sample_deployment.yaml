@@ -6,7 +6,6 @@
 # - Octavia-internal Service
 # - Octavia-public Service
 # - Octavia-internal Route
-# - Octavia-public Route
 
 apiVersion: octavia.openstack.org/v1beta1
 kind: Octavia
@@ -214,7 +213,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    internal: "true"
+    endpoint: internal
     service: octavia
   name: octavia-internal
 spec:
@@ -228,7 +227,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    public: "true"
+    endpoint: public
     service: octavia
   name: octavia-public
 spec:
@@ -237,33 +236,3 @@ spec:
   selector:
     service: octavia
   type: ClusterIP
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: octavia-public
-  labels:
-    public: "true"
-    service: octavia
-spec:
-  port:
-    targetPort: octavia-public
-  to:
-    kind: Service
-    name: octavia-public
----
-# the actual addresses of the apiEndpoints are platform specific, so we can't rely on
-# kuttl asserts to check them. This short script gathers the addresses and checks that
-# the three endpoints are defined and their addresses follow the default pattern
-apiVersion: kuttl.dev/v1beta1
-kind: TestAssert
-commands:
-  - script: |
-      regex="octavia-public-${NAMESPACE}\.apps.*"
-      apiEndpoints=$(oc get route -n $NAMESPACE octavia-public -o jsonpath='{.status.ingress[0].host}')
-      matches=$(echo $apiEndpoints | sed -e "s?$regex??")
-      if [ -z "$matches" ]; then
-        exit 0
-      else
-        exit 1
-      fi
