@@ -150,11 +150,16 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		cl := condition.CreateList(
 			condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
 			condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
+			condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 			condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
 			condition.UnknownCondition(condition.RoleReadyCondition, condition.InitReason, condition.RoleReadyInitMessage),
 			condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
+			condition.UnknownCondition(octaviav1.OctaviaAPIReadyCondition, condition.InitReason, octaviav1.OctaviaAPIReadyInitMessage),
+			amphoraControllerInitCondition(octaviav1.HealthManager),
+			amphoraControllerInitCondition(octaviav1.Housekeeping),
+			amphoraControllerInitCondition(octaviav1.Worker),
 		)
 
 		instance.Status.Conditions.Init(&cl)
@@ -379,10 +384,10 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.InputReadyWaitingMessage))
+			condition.RabbitMqTransportURLReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.RabbitMqTransportURLReadyErrorMessage, err.Error()))
 		return ctrl.Result{}, err
 	}
 
@@ -519,10 +524,10 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ReadyCondition,
+			octaviav1.OctaviaAPIReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			"OctaviaAPI error occurred %s",
+			octaviav1.OctaviaAPIReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
 	}
@@ -534,18 +539,20 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
 	//
 	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
-	conditionStatus := octaviaAPI.Status.Conditions.Mirror(condition.ReadyCondition)
+	conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
 	if conditionStatus != nil {
 		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAPIReadyCondition, condition.DeploymentReadyMessage)
 	}
 
-	octaviaHousekeeping, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHousekeeping, "housekeeping")
+	octaviaHousekeeping, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ReadyCondition,
+			amphoraControllerReadyCondition(octaviav1.Housekeeping),
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			"OctaviaHousekeeping error occurred %s",
+			amphoraControllerErrorMessage(octaviav1.Housekeeping),
 			err.Error()))
 		return ctrl.Result{}, err
 	}
@@ -555,14 +562,20 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
+	conditionStatus = octaviaHousekeeping.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Housekeeping))
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
+	}
 
-	octaviaHealthManager, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHealthManager, "healthmanager")
+	octaviaHealthManager, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ReadyCondition,
+			amphoraControllerReadyCondition(octaviav1.HealthManager),
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			"OctaviaHealthManager error occurred %s",
+			amphoraControllerErrorMessage(octaviav1.HealthManager),
 			err.Error()))
 		return ctrl.Result{}, err
 	}
@@ -572,14 +585,20 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
+	conditionStatus = octaviaHealthManager.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.HealthManager))
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.HealthManager), condition.DeploymentReadyMessage)
+	}
 
-	octaviaWorker, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaWorker, "worker")
+	octaviaWorker, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaWorker, octaviav1.Worker)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ReadyCondition,
+			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			"OctaviaWorker error occurred %s",
+			amphoraControllerErrorMessage(octaviav1.Worker),
 			err.Error()))
 		return ctrl.Result{}, err
 	}
@@ -589,6 +608,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
+	conditionStatus = octaviaWorker.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Worker))
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Worker), condition.DeploymentReadyMessage)
+	}
 
 	// create Deployment - end
 
@@ -760,4 +785,40 @@ func (r *OctaviaReconciler) amphoraControllerDeploymentCreateOrUpdate(
 	})
 
 	return deployment, op, err
+}
+
+func amphoraControllerReadyCondition(role string) condition.Type {
+	condMap := map[string]condition.Type{
+		octaviav1.HealthManager: octaviav1.OctaviaHealthManagerReadyCondition,
+		octaviav1.Housekeeping:  octaviav1.OctaviaHousekeepingReadyCondition,
+		octaviav1.Worker:        octaviav1.OctaviaWorkerReadyCondition,
+	}
+	return condMap[role]
+}
+
+func amphoraControllerInitCondition(role string) *condition.Condition {
+	condMap := map[string]*condition.Condition{
+		octaviav1.HealthManager: condition.UnknownCondition(
+			amphoraControllerReadyCondition(role),
+			condition.InitReason,
+			octaviav1.OctaviaHealthManagerReadyInitMessage),
+		octaviav1.Housekeeping: condition.UnknownCondition(
+			amphoraControllerReadyCondition(role),
+			condition.InitReason,
+			octaviav1.OctaviaHousekeepingReadyInitMessage),
+		octaviav1.Worker: condition.UnknownCondition(
+			amphoraControllerReadyCondition(role),
+			condition.InitReason,
+			octaviav1.OctaviaWorkerReadyInitMessage),
+	}
+	return condMap[role]
+}
+
+func amphoraControllerErrorMessage(role string) string {
+	condMap := map[string]string{
+		octaviav1.HealthManager: octaviav1.OctaviaHealthManagerReadyErrorMessage,
+		octaviav1.Housekeeping:  octaviav1.OctaviaHousekeepingReadyErrorMessage,
+		octaviav1.Worker:        octaviav1.OctaviaWorkerReadyErrorMessage,
+	}
+	return condMap[role]
 }
