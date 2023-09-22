@@ -46,12 +46,6 @@ func getVolumeMounts(serviceName string) []corev1.VolumeMount {
 			MountPath: "/run/octavia",
 			ReadOnly:  false,
 		},
-		{
-			Name:      "config-data-merged",
-			MountPath: "/var/lib/kolla/config_files/config.json",
-			SubPath:   serviceName + "-config.json",
-			ReadOnly:  true,
-		},
 	}
-	return append(octavia.GetVolumeMounts(), volumeMounts...)
+	return append(octavia.GetVolumeMounts(serviceName), volumeMounts...)
 }

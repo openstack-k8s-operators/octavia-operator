@@ -3,13 +3,12 @@ kind: Octavia
 metadata:
   name: octavia
 spec:
-  # TODO(tweining): Add fields here
   databaseInstance: openstack
   databaseUser: octavia
   serviceUser: octavia
+  rabbitMqClusterName: rabbitmq
+  replicas: 1
   secret: osp-secret
-  # passwordSelectors: TODO
-  # nodeSelector: TODO
   debug:
     dbSync: false
     service: false
@@ -17,14 +16,51 @@ spec:
   customServiceConfig: |
     [DEFAULT]
     debug = true
+  octaviaHousekeeping:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: housekeeping
+    certssecret: todo
+    replicas: 1
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+  octaviaHealthManager:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: healthmanager
+    certssecret: todo
+    replicas: 1
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+  octaviaWorker:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    replicas: 1
+    role: worker
+    certssecret: todo
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
   octaviaAPI:
     databaseInstance: openstack
     databaseUser: octavia
     serviceUser: octavia
     serviceAccount: octavia
     secret: osp-secret
-    # passwordSelectors: TODO
-    # nodeSelector: TODO
     debug:
       dbSync: false
       service: false

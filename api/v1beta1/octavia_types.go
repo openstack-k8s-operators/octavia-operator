@@ -27,6 +27,15 @@ const (
 
 	// OctaviaAPIContainerImage is the fall-back container image for OctaviaAPI
 	OctaviaAPIContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified"
+
+	// OctaviaHousekeepingContainerImage is the fall-back container image for OctaviaHousekeeping
+	OctaviaHousekeepingContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-housekeeping:current-podified"
+
+	// OctaviaHealthManagerContainerImage is the fall-back container image for OctaviaHealthManager
+	OctaviaHealthManagerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-health-manager:current-podified"
+
+	// OctaviaWorkerContainerImage is the fall-back container image for OctaviaWorker
+	OctaviaWorkerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-worker:current-podified"
 )
 
 // OctaviaSpec defines the desired state of Octavia
@@ -45,6 +54,12 @@ type OctaviaSpec struct {
 	// DatabaseUser - optional username used for octavia DB, defaults to octavia
 	// TODO: -> implement needs work in mariadb-operator, right now only octavia
 	DatabaseUser string `json:"databaseUser"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=rabbitmq
+	// RabbitMQ instance name
+	// Needed to request a transportURL that is created and used in Octavia
+	RabbitMqClusterName string `json:"rabbitMqClusterName"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
@@ -90,6 +105,18 @@ type OctaviaSpec struct {
 	// +kubebuilder:validation:Required
 	// OctaviaAPI - Spec definition for the API service of the Octavia deployment
 	OctaviaAPI OctaviaAPISpec `json:"octaviaAPI"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHousekeeping OctaviaAmphoraControllerSpec `json:"octaviaHousekeeping"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHealthManager OctaviaAmphoraControllerSpec `json:"octaviaHealthManager"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaWorker OctaviaAmphoraControllerSpec `json:"octaviaWorker"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
@@ -116,6 +143,9 @@ type OctaviaStatus struct {
 
 	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// TransportURLSecret - Secret containing RabbitMQ transportURL
+	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// ReadyCount of octavia API instances
 	OctaviaAPIReadyCount int32 `json:"apireadyCount,omitempty"`
@@ -169,7 +199,10 @@ func (instance Octavia) IsReady() bool {
 func SetupDefaults() {
 	// Acquire environmental defaults and initialize Octavia defaults with them
 	octaviaDefaults := OctaviaDefaults{
-		ContainerImageURL: util.GetEnvVar("OCTAVIA_API_IMAGE_URL_DEFAULT", OctaviaAPIContainerImage),
+		APIContainerImageURL: util.GetEnvVar("OCTAVIA_API_IMAGE_URL_DEFAULT", OctaviaAPIContainerImage),
+		HousekeepingContainerImageURL: util.GetEnvVar("OCTAVIA_HOUSEKEEPING_IMAGE_URL_DEFAULT", OctaviaHousekeepingContainerImage),
+		HealthManagerContainerImageURL: util.GetEnvVar("OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
+		WorkerContainerImageURL: util.GetEnvVar("OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
 	}
 
 	SetupOctaviaDefaults(octaviaDefaults)
