@@ -23,6 +23,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// HealthManager is the role name for amphora controllers for the Octavia Health Manager services
+	HealthManager = "healthmanager"
+	// Housekeeping is the role name for amphora controllers for the Octavia Housekeeping services
+	Housekeeping = "housekeeping"
+	// Worker is the role name for amphora controllers for the Octavia Workerservices
+	Worker = "worker"
+)
+
 // OctaviaAmphoraControllerSpec defines common state for all Octavia Amphora Controllers
 type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Required
