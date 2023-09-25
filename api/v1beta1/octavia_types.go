@@ -199,10 +199,10 @@ func (instance Octavia) IsReady() bool {
 func SetupDefaults() {
 	// Acquire environmental defaults and initialize Octavia defaults with them
 	octaviaDefaults := OctaviaDefaults{
-		APIContainerImageURL: util.GetEnvVar("OCTAVIA_API_IMAGE_URL_DEFAULT", OctaviaAPIContainerImage),
-		HousekeepingContainerImageURL: util.GetEnvVar("OCTAVIA_HOUSEKEEPING_IMAGE_URL_DEFAULT", OctaviaHousekeepingContainerImage),
-		HealthManagerContainerImageURL: util.GetEnvVar("OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
-		WorkerContainerImageURL: util.GetEnvVar("OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
+		APIContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_API_IMAGE_URL_DEFAULT", OctaviaAPIContainerImage),
+		HousekeepingContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HOUSEKEEPING_IMAGE_URL_DEFAULT", OctaviaHousekeepingContainerImage),
+		HealthManagerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
+		WorkerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
 	}
 
 	SetupOctaviaDefaults(octaviaDefaults)
