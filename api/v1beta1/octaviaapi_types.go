@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -60,7 +61,7 @@ type OctaviaAPISpec struct {
 
 	// +kubebuilder:validation:Required
 	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
-    ServiceAccount string `json:"serviceAccount"`
+	ServiceAccount string `json:"serviceAccount"`
 
 	// +kubebuilder:validation:Required
 	// Octavia Container Image URL
@@ -113,6 +114,17 @@ type OctaviaAPISpec struct {
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Override, provides the ability to override the generated manifest of several child resources.
+	Override APIOverrideSpec `json:"override,omitempty"`
+}
+
+// APIOverrideSpec to override the generated manifest of several child resources.
+type APIOverrideSpec struct {
+	// Override configuration for the Service created to serve traffic to the cluster.
+	// The key must be the endpoint type (public, internal)
+	Service map[service.Endpoint]service.RoutedOverrideSpec `json:"service,omitempty"`
 }
 
 // OctaviaAPIDebug defines the observed state of OctaviaAPI

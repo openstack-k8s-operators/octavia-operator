@@ -23,7 +23,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	routev1 "github.com/openshift/api/route/v1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -34,6 +33,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -178,7 +178,6 @@ func (r *OctaviaAPIReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&routev1.Route{}).
 		Watches(&source.Kind{Type: &ovnclient.OVNDBCluster{}}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.Log))).
 		Complete(r)
 }
@@ -235,40 +234,108 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 ) (ctrl.Result, error) {
 	r.Log.Info("Reconciling Service init")
 	//
-	// expose the service (create service, route and return the created endpoint URLs)
+	// expose the service (create service and return the created endpoint URLs)
 	//
-	var octaviaPorts = map[endpoint.Endpoint]endpoint.Data{
-		endpoint.EndpointPublic: {
+	var octaviaEndpoints = map[service.Endpoint]endpoint.Data{
+		service.EndpointPublic: {
 			Port: octavia.OctaviaPublicPort,
 		},
-		endpoint.EndpointInternal: {
+		service.EndpointInternal: {
 			Port: octavia.OctaviaInternalPort,
 		},
 	}
 
-	apiEndpoints, ctrlResult, err := endpoint.ExposeEndpoints(
-		ctx,
-		helper,
-		octavia.ServiceName,
-		serviceLabels,
-		octaviaPorts,
-		time.Duration(5)*time.Second,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
-		return ctrlResult, nil
+	apiEndpoints := make(map[string]string)
+
+	for endpointType, data := range octaviaEndpoints {
+		endpointTypeStr := string(endpointType)
+		endpointName := octavia.ServiceName + "-" + endpointTypeStr
+
+		svcOverride := instance.Spec.Override.Service[endpointType]
+		if svcOverride.EmbeddedLabelsAnnotations == nil {
+			svcOverride.EmbeddedLabelsAnnotations = &service.EmbeddedLabelsAnnotations{}
+		}
+
+		exportLabels := util.MergeStringMaps(
+			serviceLabels,
+			map[string]string{
+				service.AnnotationEndpointKey: endpointTypeStr,
+			},
+		)
+
+		// Create the service
+		svc, err := service.NewService(
+			service.GenericService(&service.GenericServiceDetails{
+				Name:      endpointName,
+				Namespace: instance.Namespace,
+				Labels:    exportLabels,
+				Selector:  serviceLabels,
+				Port: service.GenericServicePort{
+					Name:     endpointName,
+					Port:     data.Port,
+					Protocol: corev1.ProtocolTCP,
+				},
+			}),
+			5,
+			&svcOverride.OverrideSpec,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
+
+			return ctrl.Result{}, err
+		}
+
+		svc.AddAnnotation(map[string]string{
+			service.AnnotationEndpointKey: endpointTypeStr,
+		})
+
+		// add Annotation to whether creating an ingress is required or not
+		if endpointType == service.EndpointPublic && svc.GetServiceType() == corev1.ServiceTypeClusterIP {
+			svc.AddAnnotation(map[string]string{
+				service.AnnotationIngressCreateKey: "true",
+			})
+		} else {
+			svc.AddAnnotation(map[string]string{
+				service.AnnotationIngressCreateKey: "false",
+			})
+			if svc.GetServiceType() == corev1.ServiceTypeLoadBalancer {
+				svc.AddAnnotation(map[string]string{
+					service.AnnotationHostnameKey: svc.GetServiceHostname(), // add annotation to register service name in dnsmasq
+				})
+			}
+		}
+
+		ctrlResult, err := svc.CreateOrPatch(ctx, helper)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.ExposeServiceReadyErrorMessage,
+				err.Error()))
+
+			return ctrlResult, err
+		} else if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.ExposeServiceReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.ExposeServiceReadyRunningMessage))
+			return ctrlResult, nil
+		}
+		// create service - end
+
+		// TODO: TLS, pass in https as protocol, create TLS cert
+		apiEndpoints[string(endpointType)], err = svc.GetAPIEndpoint(
+			svcOverride.EndpointURL, data.Protocol, data.Path)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
 	}
 	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
 	// expose service - end
@@ -286,7 +353,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		PasswordSelector:   instance.Spec.PasswordSelectors.Service,
 	}
 	ksSvc := keystonev1.NewKeystoneService(ksSvcSpec, instance.Namespace, serviceLabels, time.Duration(10)*time.Second)
-	ctrlResult, err = ksSvc.CreateOrPatch(ctx, helper)
+	ctrlResult, err := ksSvc.CreateOrPatch(ctx, helper)
 	if err != nil {
 		return ctrlResult, err
 	}

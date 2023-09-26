@@ -5,7 +5,6 @@
 # No Deployment for OctaviaAPI CR
 # No Pods in octavia Deployment
 # No Octavia Services
-# No Octavia Routes
 #
 apiVersion: octavia.openstack.org/v1beta1
 kind: Octavia
@@ -32,7 +31,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    internal: "true"
+    endpoint: internal
     service: octavia
   name: octavia-internal
 spec:
@@ -46,7 +45,7 @@ apiVersion: v1
 kind: Service
 metadata:
   labels:
-    public: "true"
+    endpoint: public
     service: octavia
   name: octavia-public
 spec:
@@ -55,17 +54,3 @@ spec:
   selector:
     service: octavia
   type: ClusterIP
----
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  name: octavia-public
-  labels:
-    public: "true"
-    service: octavia
-spec:
-  port:
-    targetPort: octavia-public
-  to:
-    kind: Service
-    name: octavia-public
