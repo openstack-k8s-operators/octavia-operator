@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
@@ -29,6 +30,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
@@ -56,6 +58,7 @@ type OctaviaAmphoraControllerReconciler struct {
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaamphoracontrollers,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaamphoracontrollers/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviaamphoracontrollers/finalizers,verbs=update
+// +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
 
 // Reconcile implementation of the reconcile loop for amphora
 // controllers like the octavia housekeeper, worker and health manager
@@ -84,6 +87,7 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 			condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 			condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
 		)
 		// TODO(beagles): what other conditions?
 		instance.Status.Conditions.Init(&cl)
@@ -94,6 +98,10 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 
 	if instance.Status.Hash == nil {
 		instance.Status.Hash = map[string]string{}
+	}
+
+	if instance.Status.NetworkAttachments == nil {
+		instance.Status.NetworkAttachments = map[string][]string{}
 	}
 
 	helper, err := helper.NewHelper(
@@ -202,6 +210,34 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
+	for _, networkAttachment := range instance.Spec.NetworkAttachments {
+		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.NetworkAttachmentsReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.NetworkAttachmentsReadyWaitingMessage,
+					networkAttachment))
+				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", networkAttachment)
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	}
+
+	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+			instance.Spec.NetworkAttachments, err)
+	}
+
 	// Handle service update
 	ctrlResult, err := r.reconcileUpdate(ctx, instance, helper)
 	if err != nil {
@@ -231,7 +267,8 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		amphoracontrollers.Deployment(
 			instance,
 			inputHash,
-			serviceLabels),
+			serviceLabels,
+			serviceAnnotations),
 		5,
 	)
 
@@ -252,10 +289,45 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 			condition.DeploymentReadyRunningMessage))
 		return ctrlResult, nil
 	}
+
+	// verify if network attachment matches expectations
+	networkReady := false
+	networkAttachmentStatus := map[string][]string{}
+	if *instance.Spec.Replicas > 0 {
+		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
+			ctx,
+			helper,
+			instance.Spec.NetworkAttachments,
+			serviceLabels,
+			instance.Status.ReadyCount,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkReady = true
+	}
+
+	instance.Status.NetworkAttachments = networkAttachmentStatus
+	if networkReady {
+		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+	} else {
+		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err.Error()))
+
+		return ctrl.Result{}, err
+	}
+
 	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
 	if instance.Status.ReadyCount > 0 {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
 	}
+
 	// create Deployment - end
 
 	util.LogForObject(helper, "Reconciled Service successfully", instance)

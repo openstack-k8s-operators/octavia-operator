@@ -34,6 +34,7 @@ func Deployment(
 	instance *octaviav1.OctaviaAmphoraController,
 	configHash string,
 	labels map[string]string,
+	annotations map[string]string,
 ) *appsv1.Deployment {
 	serviceName := fmt.Sprintf("octavia-%s", instance.Spec.Role)
 
@@ -86,10 +87,11 @@ func Deployment(
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
-			Replicas: &instance.Spec.Replicas,
+			Replicas: instance.Spec.Replicas,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Annotations: annotations,
+					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: instance.Spec.ServiceAccount,
