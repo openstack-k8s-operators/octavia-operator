@@ -7,7 +7,6 @@ spec:
   databaseUser: octavia
   serviceUser: octavia
   rabbitMqClusterName: rabbitmq
-  replicas: 1
   secret: osp-secret
   debug:
     dbSync: false
@@ -23,7 +22,6 @@ spec:
     serviceAccount: octavia
     role: housekeeping
     certssecret: todo
-    replicas: 1
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -36,7 +34,6 @@ spec:
     serviceAccount: octavia
     role: healthmanager
     certssecret: todo
-    replicas: 1
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -47,7 +44,6 @@ spec:
     databaseUser: octavia
     serviceUser: octavia
     serviceAccount: octavia
-    replicas: 1
     role: worker
     certssecret: todo
     secret: osp-secret
