@@ -142,6 +142,12 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
+                  networkAttachments:
+                    description: NetworkAttachments is a list of NetworkAttachment
+                      resource names to expose the services to the given network
+                    items:
+                      type: string
+                    type: array
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -470,6 +476,12 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
+                  networkAttachments:
+                    description: NetworkAttachments is a list of NetworkAttachment
+                      resource names to expose the services to the given network
+                    items:
+                      type: string
+                    type: array
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -620,6 +632,12 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
+                  networkAttachments:
+                    description: NetworkAttachments is a list of NetworkAttachment
+                      resource names to expose the services to the given network
+                    items:
+                      type: string
+                    type: array
                   nodeSelector:
                     additionalProperties:
                       type: string
@@ -770,6 +788,12 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
+                  networkAttachments:
+                    description: NetworkAttachments is a list of NetworkAttachment
+                      resource names to expose the services to the given network
+                    items:
+                      type: string
+                    type: array
                   nodeSelector:
                     additionalProperties:
                       type: string

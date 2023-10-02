@@ -72,7 +72,7 @@ type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Maximum=32
 	// +kubebuilder:validation:Minimum=0
 	// Replicas - Octavia Worker Replicas
-	Replicas int32 `json:"replicas"`
+	Replicas *int32 `json:"replicas"`
 
 	// +kubebuilder:validation:Required
 	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
@@ -112,6 +112,10 @@ type OctaviaAmphoraControllerSpec struct {
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// NetworkAttachments is a list of NetworkAttachment resource names to expose the services to the given network
+	NetworkAttachments []string `json:"networkAttachments,omitempty"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller
@@ -127,10 +131,14 @@ type OctaviaAmphoraControllerStatus struct {
 
 	// Octavia Database Hostname
 	DatabaseHostname string `json:"databaseHostname,omitempty"`
+
+	// NetworkAttachment status of the deployment pods
+	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="NetworkAttachments",type="string",JSONPath=".status.spec.networkAttachments",description="NetworkAttachments"
 //+kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.conditions[0].status",description="Status"
 //+kubebuilder:printcolumn:name="Message",type="string",JSONPath=".status.conditions[0].message",description="Message"
 
