@@ -24,6 +24,7 @@ export DBHOST=${DatabaseHost:?"Please specify a DatabaseHost variable."}
 export DBUSER=${DatabaseUser:?"Please specify a DatabaseUser variable."}
 export DBPASSWORD=${DatabasePassword:?"Please specify a DatabasePassword variable."}
 export DB=${DatabaseName:-"octavia"}
+export TRANSPORTURL=${TransportURL:-""}
 
 SVC_CFG=/etc/octavia/octavia.conf
 SVC_CFG_MERGED=/var/lib/config-data/merged/octavia.conf
@@ -40,6 +41,10 @@ for dir in /var/lib/config-data/default; do
     merge_config_dir ${dir}
 done
 
+# set secrets
+if [ -n "$TRANSPORTURL" ]; then
+    crudini --set /var/lib/config-data/merged/octavia.conf DEFAULT transport_url $TRANSPORTURL
+fi
 # set secrets
 crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
 crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $PASSWORD

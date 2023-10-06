@@ -34,6 +34,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
+	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -188,7 +189,27 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	// Handle config map
 	configMapVars := make(map[string]env.Setter)
-	err := r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
+	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("TransportURL secret %s not found", instance.Spec.TransportURLSecret)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+
+	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -198,6 +219,8 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+
+	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	//
 	// create hash over all the different input resources to identify if any those changed

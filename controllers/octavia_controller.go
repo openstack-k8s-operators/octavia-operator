@@ -749,6 +749,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
 		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		if len(deployment.Spec.NodeSelector) == 0 {
