@@ -273,6 +273,15 @@ rules:
   - security.openshift.io
   resourceNames:
   - anyuid
+  - hostmount-anyuid
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - anyuid
   - privileged
   resources:
   - securitycontextconstraints

@@ -372,6 +372,9 @@ spec:
                 default: octavia
                 description: ServiceUser - service user name
                 type: string
+              transportURLSecret:
+                description: TransportURLSecret - Secret containing RabbitMQ transportURL
+                type: string
             required:
             - containerImage
             - databaseInstance
