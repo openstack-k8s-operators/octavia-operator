@@ -17,7 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -116,6 +115,16 @@ type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Optional
 	// NetworkAttachments is a list of NetworkAttachment resource names to expose the services to the given network
 	NetworkAttachments []string `json:"networkAttachments,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=service
+	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
+	// TODO(gthiemonge) same as ServiceAccount?
+	TenantName string `json:"tenantName"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
+	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller
@@ -144,10 +153,10 @@ type OctaviaAmphoraControllerStatus struct {
 
 // OctaviaAmphoraController is the Schema for the octaviaworkers API
 type OctaviaAmphoraController struct {
-	metav1.TypeMeta `json:",inline"`
+	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec OctaviaAmphoraControllerSpec `json:"spec,omitempty"`
+	Spec   OctaviaAmphoraControllerSpec   `json:"spec,omitempty"`
 	Status OctaviaAmphoraControllerStatus `json:"status,omitempty"`
 }
 

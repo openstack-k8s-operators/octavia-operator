@@ -37,36 +37,36 @@ const (
 	//
 	// OctaviaAPIReady condition messages
 	//
-    // OctaviaAPIReadyInitMessage
-    OctaviaAPIReadyInitMessage = "OctaviaAPI not started"
+	// OctaviaAPIReadyInitMessage
+	OctaviaAPIReadyInitMessage = "OctaviaAPI not started"
 
-    // OctaviaAPIReadyErrorMessage
-    OctaviaAPIReadyErrorMessage = "OctaviaAPI error occured %s"
+	// OctaviaAPIReadyErrorMessage
+	OctaviaAPIReadyErrorMessage = "OctaviaAPI error occured %s"
 
-    //
-    // OctaviaHealthManagerReady condition messages
-    //
-    // OctaviaHealthManagerReadyInitMessage
-    OctaviaHealthManagerReadyInitMessage = "OctaviaHealthManager is not started"
+	//
+	// OctaviaHealthManagerReady condition messages
+	//
+	// OctaviaHealthManagerReadyInitMessage
+	OctaviaHealthManagerReadyInitMessage = "OctaviaHealthManager is not started"
 
-    // OctaviaHealthManagerReadyErrorMessage
-    OctaviaHealthManagerReadyErrorMessage = "OctaviaHealthManager error occured %s"
+	// OctaviaHealthManagerReadyErrorMessage
+	OctaviaHealthManagerReadyErrorMessage = "OctaviaHealthManager error occured %s"
 
-    //
-    // OctaviaHousekeepingReady condition messages
-    //
-    // OctaviaHousekeepingReadyInitMessage
-    OctaviaHousekeepingReadyInitMessage = "OctaviaHousekeeping are not started"
+	//
+	// OctaviaHousekeepingReady condition messages
+	//
+	// OctaviaHousekeepingReadyInitMessage
+	OctaviaHousekeepingReadyInitMessage = "OctaviaHousekeeping are not started"
 
-    // OctaviaAmphoraControllerReadyErrorMessage
-    OctaviaHousekeepingReadyErrorMessage = "OctaviaHousekeeping error occured %s"
+	// OctaviaAmphoraControllerReadyErrorMessage
+	OctaviaHousekeepingReadyErrorMessage = "OctaviaHousekeeping error occured %s"
 
-    //
-    // OctaviaWorkerReady condition messages
-    //
-    // OctaviaWorkerReadyInitMessage
-    OctaviaWorkerReadyInitMessage = "OctaviaWorker are not started"
+	//
+	// OctaviaWorkerReady condition messages
+	//
+	// OctaviaWorkerReadyInitMessage
+	OctaviaWorkerReadyInitMessage = "OctaviaWorker are not started"
 
-    // OctaviaAmphoraControllerReadyErrorMessage
-    OctaviaWorkerReadyErrorMessage = "OctaviaWorker error occured %s"
+	// OctaviaAmphoraControllerReadyErrorMessage
+	OctaviaWorkerReadyErrorMessage = "OctaviaWorker error occured %s"
 )
