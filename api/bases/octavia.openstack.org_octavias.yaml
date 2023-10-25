@@ -456,9 +456,15 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  certspassphrasesecret:
+                    default: octavia-ca-passphrase
+                    description: '*kubebuilder:validation:Optional Name of secret
+                      containing passphrase for the CA private keys'
+                    type: string
                   certssecret:
-                    description: '*kubebuilder:validation:Required Secret containing
-                      certs for securing communication with amphora based Load Balancers'
+                    description: '*kubebuilder:validation:Required LoadBalancerCerts
+                      - Secret containing certs for securing communication with amphora
+                      based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -622,6 +628,7 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
+                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
@@ -632,9 +639,15 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  certspassphrasesecret:
+                    default: octavia-ca-passphrase
+                    description: '*kubebuilder:validation:Optional Name of secret
+                      containing passphrase for the CA private keys'
+                    type: string
                   certssecret:
-                    description: '*kubebuilder:validation:Required Secret containing
-                      certs for securing communication with amphora based Load Balancers'
+                    description: '*kubebuilder:validation:Required LoadBalancerCerts
+                      - Secret containing certs for securing communication with amphora
+                      based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -798,6 +811,7 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
+                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
@@ -808,9 +822,15 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  certspassphrasesecret:
+                    default: octavia-ca-passphrase
+                    description: '*kubebuilder:validation:Optional Name of secret
+                      containing passphrase for the CA private keys'
+                    type: string
                   certssecret:
-                    description: '*kubebuilder:validation:Required Secret containing
-                      certs for securing communication with amphora based Load Balancers'
+                    description: '*kubebuilder:validation:Required LoadBalancerCerts
+                      - Secret containing certs for securing communication with amphora
+                      based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -974,6 +994,7 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
+                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
