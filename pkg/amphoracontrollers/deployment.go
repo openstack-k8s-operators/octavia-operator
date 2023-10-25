@@ -41,6 +41,10 @@ func Deployment(
 	// The API pod has an extra volume so the API and the provider agent can
 	// communicate with each other.
 	volumes := octavia.GetVolumes(instance.Name)
+	volumes = append(volumes, GetCertVolume(instance.Spec.LoadBalancerCerts)...)
+
+	volumeMounts := octavia.GetVolumeMounts(serviceName)
+	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
 
 	// TODO(beagles): service debugging
 
@@ -100,7 +104,7 @@ func Deployment(
 							Name:           serviceName,
 							Image:          instance.Spec.ContainerImage,
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   octavia.GetVolumeMounts(serviceName),
+							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
