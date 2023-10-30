@@ -5,16 +5,13 @@
             "label": "Run make",
             "type": "shell",
             "command": "make install manifests generate fmt vet",
-            "group": {
-                "kind": "build",
-                "isDefault": true
-            },
+            "group": "build",
             "presentation": {
                 "reveal": "always",
                 "panel": "new"
             },
             "options": {
-                "cwd": "${workspaceFolder}/octavia-operator",
+                "cwd": "${fileWorkspaceFolder}/",
                 "env": {
                     "OPERATOR_TEMPLATES": "./templates",
                     "PATH": "~/.crc/bin/oc:${env:PATH}"
@@ -23,4 +20,4 @@
             "problemMatcher": []
         }
     ]
-  }
+}

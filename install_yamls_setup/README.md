@@ -8,13 +8,15 @@ See `install_yamls_setup/roles/podified_cp/defaults/main.yaml` for variables
 and their default values. In addition to that these variables need to be
 defined:
 
-    openshift_pull_secret: <pull secret from https://console.redhat.com/openshift/create/local >
+    openshift_pull_secret: '<pull secret from https://console.redhat.com/openshift/create/local >'
     podman_dockerio_user: <user>
     podman_dockerio_password: <password>
     podman_quayio_user: <user>
     podman_quayio_password: <password>
 
-The recommended way to manage those secrets is using `ansible-vault`.
+The recommended way to manage those secrets is using `ansible-vault`. Pay attention that
+`openshift_pull_secret` needs to be a string and hence the JSON data needs to be put in
+quotes.
 
 ## Playbook
 
