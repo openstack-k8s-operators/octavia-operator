@@ -30,11 +30,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// ClientOpts - enable features in the OpenStack client
+type ClientOpts struct {
+	// SystemScope indicates that the client uses system scope instead of project scope
+	SystemScope bool
+}
+
 // GetAdminServiceClient -
 func GetAdminServiceClient(
 	ctx context.Context,
 	h *helper.Helper,
 	keystoneAPI *keystonev1.KeystoneAPI,
+	clientOpts ClientOpts,
 ) (*openstack.OpenStack, ctrl.Result, error) {
 	// get public endpoint as authurl from keystone instance
 	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
@@ -57,19 +64,24 @@ func GetAdminServiceClient(
 		return nil, ctrlResult, nil
 	}
 
+	authOpts := openstack.AuthOpts{
+		AuthURL:    authURL,
+		Username:   keystoneAPI.Spec.AdminUser,
+		Password:   authPassword,
+		TenantName: keystoneAPI.Spec.AdminProject,
+		DomainName: "Default",
+		Region:     keystoneAPI.Spec.Region,
+	}
+	if clientOpts.SystemScope {
+		authOpts.Scope = &gophercloud.AuthScope{
+			System: clientOpts.SystemScope,
+		}
+	}
+
 	os, err := openstack.NewOpenStack(
 		h.GetLogger(),
-		openstack.AuthOpts{
-			AuthURL:    authURL,
-			Username:   keystoneAPI.Spec.AdminUser,
-			Password:   authPassword,
-			TenantName: keystoneAPI.Spec.AdminProject,
-			DomainName: "Default",
-			Region:     keystoneAPI.Spec.Region,
-			Scope: &gophercloud.AuthScope{
-				System: true,
-			},
-		})
+		authOpts,
+	)
 	if err != nil {
 		return nil, ctrl.Result{}, err
 	}
@@ -100,4 +112,19 @@ func GetNetworkClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error
 		Availability: gophercloud.AvailabilityInternal,
 	}
 	return gophercloudopenstack.NewNetworkV2(o.GetOSClient().ProviderClient, endpointOpts)
+}
+
+// GetComputeClient -
+func GetComputeClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error) {
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       o.GetRegion(),
+		Availability: gophercloud.AvailabilityInternal,
+	}
+	client, err := gophercloudopenstack.NewComputeV2(o.GetOSClient().ProviderClient, endpointOpts)
+	if err != nil {
+		return nil, err
+	}
+	// Need at least microversion 2.55 for flavor description
+	client.Microversion = "2.55"
+	return client, nil
 }

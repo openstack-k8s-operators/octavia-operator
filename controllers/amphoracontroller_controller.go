@@ -58,6 +58,12 @@ type OctaviaAmphoraControllerReconciler struct {
 	Scheme  *runtime.Scheme
 }
 
+// OctaviaTemplateVars structure that contains generated parameters for the service config files
+type OctaviaTemplateVars struct {
+	LbMgmtNetworkID        string
+	AmphoraDefaultFlavorID string
+}
+
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
 func (r *OctaviaAmphoraControllerReconciler) GetLogger(ctx context.Context) logr.Logger {
 	return log.FromContext(ctx).WithName("Controllers").WithName("OctaviaAmphoraController")
@@ -226,7 +232,18 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkID))
 
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, networkID)
+	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
+
+	templateVars := OctaviaTemplateVars{
+		LbMgmtNetworkID:        networkID,
+		AmphoraDefaultFlavorID: defaultFlavorID,
+	}
+
+	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, templateVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -379,7 +396,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
-	lbMgmtNetworkID string,
+	templateVars OctaviaTemplateVars,
 ) error {
 	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
@@ -405,7 +422,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["ServiceRoleName"] = instance.Spec.Role
-	templateParameters["LbMgmtNetworkId"] = lbMgmtNetworkID
+	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
+	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
