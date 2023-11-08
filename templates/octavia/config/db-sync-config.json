@@ -10,11 +10,6 @@
     ],
     "permissions": [
         {
-            "path": "/var/log/octavia",
-            "owner": "octavia:octavia",
-            "recurse": true
-        },
-        {
             "path": "/run/octavia",
             "owner": "octavia:octavia",
             "recurse": true

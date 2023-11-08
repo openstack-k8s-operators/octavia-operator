@@ -1,5 +1,5 @@
 {
-    "command": "/usr/bin/octavia-health-manager --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf --log-file /var/log/octavia/healthmanager.log",
+    "command": "/usr/bin/octavia-health-manager --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf",
     "config_files": [
         {
             "source": "/var/lib/config-data/merged/octavia.conf",
@@ -12,13 +12,6 @@
             "dest": "/etc/octavia/octavia.conf.d/custom.conf",
             "owner": "octavia",
             "perm": "0600"
-        }
-    ],
-    "permissions": [
-        {
-            "path": "/var/log/octavia",
-            "owner": "octavia:octavia",
-            "recurse": true
         }
     ]
 }
