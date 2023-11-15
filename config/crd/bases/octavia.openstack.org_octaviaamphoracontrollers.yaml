@@ -87,6 +87,21 @@ spec:
                   to add additional files. Those get added to the service config dir
                   in /etc/<service> . TODO: -> implement'
                 type: object
+              lbMgmtNetwork:
+                default:
+                  manageLbMgmtNetworks: true
+                  subnetIpVersion: 4
+                description: OctaviaLbMgmtNetworks Settings for Octavia management
+                  networks
+                properties:
+                  manageLbMgmtNetworks:
+                    default: true
+                    type: boolean
+                  subnetIpVersion:
+                    default: 4
+                    description: IP Version of the managed subnets
+                    type: integer
+                type: object
               networkAttachments:
                 description: NetworkAttachments is a list of NetworkAttachment resource
                   names to expose the services to the given network
@@ -189,6 +204,11 @@ spec:
                 default: octavia
                 description: 'ServiceUser - service user name (TODO: beagles, do we
                   need this at all)'
+                type: string
+              tenantName:
+                default: service
+                description: TenantName - the name of the OpenStack tenant that controls
+                  the Octavia resources TODO(gthiemonge) same as ServiceAccount?
                 type: string
               transportURLSecret:
                 description: TransportURLSecret - Secret containing RabbitMQ transportURL

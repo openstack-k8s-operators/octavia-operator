@@ -35,6 +35,7 @@ import (
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	neutronv1 "github.com/openstack-k8s-operators/neutron-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -218,7 +219,14 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
 
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
+	// Create load balancer management network and get its Id
+	networkID, err := amphoracontrollers.EnsureLbMgmtNetworks(ctx, instance, &r.Log, helper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkID))
+
+	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, networkID)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -371,6 +379,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
+	lbMgmtNetworkID string,
 ) error {
 	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
@@ -396,6 +405,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["ServiceRoleName"] = instance.Spec.Role
+	templateParameters["LbMgmtNetworkId"] = lbMgmtNetworkID
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
@@ -459,5 +469,6 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
+		Owns(&neutronv1.NeutronAPI{}).
 		Complete(r)
 }

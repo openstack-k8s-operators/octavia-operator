@@ -818,6 +818,8 @@ func (r *OctaviaReconciler) amphoraControllerDeploymentCreateOrUpdate(
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
+		deployment.Spec.LbMgmtNetworks.ManageLbMgmtNetworks = instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks
+		deployment.Spec.LbMgmtNetworks.SubnetIPVersion = instance.Spec.LbMgmtNetworks.SubnetIPVersion
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
