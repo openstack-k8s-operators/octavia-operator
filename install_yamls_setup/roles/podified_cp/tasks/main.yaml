@@ -23,6 +23,7 @@
       - podman
       - python3
       - python3-pip
+      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
     state: latest
   become: yes
   tags: install
@@ -187,6 +188,7 @@
     - export OS_PASSWORD=12345678
     - export EDPM_COMPUTE_CEPH_ENABLED=false
     - export BMO_SETUP=false
+    - export KUBECONFIG=~/.kube/config
     - export PATH=$PATH:~/.crc/bin/oc
   tags: config
 
@@ -198,6 +200,10 @@
   tags: config
 
 # Now run the operator as a Go program locally (outside the Kubernetes cluster):
+#
+# First run kubefwd in the background so communication between local operator
+# and cluster is possible:
+# sudo -E kubefwd services -n openstack &
 #
 # Either using VSCode or directly in a shell:
 # In VSCode open the home folder and add the ~/octavia_operator folder to the
