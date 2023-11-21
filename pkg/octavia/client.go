@@ -36,8 +36,8 @@ func GetAdminServiceClient(
 	h *helper.Helper,
 	keystoneAPI *keystonev1.KeystoneAPI,
 ) (*openstack.OpenStack, ctrl.Result, error) {
-	// get public endpoint as authurl from keystone instance
-	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointPublic)
+	// get internal endpoint as authurl from keystone instance
+	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
 	if err != nil {
 		return nil, ctrl.Result{}, err
 	}
