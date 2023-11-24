@@ -38,7 +38,6 @@ import (
 	neutronv1 "github.com/openstack-k8s-operators/neutron-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
-	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -316,7 +315,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	//
 
 	serviceLabels := map[string]string{
-		common.AppSelector: octavia.ServiceName,
+		common.AppSelector: instance.ObjectMeta.Name,
 	}
 
 	// Define a new Deployment object
@@ -399,7 +398,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateVars OctaviaTemplateVars,
 ) error {
 	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
 	customData := map[string]string{common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig}
 	for key, data := range instance.Spec.DefaultConfigOverwrite {
 		customData[key] = data
