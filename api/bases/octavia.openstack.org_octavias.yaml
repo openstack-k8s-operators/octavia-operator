@@ -462,6 +462,7 @@ spec:
                       containing passphrase for the CA private keys'
                     type: string
                   certssecret:
+                    default: octavia-certs-secret
                     description: '*kubebuilder:validation:Required LoadBalancerCerts
                       - Secret containing certs for securing communication with amphora
                       based Load Balancers'
@@ -645,6 +646,7 @@ spec:
                       containing passphrase for the CA private keys'
                     type: string
                   certssecret:
+                    default: octavia-certs-secret
                     description: '*kubebuilder:validation:Required LoadBalancerCerts
                       - Secret containing certs for securing communication with amphora
                       based Load Balancers'
@@ -828,6 +830,7 @@ spec:
                       containing passphrase for the CA private keys'
                     type: string
                   certssecret:
+                    default: octavia-certs-secret
                     description: '*kubebuilder:validation:Required LoadBalancerCerts
                       - Secret containing certs for securing communication with amphora
                       based Load Balancers'
