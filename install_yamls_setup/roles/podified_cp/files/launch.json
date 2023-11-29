@@ -7,12 +7,16 @@
             "request": "launch",
             "mode": "auto",
             "program": "${fileWorkspaceFolder}/main.go",
+            "args": ["-metrics-bind-address", ":${env:METRICS_PORT}",
+                     "-health-probe-bind-address", ":${env:HEALTH_PORT}"],
             "cwd": "${fileWorkspaceFolder}",
             "preLaunchTask": "Run make",
             "env": {
                 "WATCH_NAMESPACE": "openstack",
                 "OPERATOR_TEMPLATES": "./templates",
-                "ENABLE_WEBHOOKS": "false"
+                "ENABLE_WEBHOOKS": "false",
+                "METRICS_PORT": "8082",
+                "HEALTH_PORT": "8083"
             }
         }
     ]
