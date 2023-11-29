@@ -458,14 +458,13 @@ spec:
                 properties:
                   certspassphrasesecret:
                     default: octavia-ca-passphrase
-                    description: '*kubebuilder:validation:Optional Name of secret
-                      containing passphrase for the CA private keys'
+                    description: Name of secret containing passphrase for the CA private
+                      keys
                     type: string
                   certssecret:
                     default: octavia-certs-secret
-                    description: '*kubebuilder:validation:Required LoadBalancerCerts
-                      - Secret containing certs for securing communication with amphora
-                      based Load Balancers'
+                    description: LoadBalancerCerts - Secret containing certs for securing
+                      communication with amphora based Load Balancers
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -629,7 +628,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
@@ -642,14 +640,13 @@ spec:
                 properties:
                   certspassphrasesecret:
                     default: octavia-ca-passphrase
-                    description: '*kubebuilder:validation:Optional Name of secret
-                      containing passphrase for the CA private keys'
+                    description: Name of secret containing passphrase for the CA private
+                      keys
                     type: string
                   certssecret:
                     default: octavia-certs-secret
-                    description: '*kubebuilder:validation:Required LoadBalancerCerts
-                      - Secret containing certs for securing communication with amphora
-                      based Load Balancers'
+                    description: LoadBalancerCerts - Secret containing certs for securing
+                      communication with amphora based Load Balancers
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -813,7 +810,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
@@ -826,14 +822,13 @@ spec:
                 properties:
                   certspassphrasesecret:
                     default: octavia-ca-passphrase
-                    description: '*kubebuilder:validation:Optional Name of secret
-                      containing passphrase for the CA private keys'
+                    description: Name of secret containing passphrase for the CA private
+                      keys
                     type: string
                   certssecret:
                     default: octavia-certs-secret
-                    description: '*kubebuilder:validation:Required LoadBalancerCerts
-                      - Secret containing certs for securing communication with amphora
-                      based Load Balancers'
+                    description: LoadBalancerCerts - Secret containing certs for securing
+                      communication with amphora based Load Balancers
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -997,7 +992,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certspassphrasesecret
                 - certssecret
                 - databaseInstance
                 - role
