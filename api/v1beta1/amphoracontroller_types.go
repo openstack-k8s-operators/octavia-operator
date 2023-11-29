@@ -78,6 +78,7 @@ type OctaviaAmphoraControllerSpec struct {
 	Secret string `json:"secret"`
 
 	// *kubebuilder:validation:Required
+	// +kubebuilder:default=octavia-certs-secret
 	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
 	LoadBalancerCerts string `json:"certssecret"`
 

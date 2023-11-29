@@ -97,8 +97,6 @@ func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error
 }
 
 // Create a certificate and key for the client and sign it with the CA
-// TODO: Change signature to take PEM encoded CA key as []byte so it can be
-// used directly with data from secret store
 func generateClientCert(caCertPEM []byte, caPrivKey *rsa.PrivateKey) ([]byte, error) {
 
 	certTemplate := &x509.Certificate{
