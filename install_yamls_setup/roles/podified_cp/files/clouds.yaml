@@ -7,5 +7,6 @@ clouds:
       username: admin
       user_domain_name: Default
       project_domain_name: Default
+      verify: false
     identity_api_version: '3'
     region_name: regionOne

@@ -23,6 +23,7 @@
       - podman
       - python3
       - python3-pip
+      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
     state: latest
   become: yes
   tags: install
@@ -110,10 +111,28 @@
       set +ex
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      make attach_default_interface_cleanup
       make crc_attach_default_interface
       exit 0
     chdir: "~/install_yamls/devsetup"
   tags: crc
+
+# Without this there could be image pull limit errors when deploying rabbitmq
+# Based on https://docs.openshift.com/container-platform/4.13/openshift_images/managing_images/using-image-pull-secrets.html#images-update-global-pull-secret_using-image-pull-secrets
+- name: Add docker.io credentials to pull-secret in OSP cluster
+  shell:
+    cmd: |
+      set +ex
+      eval $(crc oc-env)
+      oc get secret/pull-secret -n openshift-config \
+        --template='{{ '{{' }} index .data ".dockerconfigjson" | base64decode{{ '}}' }}' \
+        >pull-secret.json
+      oc registry login --registry="docker.io" \
+        --auth-basic="{{ podman_dockerio_user }}:{{ podman_dockerio_password }}" \
+        --to=pull-secret.json
+      oc set data secret/pull-secret -n openshift-config \
+        --from-file=.dockerconfigjson=pull-secret.json
+  tags: pull-secret
 
 - name: Deploy openstack operators
   shell:
@@ -121,13 +140,18 @@
       set +ex
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      oc project openstack-operators
-      for i in mariadb keystone ovn neutron rabbitmq ; do
-        make $i || break ; sleep 60 ; make ${i}_deploy || break
-      done
-      make infra
-      make memcached_deploy
+      NETWORK_ISOLATION=false make openstack 2>&1 | tee make_openstack.log
+      sleep 100
+      NETWORK_ISOLATION=false make openstack_deploy 2>&1 | tee make_openstack_deploy.log
       sleep 300
+      oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
+        jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
+      oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type json \
+        -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", \
+        "value": "0"}]"
+      sleep 10
+      oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type=json \
+        -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
       oc completion bash | sudo tee /etc/bash_completion.d/oc_completion
       openstack complete | sudo tee /etc/bash_completion.d/osc.bash_completion
       exit 0
@@ -135,7 +159,7 @@
     chdir: "~/install_yamls"
   tags: crc
 
-- name: Export OS_CLOUD and OS_PASSWORD in .bashrc
+- name: Add exports to .bashrc
   lineinfile:
     path: ~/.bashrc
     line: "{{ item }}"
@@ -143,6 +167,9 @@
     - export PATH=$PATH:~/.crc/bin/oc
     - export OS_CLOUD=default
     - export OS_PASSWORD=12345678
+    - export EDPM_COMPUTE_CEPH_ENABLED=false
+    - export BMO_SETUP=false
+    - export KUBECONFIG=~/.kube/config
   tags: config
 
 - name: Copy ~/.tmux.conf
@@ -178,18 +205,6 @@
   notify: "Apply sysctl"
   tags: config
 
-- name: Add exports to .bashrc
-  lineinfile:
-    path: ~/.bashrc
-    line: "{{ item }}"
-  with_items:
-    - export OS_CLOUD=default
-    - export OS_PASSWORD=12345678
-    - export EDPM_COMPUTE_CEPH_ENABLED=false
-    - export BMO_SETUP=false
-    - export PATH=$PATH:~/.crc/bin/oc
-  tags: config
-
 - name: Copy PodSet CR with containerImage fields set
   copy:
     src: octavia_v1beta1_octavia.yaml
@@ -198,6 +213,10 @@
   tags: config
 
 # Now run the operator as a Go program locally (outside the Kubernetes cluster):
+#
+# First run kubefwd in the background so communication between local operator
+# and cluster is possible:
+# sudo -E kubefwd services -n openstack &
 #
 # Either using VSCode or directly in a shell:
 # In VSCode open the home folder and add the ~/octavia_operator folder to the
