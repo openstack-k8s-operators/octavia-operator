@@ -50,9 +50,15 @@ spec:
             description: OctaviaAmphoraControllerSpec defines common state for all
               Octavia Amphora Controllers
             properties:
+              certspassphrasesecret:
+                default: octavia-ca-passphrase
+                description: Name of secret containing passphrase for the CA private
+                  keys
+                type: string
               certssecret:
-                description: '*kubebuilder:validation:Required Secret containing certs
-                  for securing communication with amphora based Load Balancers'
+                default: octavia-certs-secret
+                description: LoadBalancerCerts - Secret containing certs for securing
+                  communication with amphora based Load Balancers
                 type: string
               containerImage:
                 description: ContainerImage - Amphora Controller Container Image URL

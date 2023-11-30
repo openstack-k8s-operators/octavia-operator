@@ -31,6 +31,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
@@ -253,6 +254,17 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
+	err = amphoracontrollers.EnsureAmphoraCerts(ctx, instance, helper, &Log)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	//
@@ -417,12 +429,25 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
-	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
+	caPassSecret, _, err := secret.GetSecret(
+		ctx, helper, instance.Spec.CAKeyPassphraseSecret, instance.Namespace)
+	if err != nil {
+		return err
+	}
+	spec := instance.Spec
+	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
-	templateParameters["ServiceRoleName"] = instance.Spec.Role
+	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
+	serverCAPassphrase := caPassSecret.Data["server-ca-passphrase"]
+	if serverCAPassphrase != nil {
+		templateParameters["ServerCAKeyPassphrase"] = string(serverCAPassphrase)
+	} else {
+		// Can't do string(nil)
+		templateParameters["ServerCAKeyPassphrase"] = ""
+	}
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
