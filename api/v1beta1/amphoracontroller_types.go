@@ -77,15 +77,9 @@ type OctaviaAmphoraControllerSpec struct {
 	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
 	Secret string `json:"secret"`
 
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=octavia-certs-secret
-	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
+	// *kubebuilder:validation:Required
+	// Secret containing certs for securing communication with amphora based Load Balancers
 	LoadBalancerCerts string `json:"certssecret"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=octavia-ca-passphrase
-	// Name of secret containing passphrase for the CA private keys
-	CAKeyPassphraseSecret string `json:"certspassphrasesecret"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}
