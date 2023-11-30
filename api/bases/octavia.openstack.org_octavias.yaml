@@ -456,15 +456,9 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
-                    default: octavia-ca-passphrase
-                    description: Name of secret containing passphrase for the CA private
-                      keys
-                    type: string
                   certssecret:
-                    default: octavia-certs-secret
-                    description: LoadBalancerCerts - Secret containing certs for securing
-                      communication with amphora based Load Balancers
+                    description: '*kubebuilder:validation:Required Secret containing
+                      certs for securing communication with amphora based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -638,15 +632,9 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
-                    default: octavia-ca-passphrase
-                    description: Name of secret containing passphrase for the CA private
-                      keys
-                    type: string
                   certssecret:
-                    default: octavia-certs-secret
-                    description: LoadBalancerCerts - Secret containing certs for securing
-                      communication with amphora based Load Balancers
+                    description: '*kubebuilder:validation:Required Secret containing
+                      certs for securing communication with amphora based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
@@ -820,15 +808,9 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
-                    default: octavia-ca-passphrase
-                    description: Name of secret containing passphrase for the CA private
-                      keys
-                    type: string
                   certssecret:
-                    default: octavia-certs-secret
-                    description: LoadBalancerCerts - Secret containing certs for securing
-                      communication with amphora based Load Balancers
+                    description: '*kubebuilder:validation:Required Secret containing
+                      certs for securing communication with amphora based Load Balancers'
                     type: string
                   containerImage:
                     description: ContainerImage - Amphora Controller Container Image
