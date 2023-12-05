@@ -55,22 +55,26 @@ func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
 	if err != nil {
 		return nil, nil, err
 	}
+	pkcs8Key, err := x509.MarshalPKCS8PrivateKey(priv)
+	if err != nil {
+		err = fmt.Errorf("Error private key to PKCS #8 form: %w", err)
+		return priv, nil, err
+	}
 
 	var pemBlock *pem.Block
 	if passphrase != nil {
 		pemBlock, err = x509.EncryptPEMBlock( //nolint:staticcheck
 			rand.Reader,
-			"RSA PRIVATE KEY",
-			x509.MarshalPKCS1PrivateKey(priv),
+			"PRIVATE KEY",
+			pkcs8Key,
 			passphrase,
 			x509.PEMCipherAES128)
 		if err != nil {
-			fmt.Println("Error encrypting private CA key:", err)
+			err = fmt.Errorf("Error encrypting private key: %w", err)
 			return priv, nil, err
 		}
 	} else {
-		privBytes := x509.MarshalPKCS1PrivateKey(priv)
-		pemBlock = &pem.Block{Type: "PRIVATE KEY", Bytes: privBytes}
+		pemBlock = &pem.Block{Type: "PRIVATE KEY", Bytes: pkcs8Key}
 	}
 
 	privPEM := new(bytes.Buffer)
