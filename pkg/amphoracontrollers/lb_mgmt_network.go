@@ -197,7 +197,7 @@ func EnsureLbMgmtNetworks(ctx context.Context, instance *octaviav1.OctaviaAmphor
 	if err != nil {
 		return "", err
 	}
-	o, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI, octavia.ClientOpts{SystemScope: true})
+	o, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI)
 	if err != nil {
 		return "", err
 	}
