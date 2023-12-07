@@ -110,7 +110,7 @@ func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraContro
 	if err != nil {
 		return "", err
 	}
-	osclient, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI, octavia.ClientOpts{})
+	osclient, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI)
 	if err != nil {
 		return "", err
 	}

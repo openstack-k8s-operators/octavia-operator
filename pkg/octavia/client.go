@@ -30,18 +30,11 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// ClientOpts - enable features in the OpenStack client
-type ClientOpts struct {
-	// SystemScope indicates that the client uses system scope instead of project scope
-	SystemScope bool
-}
-
 // GetAdminServiceClient -
 func GetAdminServiceClient(
 	ctx context.Context,
 	h *helper.Helper,
 	keystoneAPI *keystonev1.KeystoneAPI,
-	clientOpts ClientOpts,
 ) (*openstack.OpenStack, ctrl.Result, error) {
 	// get internal endpoint as authurl from keystone instance
 	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
@@ -71,11 +64,6 @@ func GetAdminServiceClient(
 		TenantName: keystoneAPI.Spec.AdminProject,
 		DomainName: "Default",
 		Region:     keystoneAPI.Spec.Region,
-	}
-	if clientOpts.SystemScope {
-		authOpts.Scope = &gophercloud.AuthScope{
-			System: clientOpts.SystemScope,
-		}
 	}
 
 	os, err := openstack.NewOpenStack(
