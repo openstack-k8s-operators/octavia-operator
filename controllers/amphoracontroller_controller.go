@@ -35,7 +35,6 @@ import (
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
-	neutronv1 "github.com/openstack-k8s-operators/neutron-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -487,6 +486,5 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Owns(&neutronv1.NeutronAPI{}).
 		Complete(r)
 }
