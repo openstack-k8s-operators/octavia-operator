@@ -66,13 +66,6 @@ type OctaviaAmphoraControllerSpec struct {
 	// Role - the role for the controller (one of worker, housekeeping, healthmanager)
 	Role string `json:"role"`
 
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=1
-	// +kubebuilder:validation:Maximum=32
-	// +kubebuilder:validation:Minimum=0
-	// Replicas - Octavia Worker Replicas
-	Replicas *int32 `json:"replicas"`
-
 	// +kubebuilder:validation:Required
 	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
 	Secret string `json:"secret"`
@@ -137,6 +130,9 @@ type OctaviaAmphoraControllerSpec struct {
 type OctaviaAmphoraControllerStatus struct {
 	// ReadyCount of Octavia Amphora Controllers
 	ReadyCount int32 `json:"readyCount,omitempty"`
+
+	// DesiredNumberScheduled - total number of the nodes which should be running Daemon
+	DesiredNumberScheduled int32 `json:"desiredNumberScheduled,omitempty"`
 
 	// Map of hashes to track e.g. job status
 	Hash map[string]string `json:"hash,omitempty"`

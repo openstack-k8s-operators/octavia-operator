@@ -25,7 +25,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/daemonset"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -329,9 +329,9 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		common.AppSelector: instance.ObjectMeta.Name,
 	}
 
-	// Define a new Deployment object
-	depl := deployment.NewDeployment(
-		amphoracontrollers.Deployment(
+	// Define a new DaemonSet object
+	dset := daemonset.NewDaemonSet(
+		amphoracontrollers.DaemonSet(
 			instance,
 			inputHash,
 			serviceLabels,
@@ -339,7 +339,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		5,
 	)
 
-	ctrlResult, err = depl.CreateOrPatch(ctx, helper)
+	ctrlResult, err = dset.CreateOrPatch(ctx, helper)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DeploymentReadyCondition,
@@ -358,21 +358,15 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 
 	// verify if network attachment matches expectations
-	networkReady := false
-	networkAttachmentStatus := map[string][]string{}
-	if *instance.Spec.Replicas > 0 {
-		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
-			ctx,
-			helper,
-			instance.Spec.NetworkAttachments,
-			serviceLabels,
-			instance.Status.ReadyCount,
-		)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	} else {
-		networkReady = true
+	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
+		ctx,
+		helper,
+		instance.Spec.NetworkAttachments,
+		serviceLabels,
+		instance.Status.ReadyCount,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	instance.Status.NetworkAttachments = networkAttachmentStatus
@@ -390,12 +384,14 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
-	if instance.Status.ReadyCount > 0 {
+	instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
+	// TODO(gthiemonge) change for NumberReady?
+	instance.Status.ReadyCount = dset.GetDaemonSet().Status.NumberReady
+	if instance.Status.ReadyCount == instance.Status.DesiredNumberScheduled {
 		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
 	}
 
-	// create Deployment - end
+	// create DaemonSet - end
 
 	Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
@@ -509,6 +505,6 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
 }

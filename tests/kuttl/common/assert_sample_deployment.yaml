@@ -53,7 +53,6 @@ spec:
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
-    replicas: 1
     secret: osp-secret
     serviceUser: octavia
   octaviaHealthManager:
@@ -65,7 +64,6 @@ spec:
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
-    replicas: 1
     secret: osp-secret
     serviceUser: octavia
   octaviaWorker:
@@ -77,7 +75,6 @@ spec:
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
-    replicas: 1
     secret: osp-secret
     serviceUser: octavia
 status:

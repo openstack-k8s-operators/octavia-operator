@@ -139,13 +139,6 @@ spec:
                       from the Secret
                     type: string
                 type: object
-              replicas:
-                default: 1
-                description: Replicas - Octavia Worker Replicas
-                format: int32
-                maximum: 32
-                minimum: 0
-                type: integer
               resources:
                 description: Resources - Compute Resources required by this service
                   (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -276,6 +269,11 @@ spec:
               databaseHostname:
                 description: Octavia Database Hostname
                 type: string
+              desiredNumberScheduled:
+                description: DesiredNumberScheduled - total number of the nodes which
+                  should be running Daemon
+                format: int32
+                type: integer
               hash:
                 additionalProperties:
                   type: string
