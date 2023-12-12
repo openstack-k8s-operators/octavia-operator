@@ -21,7 +21,8 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: housekeeping
-    certssecret: todo
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -33,7 +34,8 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: healthmanager
-    certssecret: todo
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -45,7 +47,8 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: worker
-    certssecret: todo
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
