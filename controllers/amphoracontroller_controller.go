@@ -204,6 +204,27 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	// Handle config map
 	configMapVars := make(map[string]env.Setter)
+
+	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[ospSecret.Name] = env.SetValue(hash)
+
 	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -242,7 +263,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		AmphoraDefaultFlavorID: defaultFlavorID,
 	}
 
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, templateVars)
+	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, templateVars, ospSecret)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -407,6 +428,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
 	templateVars OctaviaTemplateVars,
+	ospSecret *corev1.Secret,
 ) error {
 	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
@@ -447,6 +469,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		// Can't do string(nil)
 		templateParameters["ServerCAKeyPassphrase"] = ""
 	}
+	// TODO(gthiemonge) store keys/passwords/passphrases in a specific config file stored in a secret
+	templateParameters["HeartbeatKey"] = string(ospSecret.Data["OctaviaHeartbeatKey"])
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
