@@ -75,6 +75,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=batch,resources=jobs,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete;
+// +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch;
@@ -588,7 +589,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAPIReadyCondition, condition.DeploymentReadyMessage)
 	}
 
-	octaviaHousekeeping, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
+	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
@@ -611,7 +612,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
 	}
 
-	octaviaHealthManager, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
+	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
@@ -634,7 +635,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.HealthManager), condition.DeploymentReadyMessage)
 	}
 
-	octaviaWorker, op, err := r.amphoraControllerDeploymentCreateOrUpdate(instance, instance.Spec.OctaviaWorker, octaviav1.Worker)
+	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaWorker, octaviav1.Worker)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
@@ -794,43 +795,43 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 	return transportURL, op, err
 }
 
-func (r *OctaviaReconciler) amphoraControllerDeploymentCreateOrUpdate(
+func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
 	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
 	role string,
 ) (*octaviav1.OctaviaAmphoraController,
 	controllerutil.OperationResult, error) {
 
-	deployment := &octaviav1.OctaviaAmphoraController{
+	daemonset := &octaviav1.OctaviaAmphoraController{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-%s", instance.Name, role),
 			Namespace: instance.Namespace,
 		},
 	}
 
-	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
-		deployment.Spec = controllerSpec
-		deployment.Spec.Role = role
-		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
-		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
-		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
-		deployment.Spec.Secret = instance.Spec.Secret
-		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
-		deployment.Spec.ServiceAccount = instance.RbacResourceName()
-		deployment.Spec.LbMgmtNetworks.ManageLbMgmtNetworks = instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks
-		deployment.Spec.LbMgmtNetworks.SubnetIPVersion = instance.Spec.LbMgmtNetworks.SubnetIPVersion
-		if len(deployment.Spec.NodeSelector) == 0 {
-			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
+		daemonset.Spec = controllerSpec
+		daemonset.Spec.Role = role
+		daemonset.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
+		daemonset.Spec.DatabaseHostname = instance.Status.DatabaseHostname
+		daemonset.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
+		daemonset.Spec.Secret = instance.Spec.Secret
+		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
+		daemonset.Spec.LbMgmtNetworks.ManageLbMgmtNetworks = instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks
+		daemonset.Spec.LbMgmtNetworks.SubnetIPVersion = instance.Spec.LbMgmtNetworks.SubnetIPVersion
+		if len(daemonset.Spec.NodeSelector) == 0 {
+			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
-		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
+		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err
 		}
 		return nil
 	})
 
-	return deployment, op, err
+	return daemonset, op, err
 }
 
 func amphoraControllerReadyCondition(role string) condition.Type {
