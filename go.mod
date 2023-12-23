@@ -84,7 +84,7 @@ require (
 )
 
 // Bump golang.org/x/net to avoid Rapid Reset CVE
-replace golang.org/x/net => golang.org/x/net v0.17.0 //allow-merging
+replace golang.org/x/net => golang.org/x/net v0.19.0 //allow-merging
 
 replace github.com/openstack-k8s-operators/octavia-operator/api => ./api
 
