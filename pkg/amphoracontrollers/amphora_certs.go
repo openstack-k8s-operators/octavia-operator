@@ -24,6 +24,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -33,7 +34,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 var (
@@ -45,6 +45,8 @@ var (
 		Province:           []string{"Bavaria"},
 		Locality:           []string{"Piding"},
 	}
+	onceEnsure   sync.Once
+	ensureResult error = nil
 )
 
 // generateKey generates a PEM encoded private RSA key and applies PEM
@@ -145,16 +147,16 @@ func generateClientCert(caCertPEM []byte, caPrivKey *rsa.PrivateKey) ([]byte, er
 	return certPEM.Bytes(), nil
 }
 
-// EnsureAmphoraCerts ensures Amphora certificates exist in the secret store
-func EnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, h *helper.Helper, log *logr.Logger) error {
+func doEnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
+	h *helper.Helper, log *logr.Logger) {
 	var oAmpSecret *corev1.Secret
 	var serverCAPass []byte = nil
 
 	_, _, err := secret.GetSecret(ctx, h, instance.Spec.LoadBalancerCerts, instance.Namespace)
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
-			err = fmt.Errorf("Error retrieving secret %s - %w", instance.Spec.LoadBalancerCerts, err)
-			return err
+			ensureResult = fmt.Errorf("Error retrieving secret %s - %w", instance.Spec.LoadBalancerCerts, err)
+			return
 		}
 
 		cAPassSecret, _, err := secret.GetSecret(
@@ -167,35 +169,35 @@ func EnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraC
 
 		serverCAKey, serverCAKeyPEM, err := generateKey(serverCAPass)
 		if err != nil {
-			err = fmt.Errorf("Error while generating server CA key: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating server CA key: %w", err)
+			return
 		}
 		serverCACert, err := generateCACert(serverCAKey, "Octavia server CA")
 		if err != nil {
-			err = fmt.Errorf("Error while generating server CA certificate: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating server CA certificate: %w", err)
+			return
 		}
 
 		clientCAKey, _, err := generateKey(nil)
 		if err != nil {
-			err = fmt.Errorf("Error while generating client CA key: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating client CA key: %w", err)
+			return
 		}
 		clientCACert, err := generateCACert(clientCAKey, "Octavia client CA")
 		if err != nil {
-			err = fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
+			return
 		}
 
 		clientKey, clientKeyPEM, err := generateKey(nil)
 		if err != nil {
-			err = fmt.Errorf("Error while generating amphora client key: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating amphora client key: %w", err)
+			return
 		}
 		clientCert, err := generateClientCert(clientCACert, clientKey)
 		if err != nil {
-			err = fmt.Errorf("Error while generating amphora client certificate: %w", err)
-			return err
+			ensureResult = fmt.Errorf("Error while generating amphora client certificate: %w", err)
+			return
 		}
 		clientKeyAndCert := append(clientKeyPEM, clientCert...)
 
@@ -216,17 +218,19 @@ func EnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraC
 			},
 		}
 
-		// err = h.GetClient().Create(ctx, oAmpSecret)
-		_, result, err := secret.CreateOrPatchSecret(ctx, h, instance, oAmpSecret)
-
+		_, _, err = secret.CreateOrPatchSecret(ctx, h, instance, oAmpSecret)
 		if err != nil {
-			err = fmt.Errorf("Error creating certs secret %s - %w",
+			ensureResult = fmt.Errorf("Error creating certs secret %s - %w",
 				instance.Spec.LoadBalancerCerts, err)
-			return err
-		} else if result != controllerutil.OperationResultNone {
-			return nil
 		}
 	}
+}
 
-	return nil
+// EnsureAmphoraCerts ensures Amphora certificates exist in the secret store
+func EnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
+	h *helper.Helper, log *logr.Logger) error {
+
+	// Do cert generation once, and only once for all services.
+	onceEnsure.Do(func() { doEnsureAmphoraCerts(ctx, instance, h, log) })
+	return ensureResult
 }
