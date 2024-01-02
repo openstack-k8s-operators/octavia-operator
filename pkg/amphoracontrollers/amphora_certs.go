@@ -38,13 +38,12 @@ import (
 
 var (
 	subjectDefault = pkix.Name{
-		Organization:  []string{"Dis"},
-		Country:       []string{"US"},
-		Province:      []string{"Oregon"},
-		Locality:      []string{"Springfield"},
-		StreetAddress: []string{"Denial"},
-		PostalCode:    []string{""},
-		CommonName:    "www.example.com",
+		CommonName:         "www.example.com",
+		Organization:       []string{"OpenStack"},
+		OrganizationalUnit: []string{"Octavia Amphorae"},
+		Country:            []string{"DE"},
+		Province:           []string{"Bavaria"},
+		Locality:           []string{"Piding"},
 	}
 )
 
