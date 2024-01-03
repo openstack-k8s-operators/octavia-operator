@@ -70,8 +70,7 @@ type OctaviaAmphoraControllerSpec struct {
 	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
 	Secret string `json:"secret"`
 
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=octavia-certs-secret
+	// +kubebuilder:validation:Optional
 	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
 	LoadBalancerCerts string `json:"certssecret"`
 

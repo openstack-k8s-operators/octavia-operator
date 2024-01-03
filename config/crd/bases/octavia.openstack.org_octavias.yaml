@@ -44,6 +44,11 @@ spec:
           spec:
             description: OctaviaSpec defines the desired state of Octavia
             properties:
+              certssecret:
+                default: octavia-certs-secret
+                description: LoadBalancerCerts - Secret containing certs for securing
+                  communication with amphora based Load Balancers
+                type: string
               customServiceConfig:
                 default: '# add your customization here'
                 description: CustomServiceConfig - customize the service config using
@@ -462,7 +467,6 @@ spec:
                       keys
                     type: string
                   certssecret:
-                    default: octavia-certs-secret
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -621,7 +625,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certssecret
                 - databaseInstance
                 - role
                 - secret
@@ -637,7 +640,6 @@ spec:
                       keys
                     type: string
                   certssecret:
-                    default: octavia-certs-secret
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -796,7 +798,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certssecret
                 - databaseInstance
                 - role
                 - secret
@@ -812,7 +813,6 @@ spec:
                       keys
                     type: string
                   certssecret:
-                    default: octavia-certs-secret
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -971,7 +971,6 @@ spec:
                     description: TransportURLSecret - Secret containing RabbitMQ transportURL
                     type: string
                 required:
-                - certssecret
                 - databaseInstance
                 - role
                 - secret
@@ -1015,6 +1014,7 @@ spec:
                 description: ServiceUser - service user name
                 type: string
             required:
+            - certssecret
             - databaseInstance
             - octaviaAPI
             - rabbitMqClusterName
