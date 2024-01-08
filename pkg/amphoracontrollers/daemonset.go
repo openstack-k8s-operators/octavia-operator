@@ -36,6 +36,8 @@ func DaemonSet(
 	labels map[string]string,
 	annotations map[string]string,
 ) *appsv1.DaemonSet {
+	runAsUser := int64(0)
+	privileged := true
 	serviceName := fmt.Sprintf("octavia-%s", instance.Spec.Role)
 
 	// The API pod has an extra volume so the API and the provider agent can
@@ -107,6 +109,14 @@ func DaemonSet(
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
+							SecurityContext: &corev1.SecurityContext{
+								Capabilities: &corev1.Capabilities{
+									Add:  []corev1.Capability{"NET_ADMIN", "SYS_ADMIN", "SYS_NICE"},
+									Drop: []corev1.Capability{},
+								},
+								RunAsUser:  &runAsUser,
+								Privileged: &privileged,
+							},
 						},
 					},
 					Volumes: volumes,
