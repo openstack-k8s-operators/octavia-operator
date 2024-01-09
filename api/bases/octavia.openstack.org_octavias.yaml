@@ -616,6 +616,17 @@ spec:
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
                     type: string
+                  sshprivkeysecret:
+                    description: LoadBalancerSSHPrivKey - The name of the secret that
+                      will be used to store the private key for connecting to amphorae
+                      via SSH. Only used when no public key was defined and a new
+                      key pair needs to be generated.
+                    type: string
+                  sshpubkey:
+                    description: LoadBalancerSSHPubKey - The name of the ConfigMap
+                      containing the pubilc key for connecting to the amphorae via
+                      SSH
+                    type: string
                   tenantName:
                     default: service
                     description: TenantName - the name of the OpenStack tenant that
@@ -788,6 +799,17 @@ spec:
                     default: octavia
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
+                    type: string
+                  sshprivkeysecret:
+                    description: LoadBalancerSSHPrivKey - The name of the secret that
+                      will be used to store the private key for connecting to amphorae
+                      via SSH. Only used when no public key was defined and a new
+                      key pair needs to be generated.
+                    type: string
+                  sshpubkey:
+                    description: LoadBalancerSSHPubKey - The name of the ConfigMap
+                      containing the pubilc key for connecting to the amphorae via
+                      SSH
                     type: string
                   tenantName:
                     default: service
@@ -962,6 +984,17 @@ spec:
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
                     type: string
+                  sshprivkeysecret:
+                    description: LoadBalancerSSHPrivKey - The name of the secret that
+                      will be used to store the private key for connecting to amphorae
+                      via SSH. Only used when no public key was defined and a new
+                      key pair needs to be generated.
+                    type: string
+                  sshpubkey:
+                    description: LoadBalancerSSHPubKey - The name of the ConfigMap
+                      containing the pubilc key for connecting to the amphorae via
+                      SSH
+                    type: string
                   tenantName:
                     default: service
                     description: TenantName - the name of the OpenStack tenant that
@@ -1012,6 +1045,17 @@ spec:
               serviceUser:
                 default: octavia
                 description: ServiceUser - service user name
+                type: string
+              sshprivkeysecret:
+                default: octavia-ssh-privkey-secret
+                description: LoadBalancerSSHPrivKey - The name of the secret that
+                  will be used to store the private key for connecting to amphorae
+                  via SSH
+                type: string
+              sshpubkey:
+                default: octavia-ssh-pubkey
+                description: LoadBalancerSSHPubKey - The name of the ConfigMap containing
+                  the pubilc key for connecting to the amphorae via SSH
                 type: string
             required:
             - certssecret

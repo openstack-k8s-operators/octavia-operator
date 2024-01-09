@@ -291,6 +291,17 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
+	err = amphoracontrollers.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	//
@@ -464,6 +475,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
+	templateParameters["NovaSshKeyPair"] = amphoracontrollers.NovaKeyPairName
 	serverCAPassphrase := caPassSecret.Data["server-ca-passphrase"]
 	if serverCAPassphrase != nil {
 		templateParameters["ServerCAKeyPassphrase"] = string(serverCAPassphrase)

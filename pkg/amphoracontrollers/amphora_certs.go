@@ -45,8 +45,8 @@ var (
 		Province:           []string{"Bavaria"},
 		Locality:           []string{"Piding"},
 	}
-	onceEnsure   sync.Once
-	ensureResult error = nil
+	onceEnsureCerts   sync.Once
+	ensureResultCerts error = nil
 )
 
 // generateKey generates a PEM encoded private RSA key and applies PEM
@@ -155,7 +155,7 @@ func doEnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphor
 	_, _, err := secret.GetSecret(ctx, h, instance.Spec.LoadBalancerCerts, instance.Namespace)
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
-			ensureResult = fmt.Errorf("Error retrieving secret %s - %w", instance.Spec.LoadBalancerCerts, err)
+			ensureResultCerts = fmt.Errorf("Error retrieving secret %s - %w", instance.Spec.LoadBalancerCerts, err)
 			return
 		}
 
@@ -169,34 +169,34 @@ func doEnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphor
 
 		serverCAKey, serverCAKeyPEM, err := generateKey(serverCAPass)
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating server CA key: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating server CA key: %w", err)
 			return
 		}
 		serverCACert, err := generateCACert(serverCAKey, "Octavia server CA")
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating server CA certificate: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating server CA certificate: %w", err)
 			return
 		}
 
 		clientCAKey, _, err := generateKey(nil)
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating client CA key: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating client CA key: %w", err)
 			return
 		}
 		clientCACert, err := generateCACert(clientCAKey, "Octavia client CA")
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
 			return
 		}
 
 		clientKey, clientKeyPEM, err := generateKey(nil)
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating amphora client key: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating amphora client key: %w", err)
 			return
 		}
 		clientCert, err := generateClientCert(clientCACert, clientKey)
 		if err != nil {
-			ensureResult = fmt.Errorf("Error while generating amphora client certificate: %w", err)
+			ensureResultCerts = fmt.Errorf("Error while generating amphora client certificate: %w", err)
 			return
 		}
 		clientKeyAndCert := append(clientKeyPEM, clientCert...)
@@ -220,7 +220,7 @@ func doEnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphor
 
 		_, _, err = secret.CreateOrPatchSecret(ctx, h, instance, oAmpSecret)
 		if err != nil {
-			ensureResult = fmt.Errorf("Error creating certs secret %s - %w",
+			ensureResultCerts = fmt.Errorf("Error creating certs secret %s - %w",
 				instance.Spec.LoadBalancerCerts, err)
 		}
 	}
@@ -231,6 +231,6 @@ func EnsureAmphoraCerts(ctx context.Context, instance *octaviav1.OctaviaAmphoraC
 	h *helper.Helper, log *logr.Logger) error {
 
 	// Do cert generation once, and only once for all services.
-	onceEnsure.Do(func() { doEnsureAmphoraCerts(ctx, instance, h, log) })
-	return ensureResult
+	onceEnsureCerts.Do(func() { doEnsureAmphoraCerts(ctx, instance, h, log) })
+	return ensureResultCerts
 }

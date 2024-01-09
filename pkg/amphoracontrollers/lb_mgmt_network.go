@@ -22,7 +22,6 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
-	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -193,11 +192,7 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.
 //
 // returns the UUID of the network
 func EnsureLbMgmtNetworks(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
-	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, helper, instance.Namespace, map[string]string{})
-	if err != nil {
-		return "", err
-	}
-	o, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI)
+	o, err := GetOpenstackClient(ctx, instance, helper)
 	if err != nil {
 		return "", err
 	}
