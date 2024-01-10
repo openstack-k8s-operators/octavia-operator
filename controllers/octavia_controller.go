@@ -821,6 +821,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
 		daemonset.Spec.LbMgmtNetworks.ManageLbMgmtNetworks = instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks
 		daemonset.Spec.LbMgmtNetworks.SubnetIPVersion = instance.Spec.LbMgmtNetworks.SubnetIPVersion
+		daemonset.Spec.LoadBalancerCerts = instance.Spec.LoadBalancerCerts
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

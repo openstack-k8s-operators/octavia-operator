@@ -121,6 +121,11 @@ type OctaviaSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=octavia-certs-secret
+	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
+	LoadBalancerCerts string `json:"certssecret"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
