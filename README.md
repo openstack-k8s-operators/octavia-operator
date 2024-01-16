@@ -1,14 +1,24 @@
 # octavia-operator
-// TODO(user): Add simple overview of use/purpose
+
+A Kubernetes Operator built using
+the [Operator Framework](https://github.com/operator-framework) for Go. It
+manages the lifecycle of
+[Openstack Octavia](https://docs.openstack.org/octavia/latest/index.html).
 
 ## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+
+Octavia is a Loadbalancer-as-a-service (LBaas) solution for Openstack.
 
 ## Getting Started
-You’ll need a Kubernetes cluster to run against. You can use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run against a remote cluster.
-**Note:** Your controller will automatically use the current context in your kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
+
+You’ll need a Kubernetes cluster to run against. You can
+use [KIND](https://sigs.k8s.io/kind) to get a local cluster for testing, or run
+against a remote cluster.
+**Note:** Your controller will automatically use the current context in your
+kubeconfig file (i.e. whatever cluster `kubectl cluster-info` shows).
 
 ### Running on the cluster
+
 1. Install Instances of Custom Resources:
 
 ```sh
@@ -35,29 +45,47 @@ make uninstall
 ```
 
 ### Undeploy controller
+
 UnDeploy the controller to the cluster:
 
 ```sh
 make undeploy
 ```
 
+## Development setup
+
+This code repository contains an Ansible playbook and a role that automates the
+setup of a development environment using
+[install_yamls](https://github.com/openstack-k8s-operators/install_yamls).
+Further information can be found [here](install_yamls_setup/README.md) in the
+`README.md` file in the `install_yamls_setup` sub folder of this Git repository.
+
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
+
+This project accepts pull requests on Github and follows
+the [Kubernetes code review process](https://github.com/kubernetes/community/blob/master/contributors/guide/owners.md#the-code-review-process)
+for integration.
 
 ### How it works
-This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
-which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster
+This project aims to follow the
+Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
+
+It uses
+[Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
+which provides a reconcile function responsible for synchronizing resources
+untile the desired state is reached on the cluster
 
 ### Test It Out
+
 1. Install the CRDs into the cluster:
 
 ```sh
 make install
 ```
 
-2. Run your controller (this will run in the foreground, so switch to a new terminal if you want to leave it running):
+2. Run your controller (this will run in the foreground, so switch to a new
+   terminal if you want to leave it running):
 
 ```sh
 make run
