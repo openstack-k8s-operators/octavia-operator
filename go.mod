@@ -6,8 +6,8 @@ require (
 	github.com/go-logr/logr v1.3.0
 	github.com/gophercloud/gophercloud v1.8.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
-	github.com/onsi/ginkgo/v2 v2.13.2
-	github.com/onsi/gomega v1.30.0
+	github.com/onsi/ginkgo/v2 v2.15.0
+	github.com/onsi/gomega v1.31.1
 	github.com/openstack-k8s-operators/infra-operator/apis v0.3.0
 	github.com/openstack-k8s-operators/keystone-operator/api v0.3.1-0.20231208104910-f8433c1c9399
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.3.1-0.20231215134849-9acca0025036
@@ -66,7 +66,7 @@ require (
 	golang.org/x/term v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
-	golang.org/x/tools v0.16.0 // indirect
+	golang.org/x/tools v0.16.1 // indirect
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect
