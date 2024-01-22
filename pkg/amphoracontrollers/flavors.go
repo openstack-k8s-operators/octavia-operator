@@ -16,84 +16,237 @@ package amphoracontrollers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
+	computeflavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/flavorprofiles"
+	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/flavors"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
-func ensureNovaFlavors(osclient *openstack.OpenStack, log *logr.Logger) (string, error) {
-	client, err := octavia.GetComputeClient(osclient)
-	if err != nil {
-		return "", err
-	}
+// OctaviaFlavors -
+type OctaviaFlavors struct {
+	Name        string
+	Description string
+	VCPUs       int
+	RAM         int
+	Disk        int
+	RxTxFactor  int
+}
 
+// FlavorProfileData -
+type FlavorProfileData struct {
+	ComputeFlavorID string `json:"compute_flavor"`
+}
+
+var (
+	// TODO(gthiemonge) we may consider updating the size of the disk
+	// 3GB is fine when enabling log offloading+disabling local disk storage
+	// but when using the defaults, the disk can be filled when testing network performances.
+	defaultFlavors = []OctaviaFlavors{
+		{
+			Name:        "amphora",
+			Description: "Flavor for Octavia amphora instances (1 vCPU, 1 GB RAM, 3 GB disk, default flavor)",
+			VCPUs:       1,
+			RAM:         1024,
+			Disk:        3,
+			RxTxFactor:  1.0,
+		}, {
+			Name:        "amphora-4vcpus",
+			Description: "Flavor for Octavia amphora instances (4 vCPUs, 4 GB RAM, 3 GB disk)",
+			VCPUs:       4,
+			RAM:         4096,
+			Disk:        3,
+			RxTxFactor:  1.0,
+		},
+	}
+)
+
+func getAmphoraFlavors(computeClient *gophercloud.ServiceClient) (map[string]computeflavors.Flavor, error) {
 	// Get Octavia flavors
-	listOpts := flavors.ListOpts{
-		AccessType: flavors.AllAccess,
+	listOpts := computeflavors.ListOpts{
+		AccessType: computeflavors.AllAccess,
 	}
-	allPages, err := flavors.ListDetail(client, listOpts).AllPages()
+	allPages, err := computeflavors.ListDetail(computeClient, listOpts).AllPages()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	allFlavors, err := flavors.ExtractFlavors(allPages)
+	allFlavors, err := computeflavors.ExtractFlavors(allPages)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	amphoraFlavors := make(map[string]flavors.Flavor)
+	amphoraFlavors := make(map[string]computeflavors.Flavor)
 	for _, flavor := range allFlavors {
 		if strings.HasPrefix(flavor.Name, "octavia-") {
 			amphoraFlavors[flavor.Name] = flavor
 		}
 	}
+	return amphoraFlavors, nil
+}
+
+func getOctaviaFlavorProfiles(lbClient *gophercloud.ServiceClient) (map[string]flavorprofiles.FlavorProfile, error) {
+	listOpts := flavorprofiles.ListOpts{}
+	allPages, err := flavorprofiles.List(lbClient, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allFlavorProfiles, err := flavorprofiles.ExtractFlavorProfiles(allPages)
+	if err != nil {
+		return nil, err
+	}
+	flavorProfiles := make(map[string]flavorprofiles.FlavorProfile)
+	for _, flavorProfile := range allFlavorProfiles {
+		flavorProfiles[flavorProfile.Name] = flavorProfile
+	}
+	return flavorProfiles, nil
+}
+
+func getOctaviaFlavors(lbClient *gophercloud.ServiceClient) (map[string]flavors.Flavor, error) {
+	listOpts := flavors.ListOpts{}
+	allPages, err := flavors.List(lbClient, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allFlavors, err := flavors.ExtractFlavors(allPages)
+	if err != nil {
+		return nil, err
+	}
+	flavors := make(map[string]flavors.Flavor)
+	for _, flavor := range allFlavors {
+		flavors[flavor.Name] = flavor
+	}
+	return flavors, nil
+}
+
+func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *octaviav1.OctaviaAmphoraController) (string, error) {
+	computeClient, err := octavia.GetComputeClient(osclient)
+	if err != nil {
+		return "", err
+	}
+
+	lbClient, err := octavia.GetLoadBalancerClient(osclient)
+	if err != nil {
+		return "", err
+	}
+
+	amphoraFlavors, err := getAmphoraFlavors(computeClient)
+	if err != nil {
+		return "", err
+	}
 
 	isPublic := false
-	// TODO(gthiemonge) we may consider updating the size of the disk
-	// 3GB is fine when enabling log offloading+disabling local disk storage
-	// but when using the defaults, the disk can be filled when testing network performances.
-	defaultFlavorsCreateOpts := []flavors.CreateOpts{
-		{
-			Name:        "octavia-amphora",
-			Description: "Flavor for Octavia amphora instances (1 vCPU, 1 GB RAM, 3 GB disk, default flavor)",
-			VCPUs:       1,
-			RAM:         1024,
-			Disk:        gophercloud.IntToPointer(3),
-			RxTxFactor:  1.0,
+	flavorsCreateOpts := []computeflavors.CreateOpts{}
+	for _, defaultFlavor := range defaultFlavors {
+		flavorsCreateOpts = append(flavorsCreateOpts, computeflavors.CreateOpts{
+			Name:        fmt.Sprintf("octavia-%s", defaultFlavor.Name),
+			Description: defaultFlavor.Description,
+			VCPUs:       defaultFlavor.VCPUs,
+			RAM:         defaultFlavor.RAM,
+			Disk:        gophercloud.IntToPointer(defaultFlavor.Disk),
+			RxTxFactor:  float64(defaultFlavor.RxTxFactor),
 			IsPublic:    &isPublic,
-		}, {
-			Name:        "octavia-amphora-4vcpus",
-			Description: "Flavor for Octavia amphora instances (4 vCPUs, 4 GB RAM, 3 GB disk)",
-			VCPUs:       4,
-			RAM:         4096,
-			Disk:        gophercloud.IntToPointer(3),
-			RxTxFactor:  1.0,
-			IsPublic:    &isPublic,
-		},
+		})
 	}
+	for _, flavor := range instance.Spec.AmphoraCustomFlavors {
+		rxTxFactor := 1.0
+		if flavor.RxTxFactor != "" {
+			if rxTxFactor, err = strconv.ParseFloat(flavor.RxTxFactor, 64); err != nil {
+				return "", err
+			}
+		}
+		flavorsCreateOpts = append(flavorsCreateOpts, computeflavors.CreateOpts{
+			Name:        fmt.Sprintf("octavia-%s", flavor.Name),
+			Description: flavor.Description,
+			VCPUs:       flavor.VCPUs,
+			RAM:         flavor.RAM,
+			Disk:        gophercloud.IntToPointer(flavor.Disk),
+			RxTxFactor:  rxTxFactor,
+			IsPublic:    &isPublic,
+		})
+	}
+
+	// Select the first flavor as the default flavor
 	defaultFlavorID := ""
-	defaultFlavorName := defaultFlavorsCreateOpts[0].Name
+	defaultFlavorName := flavorsCreateOpts[0].Name
 
 	// Default flavor already exists, get its ID
 	if flavor, ok := amphoraFlavors[defaultFlavorName]; ok {
 		defaultFlavorID = flavor.ID
 	}
 
-	// Create missing flavors
-	for idx, defaultFlavorOpts := range defaultFlavorsCreateOpts {
-		if _, ok := amphoraFlavors[defaultFlavorOpts.Name]; !ok {
-			log.Info(fmt.Sprintf("Creating Amphora flavor \"%s\"", defaultFlavorOpts.Name))
-			flavor, err := flavors.Create(client, defaultFlavorOpts).Extract()
+	// Create missing compute flavors
+	for idx, flavorOpts := range flavorsCreateOpts {
+		if _, ok := amphoraFlavors[flavorOpts.Name]; !ok {
+			log.Info(fmt.Sprintf("Creating Amphora flavor \"%s\"", flavorOpts.Name))
+			flavor, err := computeflavors.Create(computeClient, flavorOpts).Extract()
 			if err != nil {
 				return "", err
 			}
+			amphoraFlavors[flavorOpts.Name] = *flavor
 			if idx == 0 {
 				defaultFlavorID = flavor.ID
+			}
+		}
+	}
+
+	// Get Octavia FlavorProfiles and Flavors
+	flavorProfileMap, err := getOctaviaFlavorProfiles(lbClient)
+	if err != nil {
+		return "", err
+	}
+
+	flavorMap, err := getOctaviaFlavors(lbClient)
+	if err != nil {
+		return "", err
+	}
+
+	for _, flavorOpts := range flavorsCreateOpts {
+		// Create FlavorProfiles if they don't exist
+
+		name := strings.TrimPrefix(flavorOpts.Name, "octavia-")
+
+		if _, ok := flavorProfileMap[name]; !ok {
+			flavorProfileData := FlavorProfileData{
+				ComputeFlavorID: amphoraFlavors[flavorOpts.Name].ID,
+			}
+			fpDataJSON, err := json.Marshal(flavorProfileData)
+			if err != nil {
+				return "", err
+			}
+			flavorProfileCreateOpts := flavorprofiles.CreateOpts{
+				Name:         name,
+				ProviderName: "amphora",
+				FlavorData:   string(fpDataJSON),
+			}
+
+			log.Info(fmt.Sprintf("Creating Octavia flavor profile \"%s\"", flavorProfileCreateOpts.Name))
+			fp, err := flavorprofiles.Create(lbClient, flavorProfileCreateOpts).Extract()
+			if err != nil {
+				return "", err
+			}
+			flavorProfileMap[fp.Name] = *fp
+		}
+
+		// Create Flavors if they don't exist
+		if _, ok := flavorMap[name]; !ok {
+			flavorCreateOpts := flavors.CreateOpts{
+				Name:            name,
+				Description:     flavorOpts.Description,
+				FlavorProfileId: flavorProfileMap[name].ID,
+				Enabled:         true,
+			}
+			log.Info(fmt.Sprintf("Creating Octavia flavor \"%s\"", flavorCreateOpts.Name))
+			_, err := flavors.Create(lbClient, flavorCreateOpts).Extract()
+			if err != nil {
+				return "", err
 			}
 		}
 	}
@@ -107,15 +260,13 @@ func ensureNovaFlavors(osclient *openstack.OpenStack, log *logr.Logger) (string,
 func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
 	osclient, err := GetOpenstackClient(ctx, instance, helper)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Error while getting a service client when creating flavors: %w", err)
 	}
 
-	defaultNovaFlavorID, err := ensureNovaFlavors(osclient, log)
+	defaultNovaFlavorID, err := ensureFlavors(osclient, log, instance)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("Error while creating flavors: %w", err)
 	}
-
-	// TODO(gthiemonge) Create Octavia flavorprofiles and flavors when gophercloud support them
 
 	return defaultNovaFlavorID, nil
 }

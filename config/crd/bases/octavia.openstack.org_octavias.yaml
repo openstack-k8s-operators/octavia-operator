@@ -44,6 +44,30 @@ spec:
           spec:
             description: OctaviaSpec defines the desired state of Octavia
             properties:
+              amphoraCustomFlavors:
+                description: AmphoraCustomFlavors - User-defined flavors for Octavia
+                items:
+                  description: OctaviaAmphoraFlavor Settings for custom Amphora flavors
+                  properties:
+                    RAM:
+                      type: integer
+                    RxTxFactor:
+                      type: string
+                    VCPUs:
+                      type: integer
+                    description:
+                      type: string
+                    disk:
+                      type: integer
+                    name:
+                      type: string
+                  required:
+                  - RAM
+                  - VCPUs
+                  - disk
+                  - name
+                  type: object
+                type: array
               certsSecret:
                 default: octavia-certs-secret
                 description: LoadBalancerCerts - Secret containing certs for securing
@@ -434,6 +458,31 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  amphoraCustomFlavors:
+                    description: AmphoraCustomFlavors - User-defined flavors for Octavia
+                    items:
+                      description: OctaviaAmphoraFlavor Settings for custom Amphora
+                        flavors
+                      properties:
+                        RAM:
+                          type: integer
+                        RxTxFactor:
+                          type: string
+                        VCPUs:
+                          type: integer
+                        description:
+                          type: string
+                        disk:
+                          type: integer
+                        name:
+                          type: string
+                      required:
+                      - RAM
+                      - VCPUs
+                      - disk
+                      - name
+                      type: object
+                    type: array
                   certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private
@@ -619,6 +668,31 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  amphoraCustomFlavors:
+                    description: AmphoraCustomFlavors - User-defined flavors for Octavia
+                    items:
+                      description: OctaviaAmphoraFlavor Settings for custom Amphora
+                        flavors
+                      properties:
+                        RAM:
+                          type: integer
+                        RxTxFactor:
+                          type: string
+                        VCPUs:
+                          type: integer
+                        description:
+                          type: string
+                        disk:
+                          type: integer
+                        name:
+                          type: string
+                      required:
+                      - RAM
+                      - VCPUs
+                      - disk
+                      - name
+                      type: object
+                    type: array
                   certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private
@@ -804,6 +878,31 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
+                  amphoraCustomFlavors:
+                    description: AmphoraCustomFlavors - User-defined flavors for Octavia
+                    items:
+                      description: OctaviaAmphoraFlavor Settings for custom Amphora
+                        flavors
+                      properties:
+                        RAM:
+                          type: integer
+                        RxTxFactor:
+                          type: string
+                        VCPUs:
+                          type: integer
+                        description:
+                          type: string
+                        disk:
+                          type: integer
+                        name:
+                          type: string
+                      required:
+                      - RAM
+                      - VCPUs
+                      - disk
+                      - name
+                      type: object
+                    type: array
                   certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private

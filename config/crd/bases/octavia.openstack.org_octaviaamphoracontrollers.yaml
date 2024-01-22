@@ -50,6 +50,30 @@ spec:
             description: OctaviaAmphoraControllerSpec defines common state for all
               Octavia Amphora Controllers
             properties:
+              amphoraCustomFlavors:
+                description: AmphoraCustomFlavors - User-defined flavors for Octavia
+                items:
+                  description: OctaviaAmphoraFlavor Settings for custom Amphora flavors
+                  properties:
+                    RAM:
+                      type: integer
+                    RxTxFactor:
+                      type: string
+                    VCPUs:
+                      type: integer
+                    description:
+                      type: string
+                    disk:
+                      type: integer
+                    name:
+                      type: string
+                  required:
+                  - RAM
+                  - VCPUs
+                  - disk
+                  - name
+                  type: object
+                type: array
               certsPassphraseSecret:
                 default: octavia-ca-passphrase
                 description: Name of secret containing passphrase for the CA private
