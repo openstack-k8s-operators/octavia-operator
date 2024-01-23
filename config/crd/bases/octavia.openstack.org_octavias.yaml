@@ -44,7 +44,7 @@ spec:
           spec:
             description: OctaviaSpec defines the desired state of Octavia
             properties:
-              certssecret:
+              certsSecret:
                 default: octavia-certs-secret
                 description: LoadBalancerCerts - Secret containing certs for securing
                   communication with amphora based Load Balancers
@@ -461,12 +461,12 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
+                  certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private
                       keys
                     type: string
-                  certssecret:
+                  certsSecret:
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -616,13 +616,13 @@ spec:
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
                     type: string
-                  sshprivkeysecret:
+                  sshPrivkeySecret:
                     description: LoadBalancerSSHPrivKey - The name of the secret that
                       will be used to store the private key for connecting to amphorae
                       via SSH. Only used when no public key was defined and a new
                       key pair needs to be generated.
                     type: string
-                  sshpubkey:
+                  sshPubkey:
                     description: LoadBalancerSSHPubKey - The name of the ConfigMap
                       containing the pubilc key for connecting to the amphorae via
                       SSH
@@ -645,12 +645,12 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
+                  certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private
                       keys
                     type: string
-                  certssecret:
+                  certsSecret:
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -800,13 +800,13 @@ spec:
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
                     type: string
-                  sshprivkeysecret:
+                  sshPrivkeySecret:
                     description: LoadBalancerSSHPrivKey - The name of the secret that
                       will be used to store the private key for connecting to amphorae
                       via SSH. Only used when no public key was defined and a new
                       key pair needs to be generated.
                     type: string
-                  sshpubkey:
+                  sshPubkey:
                     description: LoadBalancerSSHPubKey - The name of the ConfigMap
                       containing the pubilc key for connecting to the amphorae via
                       SSH
@@ -829,12 +829,12 @@ spec:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
                 properties:
-                  certspassphrasesecret:
+                  certsPassphraseSecret:
                     default: octavia-ca-passphrase
                     description: Name of secret containing passphrase for the CA private
                       keys
                     type: string
-                  certssecret:
+                  certsSecret:
                     description: LoadBalancerCerts - Secret containing certs for securing
                       communication with amphora based Load Balancers
                     type: string
@@ -984,13 +984,13 @@ spec:
                     description: 'ServiceUser - service user name (TODO: beagles,
                       do we need this at all)'
                     type: string
-                  sshprivkeysecret:
+                  sshPrivkeySecret:
                     description: LoadBalancerSSHPrivKey - The name of the secret that
                       will be used to store the private key for connecting to amphorae
                       via SSH. Only used when no public key was defined and a new
                       key pair needs to be generated.
                     type: string
-                  sshpubkey:
+                  sshPubkey:
                     description: LoadBalancerSSHPubKey - The name of the ConfigMap
                       containing the pubilc key for connecting to the amphorae via
                       SSH
@@ -1046,19 +1046,19 @@ spec:
                 default: octavia
                 description: ServiceUser - service user name
                 type: string
-              sshprivkeysecret:
+              sshPrivkeySecret:
                 default: octavia-ssh-privkey-secret
                 description: LoadBalancerSSHPrivKey - The name of the secret that
                   will be used to store the private key for connecting to amphorae
                   via SSH
                 type: string
-              sshpubkey:
+              sshPubkey:
                 default: octavia-ssh-pubkey
                 description: LoadBalancerSSHPubKey - The name of the ConfigMap containing
                   the pubilc key for connecting to the amphorae via SSH
                 type: string
             required:
-            - certssecret
+            - certsSecret
             - databaseInstance
             - octaviaAPI
             - rabbitMqClusterName

@@ -125,19 +125,19 @@ type OctaviaSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=octavia-certs-secret
 	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
-	LoadBalancerCerts string `json:"certssecret"`
+	LoadBalancerCerts string `json:"certsSecret"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia-ssh-pubkey
 	// LoadBalancerSSHPubKey - The name of the ConfigMap containing the
 	// pubilc key for connecting to the amphorae via SSH
-	LoadBalancerSSHPubKey string `json:"sshpubkey,omitempty"`
+	LoadBalancerSSHPubKey string `json:"sshPubkey,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia-ssh-privkey-secret
 	// LoadBalancerSSHPrivKey - The name of the secret that will be used to
 	// store the private key for connecting to amphorae via SSH
-	LoadBalancerSSHPrivKey string `json:"sshprivkeysecret,omitempty"`
+	LoadBalancerSSHPrivKey string `json:"sshPrivkeySecret,omitempty"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
