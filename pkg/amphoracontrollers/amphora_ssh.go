@@ -49,7 +49,7 @@ var (
 
 func generateECDSAKeys() (pubKey string, privKey string, err error) {
 	// generate private key
-	curve := elliptic.P384()
+	curve := elliptic.P521()
 	privateKey, err := ecdsa.GenerateKey(curve, rand.Reader)
 	if err != nil {
 		return "", "", err
@@ -168,6 +168,35 @@ func doEnsureAmpSSHConfig(
 			ensureResultSSH = fmt.Errorf("Error getting compute client: %w", err)
 			return
 		}
+
+		allPages, err := keypairs.List(computeClient, nil).AllPages()
+		if err != nil {
+			ensureResultSSH = fmt.Errorf("Could not list keypairs: %w", err)
+			return
+		}
+
+		allKeyPairs, err := keypairs.ExtractKeyPairs(allPages)
+		if err != nil {
+			ensureResultSSH = fmt.Errorf("Could not extract keypairs: %w", err)
+			return
+		}
+
+		var keypairExists bool = false
+		for _, kp := range allKeyPairs {
+			if kp.Name == NovaKeyPairName {
+				keypairExists = true
+				break
+			}
+		}
+
+		if keypairExists {
+			err := keypairs.Delete(computeClient, NovaKeyPairName, nil).ExtractErr()
+			if err != nil {
+				ensureResultSSH = fmt.Errorf("Error deleting the existing SSH keypair for amphorae: %w", err)
+				return
+			}
+		}
+
 		createOpts := keypairs.CreateOpts{
 			Name:      NovaKeyPairName,
 			Type:      "ssh",
