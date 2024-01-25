@@ -115,6 +115,58 @@ func storePublicKeyAsConfigMap(
 	return err
 }
 
+func uploadKeypair(
+	ctx context.Context,
+	instance *octaviav1.OctaviaAmphoraController,
+	h *helper.Helper,
+	pubKey string) error {
+	osClient, err := GetOpenstackClient(ctx, instance, h)
+	if err != nil {
+		return fmt.Errorf("Error getting openstack client: %w", err)
+	}
+
+	computeClient, err := octavia.GetComputeClient(osClient)
+	if err != nil {
+		return fmt.Errorf("Error getting compute client: %w", err)
+	}
+
+	allPages, err := keypairs.List(computeClient, nil).AllPages()
+	if err != nil {
+		return fmt.Errorf("Could not list keypairs: %w", err)
+	}
+
+	allKeyPairs, err := keypairs.ExtractKeyPairs(allPages)
+	if err != nil {
+		return fmt.Errorf("Could not extract keypairs: %w", err)
+	}
+
+	var keypairExists bool = false
+	for _, kp := range allKeyPairs {
+		if kp.Name == NovaKeyPairName {
+			keypairExists = true
+			break
+		}
+	}
+
+	if keypairExists {
+		err := keypairs.Delete(computeClient, NovaKeyPairName, nil).ExtractErr()
+		if err != nil {
+			return fmt.Errorf("Error deleting the existing SSH keypair for amphorae: %w", err)
+		}
+	}
+
+	createOpts := keypairs.CreateOpts{
+		Name:      NovaKeyPairName,
+		Type:      "ssh",
+		PublicKey: pubKey,
+	}
+	_, err = keypairs.Create(computeClient, createOpts).Extract()
+	if err != nil {
+		return fmt.Errorf("Error uploading public key for SSH authentication with amphora: %w", err)
+	}
+	return nil
+}
+
 func doEnsureAmpSSHConfig(
 	ctx context.Context,
 	instance *octaviav1.OctaviaAmphoraController,
@@ -129,6 +181,12 @@ func doEnsureAmpSSHConfig(
 			ensureResultSSH = fmt.Errorf(
 				"ConfigMap %s exists but has no key data",
 				instance.Spec.LoadBalancerSSHPubKey)
+			return
+		}
+
+		err = uploadKeypair(ctx, instance, h, cmap.Data["key"])
+		if err != nil {
+			ensureResultSSH = err
 			return
 		}
 	} else {
@@ -156,55 +214,9 @@ func doEnsureAmpSSHConfig(
 				instance.Spec.LoadBalancerSSHPubKey, err)
 			return
 		}
-
-		osClient, err := GetOpenstackClient(ctx, instance, h)
+		err = uploadKeypair(ctx, instance, h, pubKey)
 		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error getting openstack client: %w", err)
-			return
-		}
-
-		computeClient, err := octavia.GetComputeClient(osClient)
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error getting compute client: %w", err)
-			return
-		}
-
-		allPages, err := keypairs.List(computeClient, nil).AllPages()
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Could not list keypairs: %w", err)
-			return
-		}
-
-		allKeyPairs, err := keypairs.ExtractKeyPairs(allPages)
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Could not extract keypairs: %w", err)
-			return
-		}
-
-		var keypairExists bool = false
-		for _, kp := range allKeyPairs {
-			if kp.Name == NovaKeyPairName {
-				keypairExists = true
-				break
-			}
-		}
-
-		if keypairExists {
-			err := keypairs.Delete(computeClient, NovaKeyPairName, nil).ExtractErr()
-			if err != nil {
-				ensureResultSSH = fmt.Errorf("Error deleting the existing SSH keypair for amphorae: %w", err)
-				return
-			}
-		}
-
-		createOpts := keypairs.CreateOpts{
-			Name:      NovaKeyPairName,
-			Type:      "ssh",
-			PublicKey: pubKey,
-		}
-		_, err = keypairs.Create(computeClient, createOpts).Extract()
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error uploading public key for SSH authentication with amphora: %w", err)
+			ensureResultSSH = err
 			return
 		}
 	}
