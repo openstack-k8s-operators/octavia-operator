@@ -39,11 +39,10 @@
   become: yes
   tags: install
 
-- name: Pip install openstack client packages as user
+- name: Pip install pre-commit as user
   ansible.builtin.pip:
     name:
-      - python-openstackclient
-      - python-octaviaclient
+      - pre-commit
     extra_args: --user
   tags: install
 
@@ -141,17 +140,24 @@
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       NETWORK_ISOLATION=false make openstack 2>&1 | tee make_openstack.log
-      sleep 100
+      sleep 10; NETWORK_ISOLATION=false make openstack_wait; sleep 10
       NETWORK_ISOLATION=false make openstack_deploy 2>&1 | tee make_openstack_deploy.log
-      sleep 300
+      sleep 10; NETWORK_ISOLATION=false make openstack_wait_deploy; sleep 10
+
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
-      oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type json \
-        -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", \
-        "value": "0"}]"
       sleep 10
       oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type=json \
         -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
+
+      oc project openstack-operators
+      oc patch openstackcontrolplane openstack-galera       --type=merge --patch '
+          spec:
+            octavia:
+              enabled: true
+        '
+
+
       oc completion bash | sudo tee /etc/bash_completion.d/oc_completion
       openstack complete | sudo tee /etc/bash_completion.d/osc.bash_completion
       exit 0
