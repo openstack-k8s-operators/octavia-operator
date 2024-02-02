@@ -88,11 +88,6 @@ type OctaviaAPISpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
-	// actual action pod gets started with sleep infinity
-	Debug OctaviaAPIDebug `json:"debug,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// PreserveJobs - do not delete jobs after they finished e.g. to check logs
 	PreserveJobs bool `json:"preserveJobs,omitempty"`
@@ -133,19 +128,6 @@ type APIOverrideSpec struct {
 	// Override configuration for the Service created to serve traffic to the cluster.
 	// The key must be the endpoint type (public, internal)
 	Service map[service.Endpoint]service.RoutedOverrideSpec `json:"service,omitempty"`
-}
-
-// OctaviaAPIDebug defines the observed state of OctaviaAPI
-// TODO (beagles): extract and rename to a common file?
-type OctaviaAPIDebug struct {
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// DBSync enable debug
-	DBSync bool `json:"dbSync,omitempty"`
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=false
-	// Service enable debug
-	Service bool `json:"service,omitempty"`
 }
 
 // OctaviaAPIStatus defines the observed state of OctaviaAPI
