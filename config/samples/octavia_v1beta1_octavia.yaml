@@ -8,9 +8,6 @@ spec:
   serviceUser: octavia
   rabbitMqClusterName: rabbitmq
   secret: osp-secret
-  debug:
-    dbSync: false
-    service: false
   preserveJobs: false
   customServiceConfig: |
     [DEFAULT]
@@ -60,9 +57,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     secret: osp-secret
-    debug:
-      dbSync: false
-      service: false
     preserveJobs: false
     customServiceConfig: |
       [DEFAULT]

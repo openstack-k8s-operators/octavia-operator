@@ -48,8 +48,6 @@ func DaemonSet(
 	volumeMounts := octavia.GetVolumeMounts(serviceName)
 	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
 
-	// TODO(beagles): service debugging
-
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
 		TimeoutSeconds:      15,

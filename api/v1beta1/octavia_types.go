@@ -80,11 +80,6 @@ type OctaviaSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// Debug - enable debug for different deploy stages. If an init container is used, it runs and the
-	// actual action pod gets started with sleep infinity
-	Debug OctaviaAPIDebug `json:"debug,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=false
 	// PreserveJobs - do not delete jobs after they finished e.g. to check logs
 	PreserveJobs bool `json:"preserveJobs,omitempty"`

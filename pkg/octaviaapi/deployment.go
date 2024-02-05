@@ -58,34 +58,17 @@ func Deployment(
 		InitialDelaySeconds: 5,
 	}
 
-	args := []string{"-c"}
-	if instance.Spec.Debug.Service {
-		args = append(args, common.DebugCommand)
-		livenessProbe.Exec = &corev1.ExecAction{
-			Command: []string{
-				"/bin/true",
-			},
-		}
-
-		readinessProbe.Exec = &corev1.ExecAction{
-			Command: []string{
-				"/bin/true",
-			},
-		}
-	} else {
-		args = append(args, ServiceCommand)
-
-		//
-		// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-		//
-		livenessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: "/healthcheck",
-			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
-		}
-		readinessProbe.HTTPGet = &corev1.HTTPGetAction{
-			Path: "/healthcheck",
-			Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
-		}
+	args := []string{"-c", ServiceCommand}
+	//
+	// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+	//
+	livenessProbe.HTTPGet = &corev1.HTTPGetAction{
+		Path: "/healthcheck",
+		Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
+	}
+	readinessProbe.HTTPGet = &corev1.HTTPGetAction{
+		Path: "/healthcheck",
+		Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
 	}
 
 	envVars := map[string]env.Setter{}

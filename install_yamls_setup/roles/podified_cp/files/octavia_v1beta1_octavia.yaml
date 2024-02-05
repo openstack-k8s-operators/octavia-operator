@@ -60,9 +60,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     secret: osp-secret
-    debug:
-      dbSync: false
-      service: false
     preserveJobs: false
     containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
     customServiceConfig: |
