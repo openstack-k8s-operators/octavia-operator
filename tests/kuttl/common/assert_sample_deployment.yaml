@@ -19,9 +19,6 @@ spec:
     debug = true
   databaseInstance: openstack
   databaseUser: octavia
-  debug:
-    dbSync: false
-    service: false
   passwordSelectors:
     service: OctaviaPassword
     database: OctaviaDatabasePassword
@@ -34,9 +31,6 @@ spec:
       debug = true
     databaseInstance: openstack
     databaseUser: octavia
-    debug:
-      dbSync: false
-      service: false
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
