@@ -1,5 +1,5 @@
-ARG GOLANG_BUILDER=quay.io/projectquay/golang:1.19
-ARG OPERATOR_BASE_IMAGE=gcr.io/distroless/static:nonroot
+ARG GOLANG_BUILDER=registry.access.redhat.com/ubi9/go-toolset:1.19
+ARG OPERATOR_BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal:latest
 
 # Build the manager binary
 FROM $GOLANG_BUILDER AS builder
