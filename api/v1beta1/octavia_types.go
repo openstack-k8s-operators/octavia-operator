@@ -212,6 +212,9 @@ type OctaviaStatus struct {
 
 	// ReadyCount of octavia HealthManager instances
 	OctaviaHealthManagerReadyCount int32 `json:"healthmanagerreadyCount,omitempty"`
+
+	// List of Redis Host IP addresses
+	RedisHostIPs []string `json:"redisHostIPs,omitempty"`
 }
 
 //+kubebuilder:object:root=true

@@ -23,15 +23,16 @@ import (
 
 // APIDetails information
 type APIDetails struct {
-	ContainerImage       string
-	DatabaseHost         string
-	DatabaseUser         string
-	DatabaseName         string
-	TransportURLSecret   string
-	OSPSecret            string
-	DBPasswordSelector   string
-	UserPasswordSelector string
-	VolumeMounts         []corev1.VolumeMount
+	ContainerImage          string
+	DatabaseHost            string
+	DatabaseUser            string
+	DatabaseName            string
+	PersistenceDatabaseName string
+	TransportURLSecret      string
+	OSPSecret               string
+	DBPasswordSelector      string
+	UserPasswordSelector    string
+	VolumeMounts            []corev1.VolumeMount
 }
 
 const (

@@ -17,5 +17,6 @@ set -ex
 
 OPTS="--config-file /etc/octavia/octavia.conf"
 octavia-db-manage ${OPTS} upgrade head
+octavia-db-manage ${OPTS} upgrade_persistence
 
 exit 0

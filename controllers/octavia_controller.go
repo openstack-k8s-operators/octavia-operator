@@ -23,6 +23,7 @@ import (
 
 	"github.com/go-logr/logr"
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
+	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
@@ -85,6 +86,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
+// +kubebuilder:rbac:groups=redis.openstack.org,resources=redises,verbs=get;list;watch;create;update;patch;delete
 
 // service account, role, rolebinding
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update
@@ -204,6 +206,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&rabbitmqv1.TransportURL{}).
+		Owns(&redisv1.Redis{}).
 		Complete(r)
 }
 
@@ -245,58 +248,78 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
-	db := mariadbv1.NewDatabase(
-		instance.Name,
+	octaviaDb := mariadbv1.NewDatabase(
+		octavia.DatabaseName,
 		instance.Spec.DatabaseUser,
 		instance.Spec.Secret,
 		map[string]string{
 			"dbName": instance.Spec.DatabaseInstance,
 		},
 	)
-	// create or patch the DB
-	ctrlResult, err := db.CreateOrPatchDB(
-		ctx,
-		helper,
+	// Using WithNamespace to explicitly set a name that is not "octavia"
+	// If name is not set, it's set automatically to the name of the service ("octavia"),
+	// and it triggers a conflict in the mariadbdatabase functions when two DBs
+	// share the same "name"
+	persistentDb := mariadbv1.NewDatabaseWithNamespace(
+		octavia.PersistenceDatabaseName,
+		instance.Spec.DatabaseUser,
+		instance.Spec.Secret,
+		map[string]string{
+			"dbName": instance.Spec.DatabaseInstance,
+		},
+		"octavia-persistence",
+		instance.Namespace,
 	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DBReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.DBReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DBReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.DBReadyRunningMessage))
-		return ctrlResult, nil
+
+	dbs := []*mariadbv1.Database{octaviaDb, persistentDb}
+
+	for _, db := range dbs {
+		// create or patch the DB
+		ctrlResult, err := db.CreateOrPatchDB(
+			ctx,
+			helper,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.DBReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DBReadyRunningMessage))
+			return ctrlResult, nil
+		}
+
+		// wait for the DB to be setup
+		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.DBReadyErrorMessage,
+				err.Error()))
+			return ctrlResult, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DBReadyRunningMessage))
+			return ctrlResult, nil
+		}
 	}
 
-	// wait for the DB to be setup
-	ctrlResult, err = db.WaitForDBCreated(ctx, helper)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DBReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.DBReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	}
-	if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DBReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.DBReadyRunningMessage))
-		return ctrlResult, nil
-	}
 	// update Status.DatabaseHostname, used to bootstrap/config the service
-	instance.Status.DatabaseHostname = db.GetDatabaseHostname()
+	instance.Status.DatabaseHostname = dbs[0].GetDatabaseHostname()
 	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
 
 	// create service DB - end
@@ -314,7 +337,7 @@ func (r *OctaviaReconciler) reconcileInit(
 		time.Duration(5)*time.Second,
 		dbSyncHash,
 	)
-	ctrlResult, err = dbSyncjob.DoJob(
+	ctrlResult, err := dbSyncjob.DoJob(
 		ctx,
 		helper,
 	)
@@ -396,6 +419,15 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
+
+	redis, op, err := r.redisCreateOrUpdate(ctx, instance, helper)
+	if err != nil {
+		// TODO(gthiemonge) Set conditions?
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		Log.Info(fmt.Sprintf("Redis %s successfully reconciled - operation: %s", redis.Name, string(op)))
+	}
 
 	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
 	if err != nil {
@@ -797,6 +829,54 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 	return transportURL, op, err
 }
 
+func getRedisServiceIPs(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+	redis *redisv1.Redis,
+) ([]string, error) {
+	getOptions := metav1.GetOptions{}
+	service, err := helper.GetKClient().CoreV1().Services(instance.Namespace).Get(ctx, "redis", getOptions)
+	if err != nil {
+		return []string{}, err
+	}
+	// TODO Ensure that the correct port is exposed
+	return service.Spec.ClusterIPs, nil
+}
+
+func (r *OctaviaReconciler) redisCreateOrUpdate(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+) (*redisv1.Redis, controllerutil.OperationResult, error) {
+	redis := &redisv1.Redis{
+		// Use the "global" redis instance.
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis",
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, redis, func() error {
+		// We probably don't want to own the redis instance.
+		//err := controllerutil.SetControllerReference(instance, redis, r.Scheme)
+		//return err
+		return nil
+	})
+	if err != nil {
+		return nil, op, err
+	}
+
+	hostIPs, err := getRedisServiceIPs(ctx, instance, helper, redis)
+	if err != nil {
+		return redis, op, err
+	}
+
+	instance.Status.RedisHostIPs = hostIPs
+
+	return redis, op, err
+}
+
 func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
 	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
@@ -827,6 +907,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.LoadBalancerSSHPrivKey = instance.Spec.LoadBalancerSSHPrivKey
 		daemonset.Spec.LoadBalancerSSHPubKey = instance.Spec.LoadBalancerSSHPubKey
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
+		daemonset.Spec.RedisHostIPs = instance.Status.RedisHostIPs
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
