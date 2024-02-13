@@ -22,7 +22,6 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -41,11 +40,6 @@ import (
 
 // NovaKeyPairName stores the name of the nova keypair that holds the public SSH key for access to the amphorae
 const NovaKeyPairName string = "octavia-ssh-keypair"
-
-var (
-	onceEnsureSSH   sync.Once
-	ensureResultSSH error = nil
-)
 
 func generateECDSAKeys() (pubKey string, privKey string, err error) {
 	// generate private key
@@ -167,61 +161,6 @@ func uploadKeypair(
 	return nil
 }
 
-func doEnsureAmpSSHConfig(
-	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
-	h *helper.Helper,
-	log *logr.Logger,
-) {
-	cmap, _, err := configmap.GetConfigMap(
-		ctx, h, instance, instance.Spec.LoadBalancerSSHPubKey, 10*time.Second)
-	if err == nil && cmap.Data != nil {
-		// Fail if config map has no data
-		if len(cmap.Data) == 0 || cmap.Data["key"] == "" {
-			ensureResultSSH = fmt.Errorf(
-				"ConfigMap %s exists but has no key data",
-				instance.Spec.LoadBalancerSSHPubKey)
-			return
-		}
-
-		err = uploadKeypair(ctx, instance, h, cmap.Data["key"])
-		if err != nil {
-			ensureResultSSH = err
-			return
-		}
-	} else {
-		if err != nil && !k8serrors.IsNotFound(err) {
-			ensureResultSSH = fmt.Errorf("Error retrieving config map %s - %w", instance.Spec.LoadBalancerSSHPubKey, err)
-			return
-		}
-
-		pubKey, privKey, err := generateECDSAKeys()
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error while generating SSH keys for amphorae: %w", err)
-			return
-		}
-
-		err = storePrivateKeyAsSecret(ctx, instance, h, privKey)
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error creating ssh key secret %s - %w",
-				instance.Spec.LoadBalancerSSHPrivKey, err)
-			return
-		}
-
-		err = storePublicKeyAsConfigMap(ctx, instance, h, pubKey)
-		if err != nil {
-			ensureResultSSH = fmt.Errorf("Error creating ssh key config map %s - %w",
-				instance.Spec.LoadBalancerSSHPubKey, err)
-			return
-		}
-		err = uploadKeypair(ctx, instance, h, pubKey)
-		if err != nil {
-			ensureResultSSH = err
-			return
-		}
-	}
-}
-
 // EnsureAmpSSHConfig ensures amphora SSH configuration is set up
 func EnsureAmpSSHConfig(
 	ctx context.Context,
@@ -229,7 +168,45 @@ func EnsureAmpSSHConfig(
 	h *helper.Helper,
 	log *logr.Logger,
 ) error {
-	// Do SSH config once, and only once for all services.
-	onceEnsureSSH.Do(func() { doEnsureAmpSSHConfig(ctx, instance, h, log) })
-	return ensureResultSSH
+	cmap, _, err := configmap.GetConfigMap(
+		ctx, h, instance, instance.Spec.LoadBalancerSSHPubKey, 10*time.Second)
+	if err == nil && cmap.Data != nil {
+		// Fail if config map has no data
+		if len(cmap.Data) == 0 || cmap.Data["key"] == "" {
+			return fmt.Errorf(
+				"ConfigMap %s exists but has no key data",
+				instance.Spec.LoadBalancerSSHPubKey)
+		}
+
+		err = uploadKeypair(ctx, instance, h, cmap.Data["key"])
+		if err != nil {
+			return err
+		}
+	} else {
+		if err != nil && !k8serrors.IsNotFound(err) {
+			return fmt.Errorf("Error retrieving config map %s - %w", instance.Spec.LoadBalancerSSHPubKey, err)
+		}
+
+		pubKey, privKey, err := generateECDSAKeys()
+		if err != nil {
+			return fmt.Errorf("Error while generating SSH keys for amphorae: %w", err)
+		}
+
+		err = storePrivateKeyAsSecret(ctx, instance, h, privKey)
+		if err != nil {
+			return fmt.Errorf("Error creating ssh key secret %s - %w",
+				instance.Spec.LoadBalancerSSHPrivKey, err)
+		}
+
+		err = storePublicKeyAsConfigMap(ctx, instance, h, pubKey)
+		if err != nil {
+			return fmt.Errorf("Error creating ssh key config map %s - %w",
+				instance.Spec.LoadBalancerSSHPubKey, err)
+		}
+		err = uploadKeypair(ctx, instance, h, pubKey)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
