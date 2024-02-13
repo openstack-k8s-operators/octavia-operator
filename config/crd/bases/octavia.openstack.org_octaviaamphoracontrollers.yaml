@@ -50,12 +50,12 @@ spec:
             description: OctaviaAmphoraControllerSpec defines common state for all
               Octavia Amphora Controllers
             properties:
-              certspassphrasesecret:
+              certsPassphraseSecret:
                 default: octavia-ca-passphrase
                 description: Name of secret containing passphrase for the CA private
                   keys
                 type: string
-              certssecret:
+              certsSecret:
                 description: LoadBalancerCerts - Secret containing certs for securing
                   communication with amphora based Load Balancers
                 type: string
@@ -202,6 +202,16 @@ spec:
                 default: octavia
                 description: 'ServiceUser - service user name (TODO: beagles, do we
                   need this at all)'
+                type: string
+              sshPrivkeySecret:
+                description: LoadBalancerSSHPrivKey - The name of the secret that
+                  will be used to store the private key for connecting to amphorae
+                  via SSH. Only used when no public key was defined and a new key
+                  pair needs to be generated.
+                type: string
+              sshPubkey:
+                description: LoadBalancerSSHPubKey - The name of the ConfigMap containing
+                  the pubilc key for connecting to the amphorae via SSH
                 type: string
               tenantName:
                 default: service

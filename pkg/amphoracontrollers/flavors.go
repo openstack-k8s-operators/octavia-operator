@@ -22,7 +22,6 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
@@ -106,11 +105,7 @@ func ensureNovaFlavors(osclient *openstack.OpenStack, log *logr.Logger) (string,
 //
 // returns the UUID of the default Nova flavor
 func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
-	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, helper, instance.Namespace, map[string]string{})
-	if err != nil {
-		return "", err
-	}
-	osclient, _, err := octavia.GetAdminServiceClient(ctx, helper, keystoneAPI)
+	osclient, err := GetOpenstackClient(ctx, instance, helper)
 	if err != nil {
 		return "", err
 	}
