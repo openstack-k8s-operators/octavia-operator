@@ -13,7 +13,6 @@ require (
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.3.1-0.20240124141114-55d029e4658b
 	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.3.1-0.20231215134849-9acca0025036
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.3.1-0.20240124160436-36095347284f
-	github.com/openstack-k8s-operators/neutron-operator/api v0.3.1-0.20240122135031-be5f0da8fa93
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/ovn-operator/api v0.3.1-0.20231214144747-4931187a1a31
 	go.uber.org/zap v1.26.0
@@ -52,7 +51,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/openshift/api v3.9.0+incompatible // indirect
-	github.com/openstack-k8s-operators/lib-common/modules/storage v0.3.1-0.20240117103205-2bd91a3da216 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.15.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
