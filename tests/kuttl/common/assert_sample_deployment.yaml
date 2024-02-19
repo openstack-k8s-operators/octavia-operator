@@ -16,10 +16,10 @@ spec:
     [DEFAULT]
     debug = true
   databaseInstance: openstack
-  databaseUser: octavia
+  databaseAccount: octavia
+  persistenceDatabaseAccount: octavia-persistence
   passwordSelectors:
     service: OctaviaPassword
-    database: OctaviaDatabasePassword
   preserveJobs: false
   secret: osp-secret
   serviceUser: octavia
@@ -28,10 +28,10 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     passwordSelectors:
       service: OctaviaPassword
-      database: OctaviaDatabasePassword
     preserveJobs: false
     replicas: 1
     secret: osp-secret
@@ -41,10 +41,10 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     passwordSelectors:
       service: OctaviaPassword
-      database: OctaviaDatabasePassword
     secret: osp-secret
     serviceUser: octavia
   octaviaHealthManager:
@@ -52,10 +52,10 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     passwordSelectors:
       service: OctaviaPassword
-      database: OctaviaDatabasePassword
     secret: osp-secret
     serviceUser: octavia
   octaviaWorker:
@@ -63,15 +63,12 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     passwordSelectors:
       service: OctaviaPassword
-      database: OctaviaDatabasePassword
     secret: osp-secret
     serviceUser: octavia
-status:
-  databaseHostname: openstack.octavia-kuttl-tests.svc
-  apireadyCount: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -156,11 +153,6 @@ spec:
         command:
         - /bin/bash
         env:
-        - name: DatabasePassword
-          valueFrom:
-            secretKeyRef:
-              key: OctaviaDatabasePassword
-              name: osp-secret
         - name: AdminPassword
           valueFrom:
             secretKeyRef:
@@ -174,8 +166,6 @@ spec:
         - name: DatabaseHost
           value: openstack.octavia-kuttl-tests.svc
         - name: DatabaseName
-          value: octavia
-        - name: DatabaseUser
           value: octavia
         imagePullPolicy: IfNotPresent
         name: init

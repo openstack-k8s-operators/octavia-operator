@@ -170,6 +170,12 @@ rules:
   - update
   - watch
 - apiGroups:
+  - mariadb.openstack.org
+  resources:
+  - mariadbdatabases/finalizers
+  verbs:
+  - update
+- apiGroups:
   - octavia.openstack.org
   resources:
   - octaviaamphoracontrollers

@@ -79,6 +79,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete;
+// +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases/finalizers,verbs=update
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbaccounts/finalizers,verbs=update
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch;
@@ -197,6 +198,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.Octavia{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
+		Owns(&mariadbv1.MariaDBAccount{}).
 		Owns(&octaviav1.OctaviaAPI{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Secret{}).
@@ -245,84 +247,91 @@ func (r *OctaviaReconciler) reconcileInit(
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service init")
 
-	//
-	// create service DB instance
-	//
-	octaviaDb := mariadbv1.NewDatabase(
-		octavia.DatabaseName,
-		instance.Spec.DatabaseUser,
-		instance.Spec.Secret,
-		map[string]string{
-			"dbName": instance.Spec.DatabaseInstance,
-		},
-	)
-	// Using WithNamespace to explicitly set a name that is not "octavia"
-	// If name is not set, it's set automatically to the name of the service ("octavia"),
-	// and it triggers a conflict in the mariadbdatabase functions when two DBs
-	// share the same "name"
-	persistentDb := mariadbv1.NewDatabaseWithNamespace(
-		octavia.PersistenceDatabaseName,
-		instance.Spec.DatabaseUser,
-		instance.Spec.Secret,
-		map[string]string{
-			"dbName": instance.Spec.DatabaseInstance,
-		},
-		"octavia-persistence",
-		instance.Namespace,
-	)
+	// ConfigMap
+	configMapVars := make(map[string]env.Setter)
 
-	dbs := []*mariadbv1.Database{octaviaDb, persistentDb}
-
-	for _, db := range dbs {
-		// create or patch the DB
-		ctrlResult, err := db.CreateOrPatchDB(
-			ctx,
-			helper,
-		)
-		if err != nil {
+	//
+	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
+	//
+	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
 			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.DBReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-		if (ctrlResult != ctrl.Result{}) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
+				condition.InputReadyCondition,
 				condition.RequestedReason,
 				condition.SeverityInfo,
-				condition.DBReadyRunningMessage))
-			return ctrlResult, nil
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
 		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[ospSecret.Name] = env.SetValue(hash)
 
-		// wait for the DB to be setup
-		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
-		if err != nil {
+	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Status.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
 			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.DBReadyErrorMessage,
-				err.Error()))
-			return ctrlResult, err
-		}
-		if (ctrlResult != ctrl.Result{}) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
+				condition.InputReadyCondition,
 				condition.RequestedReason,
 				condition.SeverityInfo,
-				condition.DBReadyRunningMessage))
-			return ctrlResult, nil
+				condition.InputReadyWaitingMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("TransportURL secret %s not found", instance.Status.TransportURLSecret)
 		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+
+	octaviaDb, persistenceDb, result, err := r.ensureDB(ctx, helper, instance)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if (result != ctrl.Result{}) {
+		return result, nil
 	}
 
-	// update Status.DatabaseHostname, used to bootstrap/config the service
-	instance.Status.DatabaseHostname = dbs[0].GetDatabaseHostname()
-	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
+	//
+	// create Configmap required for octavia input
+	// - %-scripts configmap holding scripts to e.g. bootstrap the service
+	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
+	// - parameters which has passwords gets added from the OpenStack secret via the init container
+	//
+	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, octaviaDb, persistenceDb)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
 
-	// create service DB - end
+	//
+	// create hash over all the different input resources to identify if any those changed
+	// and a restart/recreate is required.
+	//
+	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	if err != nil {
+		return ctrl.Result{}, err
+	} else if hashChanged {
+		// Hash changed and instance status should be updated (which will be done by main defer func),
+		// so we need to return and reconcile again
+		return ctrl.Result{}, nil
+	}
+	// Create Secrets - end
+
+	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	//
 	// run octavia db sync
@@ -416,9 +425,6 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return rbacResult, nil
 	}
 
-	// ConfigMap
-	configMapVars := make(map[string]env.Setter)
-
 	redis, op, err := r.redisCreateOrUpdate(ctx, instance, helper)
 	if err != nil {
 		// TODO(gthiemonge) Set conditions?
@@ -454,26 +460,6 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
 
-	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Status.TransportURLSecret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, fmt.Errorf("TransportURL secret %s not found", instance.Status.TransportURLSecret)
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
-
 	// Amphora SSH key config for debugging
 	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
 	if err != nil {
@@ -486,64 +472,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	//
-	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
-	//
-	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
-
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
-
-	// run check OpenStack secret - end
-
-	//
-	// Create ConfigMaps and Secrets required as input for the Service and calculate an overall hash of hashes
-	//
-
-	//
-	// create Configmap required for octavia input
-	// - %-scripts configmap holding scripts to e.g. bootstrap the service
-	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
-	// - parameters which has passwords gets added from the OpenStack secret via the init container
-	//
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
-	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
-	if err != nil {
-		return ctrl.Result{}, err
-	} else if hashChanged {
-		// Hash changed and instance status should be updated (which will be done by main defer func),
-		// so we need to return and reconcile again
-		return ctrl.Result{}, nil
-	}
-
-	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
@@ -703,10 +632,139 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Worker), condition.DeploymentReadyMessage)
 	}
 
+	// remove finalizers from unused MariaDBAccount records
+	err = mariadbv1.DeleteUnusedMariaDBAccountFinalizers(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// create Deployment - end
 
 	Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
+}
+
+// ensureDB - set up the main database and the "persistence" database.
+// this then drives the ability to generate the config
+func (r *OctaviaReconciler) ensureDB(
+	ctx context.Context,
+	h *helper.Helper,
+	instance *octaviav1.Octavia,
+) (*mariadbv1.Database, *mariadbv1.Database, ctrl.Result, error) {
+
+	// ensure MariaDBAccount exists.  This account record may be created by
+	// openstack-operator or the cloud operator up front without a specific
+	// MariaDBDatabase configured yet.   Otherwise, a MariaDBAccount CR is
+	// created here with a generated username as well as a secret with
+	// generated password.   The MariaDBAccount is created without being
+	// yet associated with any MariaDBDatabase.
+
+	_, _, err := mariadbv1.EnsureMariaDBAccount(
+		ctx, h, instance.Spec.DatabaseAccount,
+		instance.Namespace, false, octavia.DatabaseUsernamePrefix,
+	)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return nil, nil, ctrl.Result{}, err
+	}
+
+	_, _, err = mariadbv1.EnsureMariaDBAccount(
+		ctx, h, instance.Spec.PersistenceDatabaseAccount,
+		instance.Namespace, false, octavia.DatabaseUsernamePrefix,
+	)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return nil, nil, ctrl.Result{}, err
+	}
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
+
+	//
+	// create service DB instance
+	//
+	octaviaDb := mariadbv1.NewDatabaseForAccount(
+		instance.Spec.DatabaseInstance, // mariadb/galera service to target
+		octavia.DatabaseName,           // name used in CREATE DATABASE in mariadb
+		octavia.DatabaseCRName,         // CR name for MariaDBDatabase
+		instance.Spec.DatabaseAccount,  // CR name for MariaDBAccount
+		instance.Namespace,             // namespace
+	)
+
+	persistenceDb := mariadbv1.NewDatabaseForAccount(
+		instance.Spec.DatabaseInstance,           // mariadb/galera service to target
+		octavia.PersistenceDatabaseName,          // name used in CREATE DATABASE in mariadb
+		octavia.PersistenceDatabaseCRName,        // CR name for MariaDBDatabase
+		instance.Spec.PersistenceDatabaseAccount, // CR name for MariaDBAccount
+		instance.Namespace,                       // namespace
+	)
+
+	dbs := []*mariadbv1.Database{octaviaDb, persistenceDb}
+
+	for _, db := range dbs {
+		// create or patch the DB
+		ctrlResult, err := db.CreateOrPatchAll(ctx, h)
+
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.DBReadyErrorMessage,
+				err.Error()))
+			return octaviaDb, persistenceDb, ctrl.Result{}, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DBReadyRunningMessage))
+			return octaviaDb, persistenceDb, ctrlResult, nil
+		}
+
+		// wait for the DB to be setup
+		ctrlResult, err = db.WaitForDBCreated(ctx, h)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.DBReadyErrorMessage,
+				err.Error()))
+			return octaviaDb, persistenceDb, ctrlResult, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DBReadyRunningMessage))
+			return octaviaDb, persistenceDb, ctrlResult, nil
+		}
+	}
+
+	// update Status.DatabaseHostname, used to bootstrap/config the service
+	instance.Status.DatabaseHostname = dbs[0].GetDatabaseHostname()
+	instance.Status.Conditions.MarkTrue(condition.DBReadyCondition, condition.DBReadyMessage)
+
+	return octaviaDb, persistenceDb, ctrl.Result{}, nil
+
+	// create service DB - end
 }
 
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
@@ -716,6 +774,8 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	envVars *map[string]env.Setter,
+	octaviaDb *mariadbv1.Database,
+	persistenceDb *mariadbv1.Database,
 ) error {
 	//
 	// create Configmap/Secret required for octavia input
@@ -735,7 +795,28 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		customData[key] = data
 	}
 
-	templateParameters := make(map[string]interface{})
+	databaseAccount := octaviaDb.GetAccount()
+	dbSecret := octaviaDb.GetSecret()
+	persistenceDatabaseAccount := persistenceDb.GetAccount()
+	persistenceDbSecret := persistenceDb.GetSecret()
+
+	// We only need a minimal 00-config.conf that is only used by db-sync job,
+	// hence only passing the database related parameters
+	templateParameters := map[string]interface{}{
+		"MinimalConfig": true, // This tells the template to generate a minimal config
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+		"PersistenceDatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			persistenceDatabaseAccount.Spec.UserName,
+			string(persistenceDbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.PersistenceDatabaseName,
+		),
+	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 
 	cms := []util.Template{
@@ -803,7 +884,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
@@ -907,7 +988,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.Role = role
 		daemonset.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		daemonset.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		daemonset.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		daemonset.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
