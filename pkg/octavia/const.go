@@ -20,10 +20,16 @@ const (
 	ServiceName = "octavia"
 	// ServiceType -
 	ServiceType = "load-balancer"
-	// DatabaseName -
+
+	// DatabaseName - Name of the database used in CREATE DATABASE statement
 	DatabaseName = "octavia"
 	// PersistenceDatabaseName -
 	PersistenceDatabaseName = "octavia_persistence"
+	// DatabaseCRName - Name of the MariaDBDatabase CR
+	DatabaseCRName = "octavia"
+	// DatabaseUsernamePrefix - used by EnsureMariaDBAccount when a new username
+	// is to be generated, e.g. "octavia_e5a4", "octavia_78bc", etc
+	DatabaseUsernamePrefix = "octavia"
 
 	// OctaviaPublicPort -
 	OctaviaPublicPort int32 = 9876

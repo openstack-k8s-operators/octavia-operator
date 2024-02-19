@@ -50,9 +50,8 @@ type OctaviaAmphoraControllerSpecCore struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
-	// DatabaseUser - optional username used for octavia DB, defaults to octavia
-	// TODO: -> implement needs work in mariadb-operator, right now only octavia
-	DatabaseUser string `json:"databaseUser"`
+	// DatabaseAccount - name of MariaDBAccount which will be used to connect.
+	DatabaseAccount string `json:"databaseAccount"`
 
 	// +kubebuilder:validation:Optional
 	// DatabaseHostname - Octavia DB hostname
@@ -76,8 +75,8 @@ type OctaviaAmphoraControllerSpecCore struct {
 	Secret string `json:"secret"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}
-	// PasswordSelectors - Selectors to identify the DB and AdminUser password from the Secret
+	// +kubebuilder:default={service: OctaviaPassword}
+	// PasswordSelectors - Selectors to identify the AdminUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
 	// +kubebuilder:validation:Optional

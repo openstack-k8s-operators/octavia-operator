@@ -79,6 +79,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=apps,resources=daemonsets,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=route.openshift.io,resources=routes,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases,verbs=get;list;watch;create;update;patch;delete;
+// +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbdatabases/finalizers,verbs=update
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbaccounts,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=mariadb.openstack.org,resources=mariadbaccounts/finalizers,verbs=update
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneapis,verbs=get;list;watch;
@@ -197,6 +198,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.Octavia{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
+		Owns(&mariadbv1.MariaDBAccount{}).
 		Owns(&octaviav1.OctaviaAPI{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Secret{}).
@@ -248,13 +250,12 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
-	octaviaDb := mariadbv1.NewDatabase(
-		octavia.DatabaseName,
-		instance.Spec.DatabaseUser,
-		instance.Spec.Secret,
-		map[string]string{
-			"dbName": instance.Spec.DatabaseInstance,
-		},
+	octaviaDb := mariadbv1.NewDatabaseForAccount(
+		instance.Spec.DatabaseInstance, // mariadb/galera service to target
+		instance.Name,                  // name used in CREATE DATABASE in mariadb
+		instance.Name,                  // CR name for MariaDBDatabase
+		instance.Spec.DatabaseAccount,  // CR name for MariaDBAccount
+		instance.Namespace,             // namespace
 	)
 	// Using WithNamespace to explicitly set a name that is not "octavia"
 	// If name is not set, it's set automatically to the name of the service ("octavia"),
@@ -275,10 +276,8 @@ func (r *OctaviaReconciler) reconcileInit(
 
 	for _, db := range dbs {
 		// create or patch the DB
-		ctrlResult, err := db.CreateOrPatchDB(
-			ctx,
-			helper,
-		)
+		ctrlResult, err := db.CreateOrPatchAll(ctx, helper)
+
 		if err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.DBReadyCondition,
@@ -296,6 +295,27 @@ func (r *OctaviaReconciler) reconcileInit(
 				condition.DBReadyRunningMessage))
 			return ctrlResult, nil
 		}
+
+		// wait for the DB to be setup
+		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.DBReadyErrorMessage,
+				err.Error()))
+			return ctrlResult, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.DBReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.DBReadyRunningMessage))
+			return ctrlResult, nil
+		}
+	}
 
 		// wait for the DB to be setup
 		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
@@ -703,6 +723,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Worker), condition.DeploymentReadyMessage)
 	}
 
+	// remove finalizers from unused MariaDBAccount records
+	err = mariadbv1.DeleteUnusedMariaDBAccountFinalizers(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// create Deployment - end
 
 	Log.Info("Reconciled Service successfully")
@@ -735,7 +761,42 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		customData[key] = data
 	}
 
-	templateParameters := make(map[string]interface{})
+	// ensure a MariaDBAccount CR and Secret exist.
+	// this mariadb API function will as an interim step actually generate a
+	// new MariaDBAccount and Secret if one does not exist already.   in a
+	// future release, this function may change to emit an error if the
+	// MariaDBAccount was not already created ahead of time (e.g. by openstack-operator
+	// or end-user YAML declaration)
+	databaseAccount, dbSecret, err := mariadbv1.EnsureMariaDBAccount(
+		ctx, h, instance.Spec.DatabaseAccount,
+		instance.Namespace, false, octavia.DatabaseUsernamePrefix,
+	)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
+
+	// We only need a minimal 00-config.conf that is only used by db-sync job,
+	// hence only passing the database related parameters
+	templateParameters := map[string]interface{}{
+		"MinimalConfig": true, // This tells the template to generate a minimal config
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 
 	cms := []util.Template{
@@ -759,7 +820,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 			Labels:        cmLabels,
 		},
 	}
-	err := configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 	if err != nil {
 		return err
 	}
@@ -803,7 +864,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
@@ -907,7 +968,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.Role = role
 		daemonset.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		daemonset.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		daemonset.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		daemonset.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret

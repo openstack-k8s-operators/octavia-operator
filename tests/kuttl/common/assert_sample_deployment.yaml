@@ -16,7 +16,7 @@ spec:
     [DEFAULT]
     debug = true
   databaseInstance: openstack
-  databaseUser: octavia
+  databaseAccount: octavia
   passwordSelectors:
     service: OctaviaPassword
     database: OctaviaDatabasePassword
@@ -28,7 +28,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -41,7 +41,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -52,7 +52,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -63,15 +63,12 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
     secret: osp-secret
     serviceUser: octavia
-status:
-  databaseHostname: openstack.octavia-kuttl-tests.svc
-  apireadyCount: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -175,7 +172,7 @@ spec:
           value: openstack.octavia-kuttl-tests.svc
         - name: DatabaseName
           value: octavia
-        - name: DatabaseUser
+        - name: databaseAccount
           value: octavia
         imagePullPolicy: IfNotPresent
         name: init
@@ -191,8 +188,6 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
-  annotations:
-    openshift.io/scc: anyuid
   labels:
     service: octavia
 ---
