@@ -21,14 +21,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 // OctaviaDefaults -
 type OctaviaDefaults struct {
-	APIContainerImageURL string
-	HousekeepingContainerImageURL string
+	APIContainerImageURL           string
+	HousekeepingContainerImageURL  string
 	HealthManagerContainerImageURL string
-	WorkerContainerImageURL string
+	WorkerContainerImageURL        string
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -82,25 +83,25 @@ func (spec *OctaviaSpec) Default() {
 var _ webhook.Validator = &Octavia{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
-func (r *Octavia) ValidateCreate() error {
+func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 	octavialog.Info("validate create", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object creation.
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
-func (r *Octavia) ValidateUpdate(old runtime.Object) error {
+func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	octavialog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
-func (r *Octavia) ValidateDelete() error {
+func (r *Octavia) ValidateDelete() (admission.Warnings, error) {
 	octavialog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.
-	return nil
+	return nil, nil
 }

@@ -52,7 +52,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 // OctaviaAPIReconciler reconciles a OctaviaAPI object
@@ -188,7 +187,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Watches(&source.Kind{Type: &ovnclient.OVNDBCluster{}}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.GetLogger(ctx)))).
+		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.GetLogger(ctx)))).
 		Complete(r)
 }
 
@@ -248,7 +247,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	//
 	// expose the service (create service and return the created endpoint URLs)
 	//
-	var octaviaEndpoints = map[service.Endpoint]endpoint.Data{
+	octaviaEndpoints := map[service.Endpoint]endpoint.Data{
 		service.EndpointPublic: {
 			Port: octavia.OctaviaPublicPort,
 		},
