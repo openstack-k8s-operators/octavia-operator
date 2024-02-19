@@ -195,6 +195,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.Octavia{}).
 		Owns(&mariadbv1.MariaDBDatabase{}).
+		Owns(&mariadbv1.MariaDBAccount{}).
 		Owns(&octaviav1.OctaviaAPI{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Secret{}).
