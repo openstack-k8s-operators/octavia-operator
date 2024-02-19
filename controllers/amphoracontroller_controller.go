@@ -38,6 +38,7 @@ import (
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -280,28 +281,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrl.Result{}, err
 	}
 
-	err = amphoracontrollers.EnsureAmphoraCerts(ctx, instance, helper, &Log)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
-	err = amphoracontrollers.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	//
@@ -463,11 +442,16 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
+
+	parentOctaviaName := amphoracontrollers.GetOwningOctaviaControllerName(
+		instance)
+	serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", parentOctaviaName)
 	caPassSecret, _, err := secret.GetSecret(
-		ctx, helper, instance.Spec.CAKeyPassphraseSecret, instance.Namespace)
+		ctx, helper, serverCAPassSecretName, instance.Namespace)
 	if err != nil {
 		return err
 	}
+
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
@@ -475,7 +459,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
-	templateParameters["NovaSshKeyPair"] = amphoracontrollers.NovaKeyPairName
+	templateParameters["NovaSshKeyPair"] = octavia.NovaKeyPairName
 	serverCAPassphrase := caPassSecret.Data["server-ca-passphrase"]
 	if serverCAPassphrase != nil {
 		templateParameters["ServerCAKeyPassphrase"] = string(serverCAPassphrase)

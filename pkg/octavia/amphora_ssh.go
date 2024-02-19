@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
 
 import (
 	"context"
@@ -31,7 +31,6 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	"golang.org/x/crypto/ssh"
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -71,7 +70,7 @@ func generateECDSAKeys() (pubKey string, privKey string, err error) {
 
 func storePrivateKeyAsSecret(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	privKey string,
 ) error {
@@ -91,7 +90,7 @@ func storePrivateKeyAsSecret(
 
 func storePublicKeyAsConfigMap(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	pubKey string,
 ) error {
@@ -111,7 +110,7 @@ func storePublicKeyAsConfigMap(
 
 func uploadKeypair(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	pubKey string) error {
 	osClient, err := GetOpenstackClient(ctx, instance, h)
@@ -119,7 +118,7 @@ func uploadKeypair(
 		return fmt.Errorf("Error getting openstack client: %w", err)
 	}
 
-	computeClient, err := octavia.GetComputeClient(osClient)
+	computeClient, err := GetComputeClient(osClient)
 	if err != nil {
 		return fmt.Errorf("Error getting compute client: %w", err)
 	}
@@ -164,7 +163,7 @@ func uploadKeypair(
 // EnsureAmpSSHConfig ensures amphora SSH configuration is set up
 func EnsureAmpSSHConfig(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	log *logr.Logger,
 ) error {

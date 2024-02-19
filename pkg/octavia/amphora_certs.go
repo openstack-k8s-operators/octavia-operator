@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
 
 import (
 	"bytes"
@@ -147,20 +147,22 @@ func generateClientCert(caCertPEM []byte, caPrivKey *rsa.PrivateKey) ([]byte, er
 // EnsureAmphoraCerts ensures Amphora certificates exist in the secret store
 func EnsureAmphoraCerts(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	log *logr.Logger) error {
 	var oAmpSecret *corev1.Secret
 	var serverCAPass []byte = nil
 
-	_, _, err := secret.GetSecret(ctx, h, instance.Spec.LoadBalancerCerts, instance.Namespace)
+	certsSecretName := fmt.Sprintf("%s-certs-secret", instance.Name)
+	_, _, err := secret.GetSecret(ctx, h, certsSecretName, instance.Namespace)
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
-			return fmt.Errorf("Error retrieving secret %s - %w", instance.Spec.LoadBalancerCerts, err)
+			return fmt.Errorf("Error retrieving secret %s - %w", certsSecretName, err)
 		}
 
+		serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", instance.Name)
 		cAPassSecret, _, err := secret.GetSecret(
-			ctx, h, instance.Spec.CAKeyPassphraseSecret, instance.Namespace)
+			ctx, h, serverCAPassSecretName, instance.Namespace)
 		if err != nil {
 			log.Info("Could not read server CA passphrase. No encryption will be applied to the generated key.")
 		} else {
@@ -197,7 +199,7 @@ func EnsureAmphoraCerts(
 
 		oAmpSecret = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      instance.Spec.LoadBalancerCerts,
+				Name:      certsSecretName,
 				Namespace: instance.Namespace,
 			},
 
@@ -215,7 +217,7 @@ func EnsureAmphoraCerts(
 		_, _, err = secret.CreateOrPatchSecret(ctx, h, instance, oAmpSecret)
 		if err != nil {
 			return fmt.Errorf("Error creating certs secret %s - %w",
-				instance.Spec.LoadBalancerCerts, err)
+				certsSecretName, err)
 		}
 	}
 	return nil
