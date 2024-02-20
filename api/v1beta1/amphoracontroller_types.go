@@ -41,9 +41,12 @@ type OctaviaAmphoraControllerSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
-	// DatabaseUser - optional username used for octavia DB, defaults to octavia
-	// TODO: -> implement needs work in mariadb-operator, right now only octavia
-	DatabaseUser string `json:"databaseUser"`
+	// DatabaseAccount - name of MariaDBAccount which will be used to connect.
+	// As an interim solution, octavia-controller will
+	// generate the MariaDBAccount object of the given name if it's not
+	// present in the cluster.  Later, openstack-operator will perform this
+	// generation and also populate this field for the Octavia objects it creates
+	DatabaseAccount string `json:"databaseAccount"`
 
 	// +kubebuilder:validation:Optional
 	// DatabaseHostname - Octavia DB hostname
@@ -91,7 +94,7 @@ type OctaviaAmphoraControllerSpec struct {
 	LoadBalancerSSHPrivKey string `json:"sshPrivkeySecret,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}
+	// +kubebuilder:default={service: OctaviaPassword}
 	// PasswordSelectors - Selectors to identify the DB and AdminUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 

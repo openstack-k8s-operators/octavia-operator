@@ -148,7 +148,7 @@ func Deployment(
 	initContainerDetails := octavia.APIDetails{
 		ContainerImage:       instance.Spec.ContainerImage,
 		DatabaseHost:         instance.Spec.DatabaseHostname,
-		DatabaseUser:         instance.Spec.DatabaseUser,
+		DatabaseAccount:      instance.Spec.DatabaseAccount,
 		DatabaseName:         octavia.DatabaseName,
 		OSPSecret:            instance.Spec.Secret,
 		TransportURLSecret:   instance.Spec.TransportURLSecret,

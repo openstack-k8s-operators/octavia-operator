@@ -83,7 +83,7 @@ func DbSyncJob(
 	initContainerDetails := APIDetails{
 		ContainerImage:       instance.Spec.OctaviaAPI.ContainerImage,
 		DatabaseHost:         instance.Status.DatabaseHostname,
-		DatabaseUser:         instance.Spec.DatabaseUser,
+		DatabaseAccount:      instance.Spec.DatabaseAccount,
 		DatabaseName:         DatabaseName,
 		OSPSecret:            instance.Spec.Secret,
 		DBPasswordSelector:   instance.Spec.PasswordSelectors.Database,

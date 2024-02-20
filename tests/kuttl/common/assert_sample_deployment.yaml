@@ -16,7 +16,7 @@ spec:
     [DEFAULT]
     debug = true
   databaseInstance: openstack
-  databaseUser: octavia
+  databaseAccount: octavia
   passwordSelectors:
     service: OctaviaPassword
     database: OctaviaDatabasePassword
@@ -28,7 +28,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -41,7 +41,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -52,7 +52,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -63,7 +63,7 @@ spec:
       [DEFAULT]
       debug = true
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     passwordSelectors:
       service: OctaviaPassword
       database: OctaviaDatabasePassword
@@ -175,7 +175,7 @@ spec:
           value: openstack.octavia-kuttl-tests.svc
         - name: DatabaseName
           value: octavia
-        - name: DatabaseUser
+        - name: databaseAccount
           value: octavia
         imagePullPolicy: IfNotPresent
         name: init

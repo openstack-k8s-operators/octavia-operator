@@ -213,7 +213,7 @@ func (r *OctaviaReconciler) reconcileDelete(ctx context.Context, instance *octav
 	util.LogForObject(helper, "Reconciling Service delete", instance)
 
 	// remove db finalizer first
-	db, err := mariadbv1.GetDatabaseByName(ctx, helper, instance.Name)
+	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, instance.Name, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil && !k8s_errors.IsNotFound(err) {
 		return ctrl.Result{}, err
 	}
@@ -246,19 +246,20 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// create service DB instance
 	//
-	db := mariadbv1.NewDatabase(
-		instance.Name,
-		instance.Spec.DatabaseUser,
-		instance.Spec.Secret,
-		map[string]string{
-			"dbName": instance.Spec.DatabaseInstance,
-		},
+	db := mariadbv1.NewDatabaseForAccount(
+		instance.Spec.DatabaseInstance, // mariadb/galera service to target
+		instance.Name,                  // name used in CREATE DATABASE in mariadb
+		instance.Name,                  // CR name for MariaDBDatabase
+		instance.Spec.DatabaseAccount,  // CR name for MariaDBAccount
+		instance.Namespace,             // namespace
 	)
 	// create or patch the DB
-	ctrlResult, err := db.CreateOrPatchDB(
+	ctrlResult, err := db.CreateOrPatchDBByName(
 		ctx,
 		helper,
+		instance.Spec.DatabaseInstance,
 	)
+
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.DBReadyCondition,
@@ -661,6 +662,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Worker), condition.DeploymentReadyMessage)
 	}
 
+	// remove finalizers from unused MariaDBAccount records
+	err = mariadbv1.DeleteUnusedMariaDBAccountFinalizers(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// create Deployment - end
 
 	Log.Info("Reconciled Service successfully")
@@ -761,7 +768,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		deployment.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		deployment.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
@@ -817,7 +824,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.Role = role
 		daemonset.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		daemonset.Spec.DatabaseHostname = instance.Status.DatabaseHostname
-		daemonset.Spec.DatabaseUser = instance.Spec.DatabaseUser
+		daemonset.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret

@@ -4,7 +4,7 @@ metadata:
   name: octavia
 spec:
   databaseInstance: openstack
-  databaseUser: octavia
+  databaseAccount: octavia
   serviceUser: octavia
   rabbitMqClusterName: rabbitmq
   secret: osp-secret
@@ -14,7 +14,7 @@ spec:
     debug = true
   octaviaHousekeeping:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     serviceUser: octavia
     serviceAccount: octavia
     role: housekeeping
@@ -27,7 +27,7 @@ spec:
       debug = true
   octaviaHealthManager:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     serviceUser: octavia
     serviceAccount: octavia
     role: healthmanager
@@ -40,7 +40,7 @@ spec:
       debug = true
   octaviaWorker:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     serviceUser: octavia
     serviceAccount: octavia
     role: worker
@@ -53,7 +53,7 @@ spec:
       debug = true
   octaviaAPI:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
     serviceUser: octavia
     serviceAccount: octavia
     secret: osp-secret

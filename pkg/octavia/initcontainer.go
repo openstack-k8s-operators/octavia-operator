@@ -25,7 +25,7 @@ import (
 type APIDetails struct {
 	ContainerImage       string
 	DatabaseHost         string
-	DatabaseUser         string
+	DatabaseAccount      string
 	DatabaseName         string
 	TransportURLSecret   string
 	OSPSecret            string
@@ -50,7 +50,7 @@ func InitContainer(init APIDetails) []corev1.Container {
 
 	envVars := map[string]env.Setter{}
 	envVars["DatabaseHost"] = env.SetValue(init.DatabaseHost)
-	envVars["DatabaseUser"] = env.SetValue(init.DatabaseUser)
+	envVars["DatabaseUser"] = env.SetValue(init.DatabaseAccount)
 	envVars["DatabaseName"] = env.SetValue(init.DatabaseName)
 
 	envs := []corev1.EnvVar{

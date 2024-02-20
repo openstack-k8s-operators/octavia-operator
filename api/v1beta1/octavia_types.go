@@ -51,9 +51,12 @@ type OctaviaSpec struct {
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
-	// DatabaseUser - optional username used for octavia DB, defaults to octavia
-	// TODO: -> implement needs work in mariadb-operator, right now only octavia
-	DatabaseUser string `json:"databaseUser"`
+	// DatabaseAccount - name of MariaDBAccount which will be used to connect.
+	// As an interim solution, octavia-controller will
+	// generate the MariaDBAccount object of the given name if it's not
+	// present in the cluster.  Later, openstack-operator will perform this
+	// generation and also populate this field for the Octavia objects it creates
+	DatabaseAccount string `json:"databaseAccount"`
 
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=rabbitmq
@@ -67,11 +70,12 @@ type OctaviaSpec struct {
 	ServiceUser string `json:"serviceUser"`
 
 	// +kubebuilder:validation:Required
-	// Secret containing OpenStack password information for octavia OctaviaDatabasePassword, AdminPassword
+	// Secret containing OpenStack password information for octavia's keystone
+	// password; no longer used for database password
 	Secret string `json:"secret"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={database: OctaviaDatabasePassword, service: OctaviaPassword}
+	// +kubebuilder:default={service: OctaviaPassword}
 	// PasswordSelectors - Selectors to identify the DB and ServiceUser password from the Secret
 	PasswordSelectors PasswordSelector `json:"passwordSelectors,omitempty"`
 
