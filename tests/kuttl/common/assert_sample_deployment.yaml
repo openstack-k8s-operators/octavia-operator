@@ -194,7 +194,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   annotations:
-    openshift.io/scc: anyuid
+    openshift.io/scc: restricted-v2
   labels:
     service: octavia
 ---
