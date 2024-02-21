@@ -69,9 +69,6 @@ spec:
       database: OctaviaDatabasePassword
     secret: osp-secret
     serviceUser: octavia
-status:
-  databaseHostname: openstack.octavia-kuttl-tests.svc
-  apireadyCount: 1
 ---
 apiVersion: apps/v1
 kind: Deployment
