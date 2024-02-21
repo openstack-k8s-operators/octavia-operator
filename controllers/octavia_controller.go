@@ -700,7 +700,39 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		customData[key] = data
 	}
 
-	templateParameters := make(map[string]interface{})
+	// ensure a MariaDBAccount CR and Secret exist.
+	// this mariadb API function will as an interim step actually generate a
+	// new MariaDBAccount and Secret if one does not exist already.   in a
+	// future release, this function may change to emit an error if the
+	// MariaDBAccount was not already created ahead of time (e.g. by openstack-operator
+	// or end-user YAML declaration)
+	databaseAccount, dbSecret, err := mariadbv1.EnsureMariaDBAccount(
+		ctx, h, instance.Spec.DatabaseAccount,
+		instance.Namespace, false,
+	)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+
+	// We only need a minimal 00-config.conf that is only used by db-sync job,
+	// hence only passing the database related parameters
+	templateParameters := map[string]interface{}{
+		"MinimalConfig": true, // This tells the template to generate a minimal config
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 
 	cms := []util.Template{
@@ -724,7 +756,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 			Labels:        cmLabels,
 		},
 	}
-	err := configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
 	if err != nil {
 		return err
 	}
