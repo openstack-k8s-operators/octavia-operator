@@ -449,6 +449,20 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	caPassSecret, _, err := secret.GetSecret(
 		ctx, helper, serverCAPassSecretName, instance.Namespace)
 	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
 		return err
 	}
 
