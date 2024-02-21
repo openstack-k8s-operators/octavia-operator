@@ -455,7 +455,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return fmt.Errorf("OpenStack secret %s not found", instance.Spec.Secret)
+			return fmt.Errorf("OpenStack server CA passphrase secret %s not found",
+				serverCAPassSecretName)
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
