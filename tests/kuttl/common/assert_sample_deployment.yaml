@@ -10,8 +10,6 @@
 apiVersion: octavia.openstack.org/v1beta1
 kind: Octavia
 metadata:
-  finalizers:
-  - Octavia
   name: octavia
 spec:
   customServiceConfig: |
@@ -72,7 +70,7 @@ spec:
     secret: osp-secret
     serviceUser: octavia
 status:
-  databaseHostname: openstack
+  databaseHostname: openstack.octavia-kuttl-tests.svc
   apireadyCount: 1
 ---
 apiVersion: apps/v1
@@ -174,7 +172,7 @@ spec:
               key: transport_url
               name: rabbitmq-transport-url-octavia-octavia-transport
         - name: DatabaseHost
-          value: openstack
+          value: openstack.octavia-kuttl-tests.svc
         - name: DatabaseName
           value: octavia
         - name: DatabaseUser
