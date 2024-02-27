@@ -255,11 +255,7 @@ func (r *OctaviaReconciler) reconcileInit(
 		instance.Namespace,             // namespace
 	)
 	// create or patch the DB
-	ctrlResult, err := db.CreateOrPatchDBByName(
-		ctx,
-		helper,
-		instance.Spec.DatabaseInstance,
-	)
+	ctrlResult, err := db.CreateOrPatchAll(ctx, helper)
 
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -722,6 +718,9 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 
 		return err
 	}
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
 
 	// We only need a minimal 00-config.conf that is only used by db-sync job,
 	// hence only passing the database related parameters

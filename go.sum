@@ -110,8 +110,8 @@ github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcU
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-github.com/zzzeek/mariadb-operator/api v0.3.1-0.20240219194300-cc53ce6bfb27 h1:VRqE9hlRwVbKTisiE81BBEZmlN5AKWiUevUlyZuoRY0=
-github.com/zzzeek/mariadb-operator/api v0.3.1-0.20240219194300-cc53ce6bfb27/go.mod h1:52Ja/B4RrrytMmKh+Kf+/BPe7Fq40Pi77vcFH4yJeoU=
+github.com/zzzeek/mariadb-operator/api v0.3.1-0.20240222195117-de879c4be63a h1:eVtZZAIwgoyOGv1BdNsjy1WRsosdvK13NeYhyXikOIo=
+github.com/zzzeek/mariadb-operator/api v0.3.1-0.20240222195117-de879c4be63a/go.mod h1:f9IIyWeoskWoeWaDFF3qmAJ2Kqyovfi0Ar/QUfk3qag=
 go.uber.org/goleak v1.2.1 h1:NBol2c7O1ZokfZ0LEU9K6Whx/KnwvepVetCUhtKja4A=
 go.uber.org/multierr v1.11.0 h1:blXXJkSxSSfBVBlC76pxqeO+LN3aDfLQo+309xJstO0=
 go.uber.org/multierr v1.11.0/go.mod h1:20+QtiLqy0Nd6FdQB9TLXag12DsQkrbs3htMFfDN80Y=
