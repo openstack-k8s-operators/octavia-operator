@@ -46,6 +46,5 @@ if [ -n "$TRANSPORTURL" ]; then
     crudini --set /var/lib/config-data/merged/octavia.conf DEFAULT transport_url $TRANSPORTURL
 fi
 # set secrets
-crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
 crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $PASSWORD
 crudini --set ${SVC_CFG_MERGED} service_auth password $PASSWORD

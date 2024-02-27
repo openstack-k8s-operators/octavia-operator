@@ -36,6 +36,7 @@ import (
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviaapi"
@@ -702,7 +703,31 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	templateParameters := make(map[string]interface{})
+	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
+		ctx, h, instance.Spec.DatabaseAccount, instance.Namespace)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
+
+	templateParameters := map[string]interface{}{
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL

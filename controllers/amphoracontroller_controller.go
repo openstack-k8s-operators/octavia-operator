@@ -33,11 +33,13 @@ import (
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/amphoracontrollers"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
@@ -449,7 +451,32 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	for key, data := range instance.Spec.DefaultConfigOverwrite {
 		customData[key] = data
 	}
-	templateParameters := make(map[string]interface{})
+
+	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
+		ctx, helper, instance.Spec.DatabaseAccount, instance.Namespace)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
+
+	templateParameters := map[string]interface{}{
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+	}
 
 	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, helper, instance.Namespace, map[string]string{})
 	if err != nil {
