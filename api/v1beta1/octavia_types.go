@@ -133,6 +133,11 @@ type OctaviaSpec struct {
 	// LoadBalancerSSHPrivKey - The name of the secret that will be used to
 	// store the private key for connecting to amphorae via SSH
 	LoadBalancerSSHPrivKey string `json:"sshPrivkeySecret,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={}
+	// AmphoraCustomFlavors - User-defined flavors for Octavia
+	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
@@ -158,6 +163,27 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:default=4
 	// IP Version of the managed subnets
 	SubnetIPVersion int `json:"subnetIpVersion,omitempty"`
+}
+
+// OctaviaAmphoraFlavor Settings for custom Amphora flavors
+type OctaviaAmphoraFlavor struct {
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// +kubebuilder:validation:Optional
+	Description string `json:"description"`
+
+	// +kubebuilder:validation:Required
+	VCPUs int `json:"VCPUs"`
+
+	// +kubebuilder:validation:Required
+	RAM int `json:"RAM"`
+
+	// +kubebuilder:validation:Required
+	Disk int `json:"disk"`
+
+	// +kubebuilder:validation:Optional
+	RxTxFactor string `json:"RxTxFactor"`
 }
 
 // OctaviaStatus defines the observed state of Octavia

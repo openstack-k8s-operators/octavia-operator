@@ -134,6 +134,11 @@ type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default={}
+	// AmphoraCustomFlavors - User-defined flavors for Octavia
+	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller

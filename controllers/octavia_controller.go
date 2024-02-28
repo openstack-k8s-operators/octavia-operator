@@ -826,6 +826,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.LoadBalancerCerts = instance.Spec.LoadBalancerCerts
 		daemonset.Spec.LoadBalancerSSHPrivKey = instance.Spec.LoadBalancerSSHPrivKey
 		daemonset.Spec.LoadBalancerSSHPubKey = instance.Spec.LoadBalancerSSHPubKey
+		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

@@ -116,3 +116,12 @@ func GetComputeClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error
 	client.Microversion = "2.55"
 	return client, nil
 }
+
+// GetLoadBalancerClient -
+func GetLoadBalancerClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error) {
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       o.GetRegion(),
+		Availability: gophercloud.AvailabilityInternal,
+	}
+	return gophercloudopenstack.NewLoadBalancerV2(o.GetOSClient().ProviderClient, endpointOpts)
+}
