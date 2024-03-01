@@ -17,8 +17,11 @@ limitations under the License.
 package controllers
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -26,6 +29,7 @@ import (
 	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
@@ -44,7 +48,9 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
+
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	k8s_labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -57,6 +63,7 @@ import (
 type OctaviaReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
+	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
@@ -654,6 +661,53 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
+	// Amphora Image deployment
+	if instance.Spec.AmphoraImageContainerImage != "" {
+		hash, err := util.ObjectHash(instance.Spec.AmphoraImageContainerImage)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		if hash != instance.Status.Hash[octaviav1.ImageUploadHash] {
+			Log.Info("Initializing amphora image upload deployment")
+			depl := deployment.NewDeployment(
+				octavia.ImageUploadDeployment(instance, serviceLabels, serviceAnnotations),
+				time.Duration(5)*time.Second,
+			)
+			ctrlResult, err = depl.CreateOrPatch(ctx, helper)
+			if err != nil {
+				return ctrlResult, err
+			} else if (ctrlResult != ctrl.Result{}) {
+				return ctrlResult, nil
+			}
+			readyCount := depl.GetDeployment().Status.ReadyReplicas
+			if readyCount > 0 {
+				urlMap, err := r.getLocalImageURLs(ctx, helper, instance)
+				if err != nil {
+					return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
+				}
+
+				ok, err := octavia.EnsureAmphoraImages(ctx, instance, &r.Log, helper, urlMap)
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+				if !ok {
+					// Images are not ready
+					return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+				}
+				Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))
+				instance.Status.Hash[octaviav1.ImageUploadHash] = hash
+
+				Log.Info("Deleting amphora image upload deployment")
+				depl.Delete(ctx, helper)
+			}
+		}
+	} else {
+		if instance.Status.Hash[octaviav1.ImageUploadHash] != "" {
+			Log.Info("Reseting image upload hash")
+			instance.Status.Hash[octaviav1.ImageUploadHash] = ""
+		}
+	}
+
 	// create Deployment - end
 
 	Log.Info("Reconciled Service successfully")
@@ -783,6 +837,45 @@ func (r *OctaviaReconciler) ensureDB(
 	// create service DB - end
 }
 
+func (r *OctaviaReconciler) getLocalImageURLs(
+	ctx context.Context,
+	helper *helper.Helper,
+	instance *octaviav1.Octavia,
+) ([]octavia.OctaviaAmphoraImage, error) {
+	serviceLabels := map[string]string{common.AppSelector: instance.Name + "-deployment"}
+	podSelectorString := k8s_labels.Set(serviceLabels).String()
+	pods, err := helper.GetKClient().CoreV1().Pods(
+		instance.Namespace).List(ctx, metav1.ListOptions{LabelSelector: podSelectorString})
+	if err != nil {
+		return nil, err
+	}
+	host := pods.Items[0].Status.HostIP
+
+	// Get the list of images and their hashes
+	listUrl := fmt.Sprintf("http://%s:%d/octavia-amphora-images.sha256sum", host, 8080)
+
+	resp, err := http.Get(listUrl)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	scanner := bufio.NewScanner(resp.Body)
+	ret := []octavia.OctaviaAmphoraImage{}
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) == 2 {
+			name, _ := strings.CutSuffix(fields[1], ".qcow2")
+			ret = append(ret, octavia.OctaviaAmphoraImage{
+				Name:     name,
+				URL:      fmt.Sprintf("http://%s:%d/%s", host, 8080, fields[1]),
+				Checksum: fields[0],
+			})
+		}
+	}
+
+	return ret, nil
+}
+
 // generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
 func (r *OctaviaReconciler) generateServiceConfigMaps(
@@ -834,6 +927,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		),
 	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
+	templateParameters["ApachePort"] = 8080
 
 	cms := []util.Template{
 		// ScriptsConfigMap

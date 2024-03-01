@@ -27,10 +27,11 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
+	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// GetAdminServiceClient -
+// GetAdminServiceClient - get a client for the "admin" tenant
 func GetAdminServiceClient(
 	ctx context.Context,
 	h *helper.Helper,
@@ -62,6 +63,54 @@ func GetAdminServiceClient(
 		Username:   keystoneAPI.Spec.AdminUser,
 		Password:   authPassword,
 		TenantName: keystoneAPI.Spec.AdminProject,
+		DomainName: "Default",
+		Region:     keystoneAPI.Spec.Region,
+	}
+
+	os, err := openstack.NewOpenStack(
+		h.GetLogger(),
+		authOpts,
+	)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+
+	return os, ctrl.Result{}, nil
+}
+
+// GetServiceClient - Get a client for the "service" tenant
+func GetServiceClient(
+	ctx context.Context,
+	h *helper.Helper,
+	octavia *octaviav1.Octavia,
+	keystoneAPI *keystonev1.KeystoneAPI,
+) (*openstack.OpenStack, ctrl.Result, error) {
+	// get internal endpoint as authurl from keystone instance
+	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+
+	// get the password of the admin user from Spec.Secret
+	// using PasswordSelectors.Admin
+	authPassword, ctrlResult, err := secret.GetDataFromSecret(
+		ctx,
+		h,
+		octavia.Spec.Secret,
+		time.Duration(10)*time.Second,
+		octavia.Spec.PasswordSelectors.Service)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+	if (ctrlResult != ctrl.Result{}) {
+		return nil, ctrlResult, nil
+	}
+
+	authOpts := openstack.AuthOpts{
+		AuthURL:    authURL,
+		Username:   octavia.Spec.ServiceUser,
+		Password:   authPassword,
+		TenantName: octavia.Spec.TenantName,
 		DomainName: "Default",
 		Region:     keystoneAPI.Spec.Region,
 	}
@@ -124,4 +173,13 @@ func GetLoadBalancerClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, 
 		Availability: gophercloud.AvailabilityInternal,
 	}
 	return gophercloudopenstack.NewLoadBalancerV2(o.GetOSClient().ProviderClient, endpointOpts)
+}
+
+// GetImageClient -
+func GetImageClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error) {
+	endpointOpts := gophercloud.EndpointOpts{
+		Region:       o.GetRegion(),
+		Availability: gophercloud.AvailabilityInternal,
+	}
+	return gophercloudopenstack.NewImageServiceV2(o.GetOSClient().ProviderClient, endpointOpts)
 }
