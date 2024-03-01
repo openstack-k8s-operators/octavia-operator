@@ -490,7 +490,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	parentOctaviaName := amphoracontrollers.GetOwningOctaviaControllerName(
+	parentOctaviaName := octavia.GetOwningOctaviaControllerName(
 		instance)
 	serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", parentOctaviaName)
 	caPassSecret, _, err := secret.GetSecret(

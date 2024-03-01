@@ -192,7 +192,7 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.
 //
 // returns the UUID of the network
 func EnsureLbMgmtNetworks(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
-	o, err := GetOpenstackClient(ctx, instance, helper)
+	o, err := octavia.GetOpenstackClient(ctx, instance.Namespace, helper)
 	if err != nil {
 		return "", err
 	}
