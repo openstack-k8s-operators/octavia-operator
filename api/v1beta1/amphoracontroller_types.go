@@ -33,6 +33,15 @@ const (
 
 // OctaviaAmphoraControllerSpec defines common state for all Octavia Amphora Controllers
 type OctaviaAmphoraControllerSpec struct {
+	OctaviaAmphoraControllerSpecCore `json:",inline"`
+
+	// +kubebuilder:validation:Optional
+	// ContainerImage - Amphora Controller Container Image URL
+	ContainerImage string `json:"containerImage,omitempty"`
+}
+
+// OctaviaAmphoraControllerSpecCore -
+type OctaviaAmphoraControllerSpecCore struct {
 	// +kubebuilder:validation:Required
 	// MariaDB instance name
 	// Right now required by the maridb-operator to get the credentials from the instance to create the DB
@@ -57,10 +66,6 @@ type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Required
 	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
 	ServiceAccount string `json:"serviceAccount"`
-
-	// +kubebuilder:validation:Optional
-	// ContainerImage - Amphora Controller Container Image URL
-	ContainerImage string `json:"containerImage,omitempty"`
 
 	// +kubebuilder:validation:Required
 	// Role - the role for the controller (one of worker, housekeeping, healthmanager)

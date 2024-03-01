@@ -77,6 +77,11 @@ func (spec *OctaviaSpec) Default() {
 	}
 }
 
+// Default - set defaults for this Octavia core spec (this version is used by the OpenStackControlplane webhook)
+func (spec *OctaviaSpecCore) Default() {
+	// nothing here yet
+}
+
 // TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
 //+kubebuilder:webhook:path=/validate-octavia-openstack-org-v1beta1-octavia,mutating=false,failurePolicy=fail,sideEffects=None,groups=octavia.openstack.org,resources=octavias,verbs=create;update,versions=v1beta1,name=voctavia.kb.io,admissionReviewVersions=v1
 
