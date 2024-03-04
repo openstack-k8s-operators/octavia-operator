@@ -177,6 +177,8 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 			condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
 			condition.UnknownCondition(octaviav1.OctaviaAPIReadyCondition, condition.InitReason, octaviav1.OctaviaAPIReadyInitMessage),
 			condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
+			condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
+			condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
 			amphoraControllerInitCondition(octaviav1.HealthManager),
 			amphoraControllerInitCondition(octaviav1.Housekeeping),
 			amphoraControllerInitCondition(octaviav1.Worker),
@@ -214,6 +216,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.ServiceAccount{}).
 		Owns(&rbacv1.Role{}).
 		Owns(&rbacv1.RoleBinding{}).
+		Owns(&corev1.Service{}).
 		Owns(&rabbitmqv1.TransportURL{}).
 		Owns(&redisv1.Redis{}).
 		Complete(r)
@@ -661,115 +664,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	// Amphora Image deployment
-	if instance.Spec.AmphoraImageContainerImage != "" {
-		hash, err := util.ObjectHash(instance.Spec.AmphoraImageContainerImage)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-		if hash != instance.Status.Hash[octaviav1.ImageUploadHash] {
-			Log.Info("Initializing amphora image upload deployment")
-			depl := deployment.NewDeployment(
-				octavia.ImageUploadDeployment(instance, serviceLabels, serviceAnnotations),
-				time.Duration(5)*time.Second,
-			)
-			ctrlResult, err = depl.CreateOrPatch(ctx, helper)
-			if err != nil {
-				return ctrlResult, err
-			} else if (ctrlResult != ctrl.Result{}) {
-				return ctrlResult, nil
-			}
-			readyCount := depl.GetDeployment().Status.ReadyReplicas
-			if readyCount > 0 {
-				exportLabels := util.MergeStringMaps(
-					serviceLabels,
-					map[string]string{
-						service.AnnotationEndpointKey: "internal",
-					},
-				)
-
-				svc, err := service.NewService(
-					service.GenericService(&service.GenericServiceDetails{
-						Name:      "octavia-image-upload-internal",
-						Namespace: instance.Namespace,
-						Labels:    exportLabels,
-						Selector:  serviceLabels,
-						Ports: []corev1.ServicePort{
-							{
-								Name:     "octavia-image-upload-internal",
-								Port:     octavia.ApacheInternalPort,
-								Protocol: corev1.ProtocolTCP,
-							},
-						},
-					}),
-					5,
-					nil,
-				)
-				if err != nil {
-					instance.Status.Conditions.Set(condition.FalseCondition(
-						condition.ExposeServiceReadyCondition,
-						condition.ErrorReason,
-						condition.SeverityWarning,
-						condition.ExposeServiceReadyErrorMessage,
-						err.Error()))
-
-					return ctrl.Result{}, err
-				}
-				svc.AddAnnotation(map[string]string{
-					service.AnnotationEndpointKey: "internal",
-				})
-				svc.AddAnnotation(map[string]string{
-					service.AnnotationIngressCreateKey: "false",
-				})
-
-				ctrlResult, err := svc.CreateOrPatch(ctx, helper)
-				if err != nil {
-					instance.Status.Conditions.Set(condition.FalseCondition(
-						condition.ExposeServiceReadyCondition,
-						condition.ErrorReason,
-						condition.SeverityWarning,
-						condition.ExposeServiceReadyErrorMessage,
-						err.Error()))
-
-					return ctrlResult, err
-				} else if (ctrlResult != ctrl.Result{}) {
-					instance.Status.Conditions.Set(condition.FalseCondition(
-						condition.ExposeServiceReadyCondition,
-						condition.RequestedReason,
-						condition.SeverityInfo,
-						condition.ExposeServiceReadyRunningMessage))
-					return ctrlResult, nil
-				}
-				endpoint, err := svc.GetAPIEndpoint(nil, nil, "")
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-
-				urlMap, err := r.getLocalImageURLs(ctx, helper, endpoint)
-				if err != nil {
-					return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
-				}
-
-				ok, err := octavia.EnsureAmphoraImages(ctx, instance, &r.Log, helper, urlMap)
-				if err != nil {
-					return ctrl.Result{}, err
-				}
-				if !ok {
-					// Images are not ready
-					return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
-				}
-				Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))
-				instance.Status.Hash[octaviav1.ImageUploadHash] = hash
-
-				Log.Info("Deleting amphora image upload deployment")
-				depl.Delete(ctx, helper)
-			}
-		}
-	} else {
-		if instance.Status.Hash[octaviav1.ImageUploadHash] != "" {
-			Log.Info("Reseting image upload hash")
-			instance.Status.Hash[octaviav1.ImageUploadHash] = ""
-		}
+	ctrlResult, err = r.reconcileAmphoraImages(ctx, instance, helper, serviceLabels, serviceAnnotations)
+	if (ctrlResult != ctrl.Result{}) {
+		return ctrlResult, nil
+	}
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// create Deployment - end
@@ -899,6 +799,148 @@ func (r *OctaviaReconciler) ensureDB(
 	return octaviaDb, persistenceDb, ctrl.Result{}, nil
 
 	// create service DB - end
+}
+
+func (r *OctaviaReconciler) reconcileAmphoraImages(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+	serviceLabels map[string]string,
+	serviceAnnotations map[string]string,
+) (ctrl.Result, error) {
+	Log := r.GetLogger(ctx)
+
+	if instance.Spec.AmphoraImageContainerImage == "" {
+		if instance.Status.Hash[octaviav1.ImageUploadHash] != "" {
+			Log.Info("Reseting image upload hash")
+			instance.Status.Hash[octaviav1.ImageUploadHash] = ""
+		}
+		return ctrl.Result{}, nil
+	}
+
+	hash, err := util.ObjectHash(instance.Spec.AmphoraImageContainerImage)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if hash == instance.Status.Hash[octaviav1.ImageUploadHash] {
+		// No change
+		return ctrl.Result{}, nil
+	}
+
+	Log.Info("Initializing amphora image upload deployment")
+	depl := deployment.NewDeployment(
+		octavia.ImageUploadDeployment(instance, serviceLabels, serviceAnnotations),
+		time.Duration(5)*time.Second,
+	)
+	ctrlResult, err := depl.CreateOrPatch(ctx, helper)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DeploymentReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.DeploymentReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.DeploymentReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.DeploymentReadyRunningMessage))
+		return ctrlResult, nil
+	}
+
+	readyCount := depl.GetDeployment().Status.ReadyReplicas
+	if readyCount == 0 {
+		// Not ready, wait for the next loop
+		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, nil
+	}
+
+	exportLabels := util.MergeStringMaps(
+		serviceLabels,
+		map[string]string{
+			service.AnnotationEndpointKey: "internal",
+		},
+	)
+
+	svc, err := service.NewService(
+		service.GenericService(&service.GenericServiceDetails{
+			Name:      "octavia-image-upload-internal",
+			Namespace: instance.Namespace,
+			Labels:    exportLabels,
+			Selector:  serviceLabels,
+			Ports: []corev1.ServicePort{
+				{
+					Name:     "octavia-image-upload-internal",
+					Port:     octavia.ApacheInternalPort,
+					Protocol: corev1.ProtocolTCP,
+				},
+			},
+		}),
+		5,
+		nil,
+	)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ExposeServiceReadyErrorMessage,
+			err.Error()))
+
+		return ctrl.Result{}, err
+	}
+	svc.AddAnnotation(map[string]string{
+		service.AnnotationEndpointKey: "internal",
+	})
+	svc.AddAnnotation(map[string]string{
+		service.AnnotationIngressCreateKey: "false",
+	})
+
+	ctrlResult, err = svc.CreateOrPatch(ctx, helper)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ExposeServiceReadyErrorMessage,
+			err.Error()))
+
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ExposeServiceReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.ExposeServiceReadyRunningMessage))
+		return ctrlResult, nil
+	}
+	endpoint, err := svc.GetAPIEndpoint(nil, nil, "")
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	urlMap, err := r.getLocalImageURLs(ctx, helper, endpoint)
+	if err != nil {
+		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
+	}
+
+	ok, err := octavia.EnsureAmphoraImages(ctx, instance, &r.Log, helper, urlMap)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	if !ok {
+		// Images are not ready
+		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
+	}
+	Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))
+	instance.Status.Hash[octaviav1.ImageUploadHash] = hash
+
+	// Tasks are successfull, the deployment can be deleted
+	Log.Info("Deleting amphora image upload deployment")
+	depl.Delete(ctx, helper)
+
+	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaReconciler) getLocalImageURLs(
