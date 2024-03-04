@@ -664,7 +664,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	ctrlResult, err = r.reconcileAmphoraImages(ctx, instance, helper, serviceLabels, serviceAnnotations)
+	ctrlResult, err = r.reconcileAmphoraImages(ctx, instance, helper)
 	if (ctrlResult != ctrl.Result{}) {
 		return ctrlResult, nil
 	}
@@ -805,8 +805,6 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
 	helper *helper.Helper,
-	serviceLabels map[string]string,
-	serviceAnnotations map[string]string,
 ) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 
@@ -827,9 +825,13 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 		return ctrl.Result{}, nil
 	}
 
+	serviceLabels := map[string]string{
+		common.AppSelector: octavia.ServiceName + "-image",
+	}
+
 	Log.Info("Initializing amphora image upload deployment")
 	depl := deployment.NewDeployment(
-		octavia.ImageUploadDeployment(instance, serviceLabels, serviceAnnotations),
+		octavia.ImageUploadDeployment(instance, serviceLabels),
 		time.Duration(5)*time.Second,
 	)
 	ctrlResult, err := depl.CreateOrPatch(ctx, helper)
@@ -853,6 +855,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	readyCount := depl.GetDeployment().Status.ReadyReplicas
 	if readyCount == 0 {
 		// Not ready, wait for the next loop
+		Log.Info("Image Upload Pod not ready")
 		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, nil
 	}
 
@@ -922,6 +925,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 
 	urlMap, err := r.getLocalImageURLs(ctx, helper, endpoint)
 	if err != nil {
+		Log.Info(fmt.Sprintf("Cannot get amphora image list: %s", err))
 		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
 	}
 
@@ -931,6 +935,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	}
 	if !ok {
 		// Images are not ready
+		Log.Info("Waiting for amphora images to be ready")
 		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 	}
 	Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))

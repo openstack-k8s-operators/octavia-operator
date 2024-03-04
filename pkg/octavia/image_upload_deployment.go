@@ -85,7 +85,6 @@ func getVolumeMounts(serviceName string) []corev1.VolumeMount {
 func ImageUploadDeployment(
 	instance *octaviav1.Octavia,
 	labels map[string]string,
-	annotations map[string]string,
 ) *appsv1.Deployment {
 	initVolumeMounts := getInitVolumeMounts()
 
@@ -104,8 +103,7 @@ func ImageUploadDeployment(
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Annotations: annotations,
-					Labels:      labels,
+					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: instance.RbacResourceName(),
