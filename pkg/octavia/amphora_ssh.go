@@ -35,6 +35,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
 // NovaKeyPairName stores the name of the nova keypair that holds the public SSH key for access to the amphorae
@@ -148,8 +149,13 @@ func uploadKeypair(
 		}
 	}
 
+	octaviaProject, err := octavia.GetProject(osClient, instance.Spec.TenantName)
+	if err != nil {
+		return fmt.Errorf("Error getting project details from openstack client: %w", err)
+	}
 	createOpts := keypairs.CreateOpts{
 		Name:      NovaKeyPairName,
+		UserID:    octaviaProject.ID,
 		Type:      "ssh",
 		PublicKey: pubKey,
 	}
