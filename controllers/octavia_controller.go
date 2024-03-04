@@ -38,6 +38,7 @@ import (
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
@@ -50,7 +51,6 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	k8s_labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -681,7 +681,71 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			}
 			readyCount := depl.GetDeployment().Status.ReadyReplicas
 			if readyCount > 0 {
-				urlMap, err := r.getLocalImageURLs(ctx, helper, instance)
+				exportLabels := util.MergeStringMaps(
+					serviceLabels,
+					map[string]string{
+						service.AnnotationEndpointKey: "internal",
+					},
+				)
+
+				svc, err := service.NewService(
+					service.GenericService(&service.GenericServiceDetails{
+						Name:      "octavia-image-upload-internal",
+						Namespace: instance.Namespace,
+						Labels:    exportLabels,
+						Selector:  serviceLabels,
+						Ports: []corev1.ServicePort{
+							{
+								Name:     "octavia-image-upload-internal",
+								Port:     octavia.ApacheInternalPort,
+								Protocol: corev1.ProtocolTCP,
+							},
+						},
+					}),
+					5,
+					nil,
+				)
+				if err != nil {
+					instance.Status.Conditions.Set(condition.FalseCondition(
+						condition.ExposeServiceReadyCondition,
+						condition.ErrorReason,
+						condition.SeverityWarning,
+						condition.ExposeServiceReadyErrorMessage,
+						err.Error()))
+
+					return ctrl.Result{}, err
+				}
+				svc.AddAnnotation(map[string]string{
+					service.AnnotationEndpointKey: "internal",
+				})
+				svc.AddAnnotation(map[string]string{
+					service.AnnotationIngressCreateKey: "false",
+				})
+
+				ctrlResult, err := svc.CreateOrPatch(ctx, helper)
+				if err != nil {
+					instance.Status.Conditions.Set(condition.FalseCondition(
+						condition.ExposeServiceReadyCondition,
+						condition.ErrorReason,
+						condition.SeverityWarning,
+						condition.ExposeServiceReadyErrorMessage,
+						err.Error()))
+
+					return ctrlResult, err
+				} else if (ctrlResult != ctrl.Result{}) {
+					instance.Status.Conditions.Set(condition.FalseCondition(
+						condition.ExposeServiceReadyCondition,
+						condition.RequestedReason,
+						condition.SeverityInfo,
+						condition.ExposeServiceReadyRunningMessage))
+					return ctrlResult, nil
+				}
+				endpoint, err := svc.GetAPIEndpoint(nil, nil, "")
+				if err != nil {
+					return ctrl.Result{}, err
+				}
+
+				urlMap, err := r.getLocalImageURLs(ctx, helper, endpoint)
 				if err != nil {
 					return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
 				}
@@ -840,19 +904,10 @@ func (r *OctaviaReconciler) ensureDB(
 func (r *OctaviaReconciler) getLocalImageURLs(
 	ctx context.Context,
 	helper *helper.Helper,
-	instance *octaviav1.Octavia,
+	endpoint string,
 ) ([]octavia.OctaviaAmphoraImage, error) {
-	serviceLabels := map[string]string{common.AppSelector: instance.Name + "-deployment"}
-	podSelectorString := k8s_labels.Set(serviceLabels).String()
-	pods, err := helper.GetKClient().CoreV1().Pods(
-		instance.Namespace).List(ctx, metav1.ListOptions{LabelSelector: podSelectorString})
-	if err != nil {
-		return nil, err
-	}
-	host := pods.Items[0].Status.HostIP
-
 	// Get the list of images and their hashes
-	listUrl := fmt.Sprintf("http://%s:%d/octavia-amphora-images.sha256sum", host, 8080)
+	listUrl := fmt.Sprintf("%s/octavia-amphora-images.sha256sum", endpoint)
 
 	resp, err := http.Get(listUrl)
 	if err != nil {
@@ -867,7 +922,7 @@ func (r *OctaviaReconciler) getLocalImageURLs(
 			name, _ := strings.CutSuffix(fields[1], ".qcow2")
 			ret = append(ret, octavia.OctaviaAmphoraImage{
 				Name:     name,
-				URL:      fmt.Sprintf("http://%s:%d/%s", host, 8080, fields[1]),
+				URL:      fmt.Sprintf("%s/%s", endpoint, fields[1]),
 				Checksum: fields[0],
 			})
 		}
@@ -927,7 +982,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		),
 	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
-	templateParameters["ApachePort"] = 8080
+	templateParameters["ApachePort"] = octavia.ApacheInternalPort
 
 	cms := []util.Template{
 		// ScriptsConfigMap

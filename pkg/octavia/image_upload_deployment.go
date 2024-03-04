@@ -89,7 +89,6 @@ func ImageUploadDeployment(
 ) *appsv1.Deployment {
 	initVolumeMounts := getInitVolumeMounts()
 
-	// TODO(gthiemonge) healthchecks?
 	args := []string{"-c", ServiceCommand}
 
 	serviceName := fmt.Sprintf("%s-image-upload", ServiceName)
@@ -110,8 +109,6 @@ func ImageUploadDeployment(
 				},
 				Spec: corev1.PodSpec{
 					ServiceAccountName: instance.RbacResourceName(),
-					// TODO(gthiemonge) Expose service on Pod
-					HostNetwork: true,
 					Containers: []corev1.Container{
 						{
 							Name: "octavia-amphora-httpd",
@@ -122,19 +119,8 @@ func ImageUploadDeployment(
 							Image:        instance.Spec.ApacheContainerImage,
 							VolumeMounts: getVolumeMounts("octavia-image-upload"),
 							Resources:    instance.Spec.Resources,
-							// TODO(gthiemonge) Probes?
+							// TODO(gthiemonge) do we need probes?
 						},
-						//{
-						//	Name: serviceName,
-						//	Command: []string{
-						//		"/bin/bash",
-						//	},
-						//	Image: instance.Spec.AmphoraImageContainerImage,
-						//	SecurityContext: &corev1.SecurityContext{
-						//		RunAsUser: &runAsUser,
-						//	},
-						//	VolumeMounts: getVolumeMounts("octavia-image-upload"),
-						//},
 					},
 					Volumes: getVolumes(instance.Name),
 				},
