@@ -239,10 +239,13 @@ commands:
             WORKER)
               template='{{.spec.octaviaWorker.containerImage}}'
               ;;
+            APACHE)
+              template='{{.spec.apacheContainerImage}}'
+              ;;
           esac
           SERVICE_IMAGE=$(oc get -n $NAMESPACE octavia octavia -o go-template="$template")
           if [ "$SERVICE_IMAGE" != "$IMG_FROM_ENV" ]; then
-            echo "$NAME image does not equal $IMG_FROM_ENV"
+            echo "$NAME image does not equal $IMG_FROM_ENV (its current value is $SERVICE_IMAGE)"
             exit 1
           fi
         fi

@@ -319,7 +319,7 @@ func SetupDefaults() {
 		HousekeepingContainerImageURL:  util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HOUSEKEEPING_IMAGE_URL_DEFAULT", OctaviaHousekeepingContainerImage),
 		HealthManagerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
 		WorkerContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
-		ApacheContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_APACHE_IMAGE_URL_DEFAULT", ApacheContainerImage),
+		ApacheContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_APACHE_IMAGE_URL_DEFAULT", ApacheContainerImage),
 		// No default for AmphoraImageContainerImageURL
 	}
 
