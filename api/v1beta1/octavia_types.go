@@ -42,6 +42,52 @@ const (
 type OctaviaSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+	OctaviaSpecBase `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// OctaviaAPI - Spec definition for the API service of the Octavia deployment
+	OctaviaAPI OctaviaAPISpec `json:"octaviaAPI"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHousekeeping OctaviaAmphoraControllerSpec `json:"octaviaHousekeeping"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHealthManager OctaviaAmphoraControllerSpec `json:"octaviaHealthManager"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaWorker OctaviaAmphoraControllerSpec `json:"octaviaWorker"`
+}
+
+// OctaviaSpecCore - this version has no containerImages and is used by OpenStackControlplane
+type OctaviaSpecCore struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+	OctaviaSpecBase `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// OctaviaAPI - Spec definition for the API service of the Octavia deployment
+	OctaviaAPI OctaviaAPISpecCore `json:"octaviaAPI"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHousekeeping OctaviaAmphoraControllerSpecCore `json:"octaviaHousekeeping"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaHealthManager OctaviaAmphoraControllerSpecCore `json:"octaviaHealthManager"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
+	OctaviaWorker OctaviaAmphoraControllerSpecCore `json:"octaviaWorker"`
+}
+
+// OctaviaSpecBase -
+type OctaviaSpecBase struct {
+	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
 
 	// +kubebuilder:validation:Required
 	// MariaDB instance name
@@ -96,22 +142,6 @@ type OctaviaSpec struct {
 	// But can also be used to add additional files. Those get added to the service config dir in /etc/<service> .
 	// TODO: -> implement
 	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// OctaviaAPI - Spec definition for the API service of the Octavia deployment
-	OctaviaAPI OctaviaAPISpec `json:"octaviaAPI"`
-
-	// +kubebuilder:validation:Optional
-	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
-	OctaviaHousekeeping OctaviaAmphoraControllerSpec `json:"octaviaHousekeeping"`
-
-	// +kubebuilder:validation:Optional
-	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
-	OctaviaHealthManager OctaviaAmphoraControllerSpec `json:"octaviaHealthManager"`
-
-	// +kubebuilder:validation:Optional
-	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
-	OctaviaWorker OctaviaAmphoraControllerSpec `json:"octaviaWorker"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}

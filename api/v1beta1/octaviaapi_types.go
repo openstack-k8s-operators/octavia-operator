@@ -35,6 +35,15 @@ const (
 
 // OctaviaAPISpec defines the desired state of OctaviaAPI
 type OctaviaAPISpec struct {
+	OctaviaAPISpecCore `json:",inline"`
+
+	// +kubebuilder:validation:Required
+	// Octavia Container Image URL
+	ContainerImage string `json:"containerImage"`
+}
+
+// OctaviaAPISpecCore -
+type OctaviaAPISpecCore struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
@@ -62,10 +71,6 @@ type OctaviaAPISpec struct {
 	// +kubebuilder:validation:Required
 	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
 	ServiceAccount string `json:"serviceAccount"`
-
-	// +kubebuilder:validation:Required
-	// Octavia Container Image URL
-	ContainerImage string `json:"containerImage"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=1
