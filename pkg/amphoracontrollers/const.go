@@ -15,6 +15,9 @@ limitations under the License.
 
 package amphoracontrollers
 
+// NOTE: Strictly speaking, these don't have to be package scope constants, but having them externally
+// accessible might aide constructing functional tests later on.
+
 const (
 	// Common consts for Management network
 
@@ -65,4 +68,34 @@ const (
 
 	// LbMgmtSubnetIPv6GatewayIP -
 	LbMgmtSubnetIPv6GatewayIP = ""
+
+	// Common consts for Management provider network
+
+	// LbProvNetName -
+	LbProvNetName = "octavia-provider-net"
+
+	// LbProvNetDescription -
+	LbProvNetDescription = "LBaaS Management Provider Network"
+
+	// LbProvSubnetName -
+	LbProvSubnetName = "octavia-provider-subnet"
+
+	// LbProvSubnetDescription -
+	LbProvSubnetDescription = "LBaaS Management Provider Subnet"
+
+	// IPv4 consts
+
+	// LbProvSubnetCIDR -
+	LbProvSubnetCIDR = "172.23.0.0/24"
+
+	// LbProvSubnetAllocationPoolStart -
+	LbProvSubnetAllocationPoolStart = "172.23.0.5"
+
+	// LbProvSubnetAllocationPoolEnd -
+	LbProvSubnetAllocationPoolEnd = "172.23.0.25"
+
+	// LbProvSubnetGatewayIP -
+	LbProvSubnetGatewayIP = "172.23.0.1"
+
+	// TODO(beagles): support IPv6 for the provider network.
 )
