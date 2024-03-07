@@ -27,9 +27,8 @@ import (
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
-func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
-	ipVersion := instance.Spec.LbMgmtNetworks.SubnetIPVersion
-
+func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
+	ipVersion := networkDetails.SubnetIPVersion
 	listOpts := subnets.ListOpts{
 		Name:      LbMgmtSubnetName,
 		NetworkID: lbMgmtNetID,
@@ -124,7 +123,7 @@ func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, instance *octaviav1.O
 	return lbMgmtSubnet, nil
 }
 
-func getLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.OctaviaAmphoraController, serviceTenantID string) (*networks.Network, error) {
+func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string) (*networks.Network, error) {
 	listOpts := networks.ListOpts{
 		Name:     LbMgmtNetName,
 		TenantID: serviceTenantID,
@@ -143,8 +142,8 @@ func getLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.Oct
 	return nil, nil
 }
 
-func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
-	lbMgmtNet, err := getLbMgmtNetwork(client, instance, serviceTenantID)
+func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+	lbMgmtNet, err := getLbMgmtNetwork(client, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +179,7 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.
 		}
 	}
 
-	_, err = ensureLbMgmtSubnet(client, instance, log, serviceTenantID, lbMgmtNet.ID)
+	_, err = ensureLbMgmtSubnet(client, networkDetails, log, serviceTenantID, lbMgmtNet.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -191,8 +190,8 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, instance *octaviav1.
 // EnsureLbMgmtNetworks - ensure that the Octavia management network is created
 //
 // returns the UUID of the network
-func EnsureLbMgmtNetworks(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
-	o, err := octavia.GetOpenstackClient(ctx, instance.Namespace, helper)
+func EnsureLbMgmtNetworks(ctx context.Context, networkDetails *octaviav1.OctaviaLbMgmtNetworks, ns string, tenantName string, log *logr.Logger, helper *helper.Helper) (string, error) {
+	o, err := octavia.GetOpenstackClient(ctx, ns, helper)
 	if err != nil {
 		return "", err
 	}
@@ -200,15 +199,15 @@ func EnsureLbMgmtNetworks(ctx context.Context, instance *octaviav1.OctaviaAmphor
 	if err != nil {
 		return "", err
 	}
-	serviceTenant, err := octavia.GetProject(o, instance.Spec.TenantName)
+	serviceTenant, err := octavia.GetProject(o, tenantName)
 	if err != nil {
 		return "", err
 	}
 	var network *networks.Network
-	if instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks {
-		network, err = ensureLbMgmtNetwork(client, instance, log, serviceTenant.ID)
+	if networkDetails != nil {
+		network, err = ensureLbMgmtNetwork(client, networkDetails, log, serviceTenant.ID)
 	} else {
-		network, err = getLbMgmtNetwork(client, instance, serviceTenant.ID)
+		network, err = getLbMgmtNetwork(client, serviceTenant.ID)
 		if network == nil {
 			return "", fmt.Errorf("Cannot find network \"%s\"", LbMgmtNetName)
 		}

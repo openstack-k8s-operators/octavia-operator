@@ -254,7 +254,14 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
 
 	// Create load balancer management network and get its Id
-	networkID, err := amphoracontrollers.EnsureLbMgmtNetworks(ctx, instance, &r.Log, helper)
+	networkID, err := amphoracontrollers.EnsureLbMgmtNetworks(
+		ctx,
+		&instance.Spec.LbMgmtNetworks,
+		instance.Namespace,
+		instance.Spec.TenantName,
+		&r.Log,
+		helper,
+	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
