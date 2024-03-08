@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -102,6 +103,29 @@ func getNetwork(client *gophercloud.ServiceClient, networkName string, serviceTe
 	return nil, nil
 }
 
+func getNetworkExt(client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
+	extTrue := true
+	listOpts := external.ListOptsExt{
+		ListOptsBuilder: networks.ListOpts{
+			Name:     networkName,
+			TenantID: serviceTenantID,
+		},
+		External: &extTrue,
+	}
+	allPages, err := networks.List(client, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allNetworks, err := networks.ExtractNetworks(allPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(allNetworks) > 0 {
+		return &allNetworks[0], nil
+	}
+	return nil, nil
+}
+
 func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
 	foundNetwork, err := getNetwork(client, createOpts.Name, serviceTenantID)
 	if err != nil {
@@ -134,7 +158,98 @@ func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.Create
 	return foundNetwork, nil
 }
 
-func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
+func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+	foundNetwork, err := getNetworkExt(client, createOpts.Name, serviceTenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	extTrue := true
+	if foundNetwork == nil {
+		extCreateOpts := external.CreateOptsExt{
+			CreateOptsBuilder: createOpts,
+			External:          &extTrue,
+		}
+
+		log.Info(fmt.Sprintf("Creating Octavia network \"%s\"", createOpts.Name))
+		foundNetwork, err = networks.Create(client, extCreateOpts).Extract()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		emptyOpts := networks.UpdateOpts{}
+		delta := networks.UpdateOpts{}
+		if foundNetwork.Description != createOpts.Description {
+			delta.Description = &createOpts.Description
+		}
+		if foundNetwork.AdminStateUp != *createOpts.AdminStateUp {
+			delta.AdminStateUp = createOpts.AdminStateUp
+		}
+		if delta != emptyOpts {
+			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
+			extUpdateOpts := external.UpdateOptsExt{
+				UpdateOptsBuilder: delta,
+				External:          &extTrue,
+			}
+			foundNetwork, err = networks.Update(client, foundNetwork.ID, extUpdateOpts).Extract()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return foundNetwork, nil
+}
+
+func ensureProvSubnet(client *gophercloud.ServiceClient, log *logr.Logger, serviceTenantID string, provnetID string) (
+	*subnets.Subnet, error) {
+	gatewayIP := LbProvSubnetGatewayIP
+	createOpts := subnets.CreateOpts{
+		Name:        LbProvSubnetName,
+		Description: LbProvSubnetDescription,
+		NetworkID:   provnetID,
+		TenantID:    serviceTenantID,
+		CIDR:        LbProvSubnetCIDR,
+		IPVersion:   gophercloud.IPVersion(4),
+		AllocationPools: []subnets.AllocationPool{
+			{
+				Start: LbProvSubnetAllocationPoolStart,
+				End:   LbProvSubnetAllocationPoolEnd,
+			},
+		},
+		GatewayIP: &gatewayIP,
+	}
+	return ensureSubnet(client, 4, createOpts, log)
+}
+
+func ensureProvNetwork(client *gophercloud.ServiceClient, log *logr.Logger, serviceTenantID string) (
+	*networks.Network, error) {
+	provNet, err := getNetwork(client, LbProvNetName, serviceTenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	asu := true
+	createOpts := networks.CreateOpts{
+		Name:         LbProvNetName,
+		Description:  LbProvNetDescription,
+		AdminStateUp: &asu,
+		TenantID:     serviceTenantID,
+	}
+	provNet, err = ensureNetworkExt(client, createOpts, log, serviceTenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = ensureProvSubnet(client, log, serviceTenantID, provNet.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return provNet, nil
+}
+
+func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger,
+	serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
 	ipVersion := networkDetails.SubnetIPVersion
 
 	var createOpts subnets.CreateOpts
@@ -235,6 +350,33 @@ func EnsureLbMgmtNetworks(ctx context.Context, networkDetails *octaviav1.Octavia
 	}
 	if err != nil {
 		return "", err
+	}
+	return network.ID, nil
+}
+
+// EnsureLbProvNetworks - ensure that the Octavia management provider network is created
+//
+// returns the UUID of the network
+func EnsureLbProvNetworks(ctx context.Context, ns string, tenantName string, log *logr.Logger, helper *helper.Helper) (string, error) {
+	o, err := octavia.GetOpenstackClient(ctx, ns, helper)
+	if err != nil {
+		return "", err
+	}
+	client, err := octavia.GetNetworkClient(o)
+	if err != nil {
+		return "", err
+	}
+	serviceTenant, err := octavia.GetProject(o, tenantName)
+	if err != nil {
+		return "", err
+	}
+	var network *networks.Network
+	network, err = ensureProvNetwork(client, log, serviceTenant.ID)
+	if err != nil {
+		return "", err
+	}
+	if network == nil {
+		return "", fmt.Errorf("Cannot find network \"%s\"", LbProvNetName)
 	}
 	return network.ID, nil
 }
