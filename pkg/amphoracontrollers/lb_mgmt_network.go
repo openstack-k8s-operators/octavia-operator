@@ -27,12 +27,11 @@ import (
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
-func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
-	ipVersion := networkDetails.SubnetIPVersion
+func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts subnets.CreateOpts, log *logr.Logger) (*subnets.Subnet, error) {
 	listOpts := subnets.ListOpts{
-		Name:      LbMgmtSubnetName,
-		NetworkID: lbMgmtNetID,
-		TenantID:  serviceTenantID,
+		Name:      createOpts.Name,
+		NetworkID: createOpts.NetworkID,
+		TenantID:  createOpts.TenantID,
 		IPVersion: ipVersion,
 	}
 	allPages, err := subnets.List(client, listOpts).AllPages()
@@ -42,45 +41,6 @@ func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octav
 	allSubnets, err := subnets.ExtractSubnets(allPages)
 	if err != nil {
 		return nil, err
-	}
-
-	var createOpts subnets.CreateOpts
-	if ipVersion == 6 {
-		gatewayIP := LbMgmtSubnetIPv6GatewayIP
-		createOpts = subnets.CreateOpts{
-			Name:            LbMgmtSubnetName,
-			Description:     LbMgmtSubnetDescription,
-			NetworkID:       lbMgmtNetID,
-			TenantID:        serviceTenantID,
-			CIDR:            LbMgmtSubnetIPv6CIDR,
-			IPVersion:       gophercloud.IPVersion(ipVersion),
-			IPv6AddressMode: LbMgmtSubnetIPv6AddressMode,
-			IPv6RAMode:      LbMgmtSubnetIPv6RAMode,
-			AllocationPools: []subnets.AllocationPool{
-				{
-					Start: LbMgmtSubnetIPv6AllocationPoolStart,
-					End:   LbMgmtSubnetIPv6AllocationPoolEnd,
-				},
-			},
-			GatewayIP: &gatewayIP,
-		}
-	} else {
-		gatewayIP := LbMgmtSubnetGatewayIP
-		createOpts = subnets.CreateOpts{
-			Name:        LbMgmtSubnetName,
-			Description: LbMgmtSubnetDescription,
-			NetworkID:   lbMgmtNetID,
-			TenantID:    serviceTenantID,
-			CIDR:        LbMgmtSubnetCIDR,
-			IPVersion:   gophercloud.IPVersion(ipVersion),
-			AllocationPools: []subnets.AllocationPool{
-				{
-					Start: LbMgmtSubnetAllocationPoolStart,
-					End:   LbMgmtSubnetAllocationPoolEnd,
-				},
-			},
-			GatewayIP: &gatewayIP,
-		}
 	}
 
 	var lbMgmtSubnet *subnets.Subnet
@@ -123,9 +83,9 @@ func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octav
 	return lbMgmtSubnet, nil
 }
 
-func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string) (*networks.Network, error) {
+func getNetwork(client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
 	listOpts := networks.ListOpts{
-		Name:     LbMgmtNetName,
+		Name:     networkName,
 		TenantID: serviceTenantID,
 	}
 	allPages, err := networks.List(client, listOpts).AllPages()
@@ -142,8 +102,88 @@ func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string)
 	return nil, nil
 }
 
+func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+	foundNetwork, err := getNetwork(client, createOpts.Name, serviceTenantID)
+	if err != nil {
+		return nil, err
+	}
+
+	if foundNetwork == nil {
+		log.Info(fmt.Sprintf("Creating Octavia network \"%s\"", createOpts.Name))
+		foundNetwork, err = networks.Create(client, createOpts).Extract()
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		emptyOpts := networks.UpdateOpts{}
+		delta := networks.UpdateOpts{}
+		if foundNetwork.Description != createOpts.Description {
+			delta.Description = &createOpts.Description
+		}
+		if foundNetwork.AdminStateUp != *createOpts.AdminStateUp {
+			delta.AdminStateUp = createOpts.AdminStateUp
+		}
+		if delta != emptyOpts {
+			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
+			foundNetwork, err = networks.Update(client, foundNetwork.ID, delta).Extract()
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+	return foundNetwork, nil
+}
+
+func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
+	ipVersion := networkDetails.SubnetIPVersion
+
+	var createOpts subnets.CreateOpts
+	if ipVersion == 6 {
+		gatewayIP := LbMgmtSubnetIPv6GatewayIP
+		createOpts = subnets.CreateOpts{
+			Name:            LbMgmtSubnetName,
+			Description:     LbMgmtSubnetDescription,
+			NetworkID:       lbMgmtNetID,
+			TenantID:        serviceTenantID,
+			CIDR:            LbMgmtSubnetIPv6CIDR,
+			IPVersion:       gophercloud.IPVersion(ipVersion),
+			IPv6AddressMode: LbMgmtSubnetIPv6AddressMode,
+			IPv6RAMode:      LbMgmtSubnetIPv6RAMode,
+			AllocationPools: []subnets.AllocationPool{
+				{
+					Start: LbMgmtSubnetIPv6AllocationPoolStart,
+					End:   LbMgmtSubnetIPv6AllocationPoolEnd,
+				},
+			},
+			GatewayIP: &gatewayIP,
+		}
+	} else {
+		gatewayIP := LbMgmtSubnetGatewayIP
+		createOpts = subnets.CreateOpts{
+			Name:        LbMgmtSubnetName,
+			Description: LbMgmtSubnetDescription,
+			NetworkID:   lbMgmtNetID,
+			TenantID:    serviceTenantID,
+			CIDR:        LbMgmtSubnetCIDR,
+			IPVersion:   gophercloud.IPVersion(ipVersion),
+			AllocationPools: []subnets.AllocationPool{
+				{
+					Start: LbMgmtSubnetAllocationPoolStart,
+					End:   LbMgmtSubnetAllocationPoolEnd,
+				},
+			},
+			GatewayIP: &gatewayIP,
+		}
+	}
+	return ensureSubnet(client, ipVersion, createOpts, log)
+}
+
+func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string) (*networks.Network, error) {
+	return getNetwork(client, LbMgmtNetName, serviceTenantID)
+}
+
 func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
-	lbMgmtNet, err := getLbMgmtNetwork(client, serviceTenantID)
+	mgmtNetwork, err := getLbMgmtNetwork(client, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -155,36 +195,17 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 		AdminStateUp: &asu,
 		TenantID:     serviceTenantID,
 	}
-	if lbMgmtNet == nil {
-		log.Info(fmt.Sprintf("Creating Octavia management network \"%s\"", createOpts.Name))
-		lbMgmtNet, err = networks.Create(client, createOpts).Extract()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		emptyOpts := networks.UpdateOpts{}
-		delta := networks.UpdateOpts{}
-		if lbMgmtNet.Description != createOpts.Description {
-			delta.Description = &createOpts.Description
-		}
-		if lbMgmtNet.AdminStateUp != *createOpts.AdminStateUp {
-			delta.AdminStateUp = createOpts.AdminStateUp
-		}
-		if delta != emptyOpts {
-			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
-			lbMgmtNet, err = networks.Update(client, lbMgmtNet.ID, delta).Extract()
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	_, err = ensureLbMgmtSubnet(client, networkDetails, log, serviceTenantID, lbMgmtNet.ID)
+	mgmtNetwork, err = ensureNetwork(client, createOpts, log, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
 
-	return lbMgmtNet, nil
+	_, err = ensureLbMgmtSubnet(client, networkDetails, log, serviceTenantID, mgmtNetwork.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return mgmtNetwork, nil
 }
 
 // EnsureLbMgmtNetworks - ensure that the Octavia management network is created
