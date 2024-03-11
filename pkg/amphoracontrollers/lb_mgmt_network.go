@@ -1,6 +1,6 @@
 /*
 Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
+@you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
 	http://www.apache.org/licenses/LICENSE-2.0
@@ -21,12 +21,89 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
+
+type NetworkProvisioningSummary struct {
+	TenantNetworkID    string
+	TenantSubnetID     string
+	TenantRouterPortID string
+	ProviderNetworkID  string
+	RouterID           string
+}
+
+//
+// TODO(beagles) we need to decide what, if any of the results of these methods we want to expose in the controller's
+// status.
+//
+
+func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+	listOpts := ports.ListOpts{
+		Name:      portName,
+		NetworkID: networkID,
+		FixedIPs: []ports.FixedIPOpts{
+			{
+				SubnetID:  subnetID,
+				IPAddress: ipAddress,
+			},
+		},
+	}
+	allPages, err := ports.List(client, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	allPorts, err := ports.ExtractPorts(allPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(allPorts) > 0 {
+		return &allPorts[0], nil
+	}
+	return nil, nil
+}
+
+func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet, log *logr.Logger) (*ports.Port, error) {
+	ipAddress := LbMgmtRouterPortIPPv4
+	if tenantSubnet.IPVersion == 6 {
+		ipAddress = LbMgmtRouterPortIPPv6
+	}
+
+	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress, log)
+	if err != nil {
+		return nil, err
+	}
+	if p != nil {
+		//
+		// TODO(beagles): reconcile port properties? Is there anything to do? Security groups possibly.
+		//
+		return p, nil
+	}
+	asu := true
+	createOpts := ports.CreateOpts{
+		Name:         LbMgmtRouterPortName,
+		AdminStateUp: &asu,
+		NetworkID:    tenantNetwork.ID,
+		FixedIPs: []ports.FixedIPOpts{
+			{
+				SubnetID:  tenantSubnet.ID,
+				IPAddress: ipAddress,
+			},
+		},
+	}
+	p, err = ports.Create(client, createOpts).Extract()
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
 
 func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts subnets.CreateOpts, log *logr.Logger) (*subnets.Subnet, error) {
 	listOpts := subnets.ListOpts{
@@ -126,7 +203,8 @@ func getNetworkExt(client *gophercloud.ServiceClient, networkName string, servic
 	return nil, nil
 }
 
-func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger,
+	serviceTenantID string) (*networks.Network, error) {
 	foundNetwork, err := getNetwork(client, createOpts.Name, serviceTenantID)
 	if err != nil {
 		return nil, err
@@ -166,8 +244,20 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 
 	extTrue := true
 	if foundNetwork == nil {
-		extCreateOpts := external.CreateOptsExt{
+		segment := []provider.Segment{
+			provider.Segment{
+				NetworkType:     "flat",
+				PhysicalNetwork: "br-octavia",
+			},
+		}
+
+		providerOpts := provider.CreateOptsExt{
 			CreateOptsBuilder: createOpts,
+			Segments:          segment,
+		}
+
+		extCreateOpts := external.CreateOptsExt{
+			CreateOptsBuilder: providerOpts,
 			External:          &extTrue,
 		}
 
@@ -187,11 +277,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 		}
 		if delta != emptyOpts {
 			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
-			extUpdateOpts := external.UpdateOptsExt{
-				UpdateOptsBuilder: delta,
-				External:          &extTrue,
-			}
-			foundNetwork, err = networks.Update(client, foundNetwork.ID, extUpdateOpts).Extract()
+			foundNetwork, err = networks.Update(client, foundNetwork.ID, delta).Extract()
 			if err != nil {
 				return nil, err
 			}
@@ -200,14 +286,14 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 	return foundNetwork, nil
 }
 
-func ensureProvSubnet(client *gophercloud.ServiceClient, log *logr.Logger, serviceTenantID string, provnetID string) (
+func ensureProvSubnet(client *gophercloud.ServiceClient, providerNetwork *networks.Network, log *logr.Logger) (
 	*subnets.Subnet, error) {
 	gatewayIP := LbProvSubnetGatewayIP
 	createOpts := subnets.CreateOpts{
 		Name:        LbProvSubnetName,
 		Description: LbProvSubnetDescription,
-		NetworkID:   provnetID,
-		TenantID:    serviceTenantID,
+		NetworkID:   providerNetwork.ID,
+		TenantID:    providerNetwork.TenantID,
 		CIDR:        LbProvSubnetCIDR,
 		IPVersion:   gophercloud.IPVersion(4),
 		AllocationPools: []subnets.AllocationPool{
@@ -221,7 +307,7 @@ func ensureProvSubnet(client *gophercloud.ServiceClient, log *logr.Logger, servi
 	return ensureSubnet(client, 4, createOpts, log)
 }
 
-func ensureProvNetwork(client *gophercloud.ServiceClient, log *logr.Logger, serviceTenantID string) (
+func ensureProvNetwork(client *gophercloud.ServiceClient, serviceTenantID string, log *logr.Logger) (
 	*networks.Network, error) {
 	provNet, err := getNetwork(client, LbProvNetName, serviceTenantID)
 	if err != nil {
@@ -240,16 +326,15 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, log *logr.Logger, serv
 		return nil, err
 	}
 
-	_, err = ensureProvSubnet(client, log, serviceTenantID, provNet.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	return provNet, nil
 }
 
-func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger,
-	serviceTenantID string, lbMgmtNetID string) (*subnets.Subnet, error) {
+func ensureLbMgmtSubnet(
+	client *gophercloud.ServiceClient,
+	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
+	tenantNetwork *networks.Network,
+	log *logr.Logger,
+) (*subnets.Subnet, error) {
 	ipVersion := networkDetails.SubnetIPVersion
 
 	var createOpts subnets.CreateOpts
@@ -258,8 +343,8 @@ func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octav
 		createOpts = subnets.CreateOpts{
 			Name:            LbMgmtSubnetName,
 			Description:     LbMgmtSubnetDescription,
-			NetworkID:       lbMgmtNetID,
-			TenantID:        serviceTenantID,
+			NetworkID:       tenantNetwork.ID,
+			TenantID:        tenantNetwork.TenantID,
 			CIDR:            LbMgmtSubnetIPv6CIDR,
 			IPVersion:       gophercloud.IPVersion(ipVersion),
 			IPv6AddressMode: LbMgmtSubnetIPv6AddressMode,
@@ -271,20 +356,27 @@ func ensureLbMgmtSubnet(client *gophercloud.ServiceClient, networkDetails *octav
 				},
 			},
 			GatewayIP: &gatewayIP,
+			// TODO(beagles): ipv6 host routes
 		}
 	} else {
 		gatewayIP := LbMgmtSubnetGatewayIP
 		createOpts = subnets.CreateOpts{
 			Name:        LbMgmtSubnetName,
 			Description: LbMgmtSubnetDescription,
-			NetworkID:   lbMgmtNetID,
-			TenantID:    serviceTenantID,
+			NetworkID:   tenantNetwork.ID,
+			TenantID:    tenantNetwork.TenantID,
 			CIDR:        LbMgmtSubnetCIDR,
 			IPVersion:   gophercloud.IPVersion(ipVersion),
 			AllocationPools: []subnets.AllocationPool{
 				{
 					Start: LbMgmtSubnetAllocationPoolStart,
 					End:   LbMgmtSubnetAllocationPoolEnd,
+				},
+			},
+			HostRoutes: []subnets.HostRoute{
+				{
+					DestinationCIDR: LbProvSubnetCIDR,
+					NextHop:         LbMgmtRouterPortIPPv4,
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -297,10 +389,15 @@ func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string)
 	return getNetwork(client, LbMgmtNetName, serviceTenantID)
 }
 
-func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks,
+	serviceTenantID string, log *logr.Logger) (*networks.Network, error) {
 	mgmtNetwork, err := getLbMgmtNetwork(client, serviceTenantID)
 	if err != nil {
 		return nil, err
+	}
+
+	if networkDetails == nil && mgmtNetwork == nil {
+		return nil, fmt.Errorf("Cannot find network \"%s\"", LbMgmtNetName)
 	}
 
 	asu := true
@@ -315,68 +412,188 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 		return nil, err
 	}
 
-	_, err = ensureLbMgmtSubnet(client, networkDetails, log, serviceTenantID, mgmtNetwork.ID)
-	if err != nil {
-		return nil, err
-	}
-
 	return mgmtNetwork, nil
 }
 
-// EnsureLbMgmtNetworks - ensure that the Octavia management network is created
-//
-// returns the UUID of the network
-func EnsureLbMgmtNetworks(ctx context.Context, networkDetails *octaviav1.OctaviaLbMgmtNetworks, ns string, tenantName string, log *logr.Logger, helper *helper.Helper) (string, error) {
-	o, err := octavia.GetOpenstackClient(ctx, ns, helper)
-	if err != nil {
-		return "", err
+func externalFixedIPs(subnetID string) []routers.ExternalFixedIP {
+	ips := []routers.ExternalFixedIP{
+		routers.ExternalFixedIP{
+			IPAddress: LbRouterFixedIPAddress,
+			SubnetID:  subnetID,
+		},
 	}
-	client, err := octavia.GetNetworkClient(o)
-	if err != nil {
-		return "", err
-	}
-	serviceTenant, err := octavia.GetProject(o, tenantName)
-	if err != nil {
-		return "", err
-	}
-	var network *networks.Network
-	if networkDetails != nil {
-		network, err = ensureLbMgmtNetwork(client, networkDetails, log, serviceTenant.ID)
-	} else {
-		network, err = getLbMgmtNetwork(client, serviceTenant.ID)
-		if network == nil {
-			return "", fmt.Errorf("Cannot find network \"%s\"", LbMgmtNetName)
-		}
-	}
-	if err != nil {
-		return "", err
-	}
-	return network.ID, nil
+	return ips
 }
 
-// EnsureLbProvNetworks - ensure that the Octavia management provider network is created
-//
-// returns the UUID of the network
-func EnsureLbProvNetworks(ctx context.Context, ns string, tenantName string, log *logr.Logger, helper *helper.Helper) (string, error) {
+func compareExternalFixedIPs(a []routers.ExternalFixedIP, b []routers.ExternalFixedIP) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].IPAddress != b[i].IPAddress {
+			return false
+		}
+		if a[i].SubnetID != b[i].SubnetID {
+			return false
+		}
+	}
+	return true
+}
+
+// reconcileRouter compares existing router properties against what is expected/desired and updates the router if
+// necessary!
+func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
+	gatewayNetwork *networks.Network,
+	gatewaySubnet *subnets.Subnet,
+	tenantRouterPort *ports.Port,
+	log *logr.Logger) (*routers.Router, error) {
+
+	if !router.AdminStateUp {
+		return router, fmt.Errorf("Router %s is not up", router.Name)
+	}
+
+	// TODO(beagles) check the status string.
+	// if router.Status == ?
+
+	needsUpdate := false
+	updateInfo := routers.UpdateOpts{}
+	enableSNAT := false
+	fixedIPs := externalFixedIPs(gatewaySubnet.ID)
+
+	//
+	// TODO(beagles) we don't care about the other fields right now because we
+	// are just going with neutron defaults but in the future we may care about
+	// Distributed (oddly HA doesn't seem to be an option)
+	//
+	gatewayInfo := router.GatewayInfo
+	if gatewayNetwork.ID != gatewayInfo.NetworkID || *gatewayInfo.EnableSNAT ||
+		compareExternalFixedIPs(gatewayInfo.ExternalFixedIPs, fixedIPs) {
+		gwInfo := routers.GatewayInfo{
+			NetworkID:        gatewayNetwork.ID,
+			EnableSNAT:       &enableSNAT,
+			ExternalFixedIPs: fixedIPs,
+		}
+		updateInfo.GatewayInfo = &gwInfo
+		needsUpdate = true
+	}
+	if needsUpdate {
+		updatedRouter, err := routers.Update(client, router.ID, updateInfo).Extract()
+		if err != nil {
+			return nil, err
+		}
+		return updatedRouter, nil
+	}
+
+	return router, nil
+}
+
+// findRouter is a simple helper method...
+func findRouter(client *gophercloud.ServiceClient, tenantID string) (*routers.Router, error) {
+	listOpts := routers.ListOpts{
+		Name:     LbRouterName,
+		TenantID: tenantID,
+	}
+	allPages, err := routers.List(client, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allRouters, err := routers.ExtractRouters(allPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(allRouters) > 0 {
+		return &allRouters[0], nil
+	}
+	return nil, nil
+}
+
+// EnsureAmphoraManagementNetwork - retrieve, create and reconcile the Octavia management network for the in cluster link to the
+// management tenant network.
+func EnsureAmphoraManagementNetwork(
+	ctx context.Context,
+	ns string,
+	tenantName string,
+	netDetails *octaviav1.OctaviaLbMgmtNetworks,
+	log *logr.Logger,
+	helper *helper.Helper,
+) (NetworkProvisioningSummary, error) {
 	o, err := octavia.GetOpenstackClient(ctx, ns, helper)
 	if err != nil {
-		return "", err
+		return NetworkProvisioningSummary{}, err
 	}
 	client, err := octavia.GetNetworkClient(o)
 	if err != nil {
-		return "", err
+		return NetworkProvisioningSummary{}, err
 	}
 	serviceTenant, err := octavia.GetProject(o, tenantName)
 	if err != nil {
-		return "", err
+		return NetworkProvisioningSummary{}, err
 	}
-	var network *networks.Network
-	network, err = ensureProvNetwork(client, log, serviceTenant.ID)
+
+	tenantNetwork, err := ensureLbMgmtNetwork(client, netDetails, serviceTenant.ID, log)
 	if err != nil {
-		return "", err
+		return NetworkProvisioningSummary{}, err
 	}
-	if network == nil {
-		return "", fmt.Errorf("Cannot find network \"%s\"", LbProvNetName)
+	tenantSubnet, err := ensureLbMgmtSubnet(client, netDetails, tenantNetwork, log)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
 	}
-	return network.ID, nil
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, log)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+
+	providerNetwork, err := ensureProvNetwork(client, serviceTenant.ID, log)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+
+	providerSubnet, err := ensureProvSubnet(client, providerNetwork, log)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+
+	router, err := findRouter(client, serviceTenant.ID)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+	if router != nil {
+		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet,
+			tenantRouterPort, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+		log.Info(fmt.Sprintf("Reconciled router %s (%s)", router.Name, router.ID))
+	} else {
+		enableSNAT := false
+		gatewayInfo := routers.GatewayInfo{
+			NetworkID:        providerNetwork.ID,
+			EnableSNAT:       &enableSNAT,
+			ExternalFixedIPs: externalFixedIPs(providerSubnet.ID),
+		}
+		adminStateUp := true
+		createOpts := routers.CreateOpts{
+			Name:         LbRouterName,
+			AdminStateUp: &adminStateUp,
+			GatewayInfo:  &gatewayInfo,
+		}
+		router, err = routers.Create(client, createOpts).Extract()
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+	}
+	interfaceOpts := routers.AddInterfaceOpts{
+		PortID: tenantRouterPort.ID,
+	}
+	_, err = routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+	return NetworkProvisioningSummary{
+		TenantNetworkID:    tenantNetwork.ID,
+		TenantSubnetID:     tenantSubnet.ID,
+		TenantRouterPortID: tenantRouterPort.ID,
+		ProviderNetworkID:  providerNetwork.ID,
+		RouterID:           router.ID,
+	}, nil
 }

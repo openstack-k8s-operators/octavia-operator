@@ -39,7 +39,7 @@ const (
 	LbMgmtSubnetCIDR = "172.24.0.0/16"
 
 	// LbMgmtSubnetAllocationPoolStart -
-	LbMgmtSubnetAllocationPoolStart = "172.24.0.2"
+	LbMgmtSubnetAllocationPoolStart = "172.24.0.5"
 
 	// LbMgmtSubnetAllocationPoolEnd -
 	LbMgmtSubnetAllocationPoolEnd = "172.24.255.254"
@@ -55,7 +55,7 @@ const (
 	LbMgmtSubnetIPv6CIDR = "fd6c:6261:6173:0001::/64"
 
 	// LbMgmtSubnetIPv6AllocationPoolStart -
-	LbMgmtSubnetIPv6AllocationPoolStart = "fd6c:6261:6173:0001::2"
+	LbMgmtSubnetIPv6AllocationPoolStart = "fd6c:6261:6173:0001::5"
 
 	// LbMgmtSubnetIPv6AllocationPoolEnd -
 	LbMgmtSubnetIPv6AllocationPoolEnd = "fd6c:6261:6173:0001:ffff:ffff:ffff:ffff"
@@ -98,4 +98,24 @@ const (
 	LbProvSubnetGatewayIP = "172.23.0.1"
 
 	// TODO(beagles): support IPv6 for the provider network.
+	// LbRouterName -
+	LbRouterName = "octavia-link-router"
+
+	// LbProvBridgeName -
+	LbProvBridgeName = "br-octavia"
+
+	// LbProvNetAttachName -
+	LbProvNetAttachName = "octavia"
+
+	// LbRouterFixedIPAddress
+	LbRouterFixedIPAddress = "172.23.0.5"
+
+	// LbMgmtRouterPortName
+	LbMgmtRouterPortName = "lb-mgmt-router-port"
+
+	// LbMgmtRouterPortIPIPv4
+	LbMgmtRouterPortIPPv4 = "172.24.0.3"
+
+	// LbMgmtRouterPortIPPv6
+	LbMgmtRouterPortIPPv6 = "fd6c:6261:6173:0001::3"
 )

@@ -254,18 +254,18 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
 
 	// Create load balancer management network and get its Id
-	networkID, err := amphoracontrollers.EnsureLbMgmtNetworks(
+	networkInfo, err := amphoracontrollers.EnsureAmphoraManagementNetwork(
 		ctx,
-		&instance.Spec.LbMgmtNetworks,
 		instance.Namespace,
 		instance.Spec.TenantName,
+		&instance.Spec.LbMgmtNetworks,
 		&r.Log,
 		helper,
 	)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkID))
+	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
 	if err != nil {
@@ -274,7 +274,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
 	templateVars := OctaviaTemplateVars{
-		LbMgmtNetworkID:        networkID,
+		LbMgmtNetworkID:        networkInfo.TenantNetworkID,
 		AmphoraDefaultFlavorID: defaultFlavorID,
 	}
 
