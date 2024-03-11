@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -253,20 +253,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
 
-	// Create load balancer management network and get its Id
-	networkInfo, err := octavia.EnsureAmphoraManagementNetwork(
-		ctx,
-		instance.Namespace,
-		instance.Spec.TenantName,
-		&instance.Spec.LbMgmtNetworks,
-		&r.Log,
-		helper,
-	)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
-
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -274,7 +260,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
 	templateVars := OctaviaTemplateVars{
-		LbMgmtNetworkID:        networkInfo.TenantNetworkID,
+		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
 		AmphoraDefaultFlavorID: defaultFlavorID,
 	}
 

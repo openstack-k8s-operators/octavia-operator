@@ -1,6 +1,8 @@
 module github.com/openstack-k8s-operators/octavia-operator/api
 
-go 1.20
+go 1.21
+
+toolchain go1.21.1
 
 require (
 	github.com/onsi/ginkgo/v2 v2.15.0

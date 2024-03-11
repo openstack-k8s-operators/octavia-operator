@@ -519,21 +519,9 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
-                  lbMgmtNetwork:
-                    default:
-                      manageLbMgmtNetworks: true
-                      subnetIpVersion: 4
-                    description: OctaviaLbMgmtNetworks Settings for Octavia management
-                      networks
-                    properties:
-                      manageLbMgmtNetworks:
-                        default: true
-                        type: boolean
-                      subnetIpVersion:
-                        default: 4
-                        description: IP Version of the managed subnets
-                        type: integer
-                    type: object
+                  lbMgmtNetworkID:
+                    default: ""
+                    type: string
                   networkAttachments:
                     description: NetworkAttachments is a list of NetworkAttachment
                       resource names to expose the services to the given network
@@ -717,21 +705,9 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
-                  lbMgmtNetwork:
-                    default:
-                      manageLbMgmtNetworks: true
-                      subnetIpVersion: 4
-                    description: OctaviaLbMgmtNetworks Settings for Octavia management
-                      networks
-                    properties:
-                      manageLbMgmtNetworks:
-                        default: true
-                        type: boolean
-                      subnetIpVersion:
-                        default: 4
-                        description: IP Version of the managed subnets
-                        type: integer
-                    type: object
+                  lbMgmtNetworkID:
+                    default: ""
+                    type: string
                   networkAttachments:
                     description: NetworkAttachments is a list of NetworkAttachment
                       resource names to expose the services to the given network
@@ -915,21 +891,9 @@ spec:
                       also be used to add additional files. Those get added to the
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
-                  lbMgmtNetwork:
-                    default:
-                      manageLbMgmtNetworks: true
-                      subnetIpVersion: 4
-                    description: OctaviaLbMgmtNetworks Settings for Octavia management
-                      networks
-                    properties:
-                      manageLbMgmtNetworks:
-                        default: true
-                        type: boolean
-                      subnetIpVersion:
-                        default: 4
-                        description: IP Version of the managed subnets
-                        type: integer
-                    type: object
+                  lbMgmtNetworkID:
+                    default: ""
+                    type: string
                   networkAttachments:
                     description: NetworkAttachments is a list of NetworkAttachment
                       resource names to expose the services to the given network
