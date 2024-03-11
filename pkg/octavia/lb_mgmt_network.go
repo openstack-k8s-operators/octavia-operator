@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
 type NetworkProvisioningSummary struct {
@@ -517,15 +516,15 @@ func EnsureAmphoraManagementNetwork(
 	log *logr.Logger,
 	helper *helper.Helper,
 ) (NetworkProvisioningSummary, error) {
-	o, err := octavia.GetOpenstackClient(ctx, ns, helper)
+	o, err := GetOpenstackClient(ctx, ns, helper)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	client, err := octavia.GetNetworkClient(o)
+	client, err := GetNetworkClient(o)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	serviceTenant, err := octavia.GetProject(o, tenantName)
+	serviceTenant, err := GetProject(o, tenantName)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}

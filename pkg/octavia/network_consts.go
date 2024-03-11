@@ -13,7 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
 
 // NOTE: Strictly speaking, these don't have to be package scope constants, but having them externally
 // accessible might aide constructing functional tests later on.
