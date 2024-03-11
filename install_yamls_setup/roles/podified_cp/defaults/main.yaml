@@ -15,4 +15,4 @@ operators_git_repos:
     dest: ~/lib-common
 make_crc_cpus: 20
 make_crc_memory: 40000
-make_crc_disk: 70
+make_crc_disk: 120

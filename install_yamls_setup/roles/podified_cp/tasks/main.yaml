@@ -139,10 +139,10 @@
       set +ex
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      NETWORK_ISOLATION=false make openstack 2>&1 | tee make_openstack.log
-      sleep 10; NETWORK_ISOLATION=false make openstack_wait; sleep 10
-      NETWORK_ISOLATION=false make openstack_deploy 2>&1 | tee make_openstack_deploy.log
-      sleep 10; NETWORK_ISOLATION=false make openstack_wait_deploy; sleep 10
+      make openstack 2>&1 | tee make_openstack.log
+      sleep 10; make openstack_wait; sleep 10
+      make openstack_deploy 2>&1 | tee make_openstack_deploy.log
+      sleep 10; make openstack_wait_deploy; sleep 10
 
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
@@ -150,13 +150,12 @@
       oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type=json \
         -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
 
-      oc project openstack-operators
-      oc patch openstackcontrolplane openstack-galera       --type=merge --patch '
+      oc project openstack
+      oc patch openstackcontrolplane openstack-galera-network-isolation --type=merge --patch '
           spec:
             octavia:
               enabled: true
         '
-
 
       oc completion bash | sudo tee /etc/bash_completion.d/oc_completion
       openstack complete | sudo tee /etc/bash_completion.d/osc.bash_completion
@@ -232,5 +231,5 @@
 # cd ~/octavia-operator; ENABLE_WEBHOOKS=false GOWORK= OPERATOR_TEMPLATES=./templates make install run
 #
 # Deploy your PodSet Custom Resource to the live OpenShift Cluster:
-# oc create -f ~/octavia_v1beta1_octavia.yaml
+# oc apply -f ~/octavia_v1beta1_octavia.yaml
 # watch octavia pods get created using `oc get pods -w`
