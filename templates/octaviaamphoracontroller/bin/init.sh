@@ -20,11 +20,6 @@ set -ex
 #
 # Secrets are obtained from ENV variables.
 export PASSWORD=${AdminPassword:?"Please specify a AdminPassword variable."}
-export DBHOST=${DatabaseHost:?"Please specify a DatabaseHost variable."}
-export DBUSER=${DatabaseUser:?"Please specify a DatabaseUser variable."}
-export DBPASSWORD=${DatabasePassword:?"Please specify a DatabasePassword variable."}
-export DB=${DatabaseName:-"octavia"}
-export PERSISTENCE_DB=${PersistenceDatabaseName:-"octavia_persistence"}
 export TRANSPORTURL=${TransportURL:-""}
 
 SVC_CFG=/etc/octavia/octavia.conf
@@ -47,8 +42,5 @@ if [ -n "$TRANSPORTURL" ]; then
     crudini --set /var/lib/config-data/merged/octavia.conf DEFAULT transport_url $TRANSPORTURL
 fi
 # set secrets
-crudini --set ${SVC_CFG_MERGED} database connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${DB}
 crudini --set ${SVC_CFG_MERGED} keystone_authtoken password $PASSWORD
 crudini --set ${SVC_CFG_MERGED} service_auth password $PASSWORD
-
-crudini --set ${SVC_CFG_MERGED} task_flow persistence_connection mysql+pymysql://${DBUSER}:${DBPASSWORD}@${DBHOST}/${PERSISTENCE_DB}

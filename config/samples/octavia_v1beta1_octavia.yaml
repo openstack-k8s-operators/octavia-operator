@@ -4,7 +4,8 @@ metadata:
   name: octavia
 spec:
   databaseInstance: openstack
-  databaseUser: octavia
+  databaseAccount: octavia
+  persistenceDatabaseAccount: octavia-persistence
   serviceUser: octavia
   rabbitMqClusterName: rabbitmq
   secret: osp-secret
@@ -14,12 +15,13 @@ spec:
     debug = true
   octaviaHousekeeping:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     serviceUser: octavia
     serviceAccount: octavia
     role: housekeeping
-    certssecret: octavia-amp-cert-data
-    certspassphrasesecret: octavia-ca-passphrase
+    certsSecret: octavia-amp-cert-data
+    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -27,12 +29,13 @@ spec:
       debug = true
   octaviaHealthManager:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     serviceUser: octavia
     serviceAccount: octavia
     role: healthmanager
-    certssecret: octavia-amp-cert-data
-    certspassphrasesecret: octavia-ca-passphrase
+    certsSecret: octavia-amp-cert-data
+    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -40,12 +43,13 @@ spec:
       debug = true
   octaviaWorker:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     serviceUser: octavia
     serviceAccount: octavia
     role: worker
-    certssecret: octavia-amp-cert-data
-    certspassphrasesecret: octavia-ca-passphrase
+    certsSecret: octavia-amp-cert-data
+    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -53,7 +57,8 @@ spec:
       debug = true
   octaviaAPI:
     databaseInstance: openstack
-    databaseUser: octavia
+    databaseAccount: octavia
+    persistenceDatabaseAccount: octavia-persistence
     serviceUser: octavia
     serviceAccount: octavia
     secret: osp-secret

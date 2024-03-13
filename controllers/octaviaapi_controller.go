@@ -26,16 +26,17 @@ import (
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviaapi"
@@ -520,6 +521,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	}
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
+	// Create ConfigMaps and Secrets - end
 
 	for _, networkAttachment := range instance.Spec.NetworkAttachments {
 		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
@@ -548,8 +550,6 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
 			instance.Spec.NetworkAttachments, err)
 	}
-
-	// Create ConfigMaps and Secrets - end
 
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
@@ -702,7 +702,53 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	templateParameters := make(map[string]interface{})
+	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
+		ctx, h, instance.Spec.DatabaseAccount, instance.Namespace)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+
+	persistenceDatabaseAccount, persistenceDbSecret, err := mariadbv1.GetAccountAndSecret(
+		ctx, h, instance.Spec.PersistenceDatabaseAccount, instance.Namespace)
+
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			mariadbv1.MariaDBAccountReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			mariadbv1.MariaDBAccountNotReadyMessage,
+			err.Error()))
+
+		return err
+	}
+
+	instance.Status.Conditions.MarkTrue(
+		mariadbv1.MariaDBAccountReadyCondition,
+		mariadbv1.MariaDBAccountReadyMessage)
+
+	templateParameters := map[string]interface{}{
+		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			databaseAccount.Spec.UserName,
+			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.DatabaseName,
+		),
+		"PersistenceDatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s",
+			persistenceDatabaseAccount.Spec.UserName,
+			string(persistenceDbSecret.Data[mariadbv1.DatabasePasswordSelector]),
+			instance.Status.DatabaseHostname,
+			octavia.PersistenceDatabaseName,
+		),
+	}
+
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
@@ -737,7 +783,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 			Labels:        cmLabels,
 		},
 	}
-	err = configmap.EnsureConfigMaps(ctx, h, instance, cms, envVars)
+	err = secret.EnsureSecrets(ctx, h, instance, cms, envVars)
 
 	if err != nil {
 		Log.Error(err, "unable to process config map")
