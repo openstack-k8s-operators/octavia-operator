@@ -188,6 +188,8 @@ status:
 apiVersion: v1
 kind: Pod
 metadata:
+  annotations:
+    openshift.io/scc: anyuid
   labels:
     service: octavia
 ---
