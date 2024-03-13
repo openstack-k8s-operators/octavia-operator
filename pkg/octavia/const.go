@@ -22,6 +22,8 @@ const (
 	ServiceType = "load-balancer"
 	// DatabaseName -
 	DatabaseName = "octavia"
+	// PersistenceDatabaseName -
+	PersistenceDatabaseName = "octavia_persistence"
 
 	// OctaviaPublicPort -
 	OctaviaPublicPort int32 = 9876
