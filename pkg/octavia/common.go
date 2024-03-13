@@ -12,7 +12,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
 
 import (
 	"context"
@@ -21,36 +21,21 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
-	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // GetOpenstackClient returns an openstack admin service client object
 func GetOpenstackClient(
 	ctx context.Context,
-	instance *octaviav1.OctaviaAmphoraController,
+	instance *octaviav1.Octavia,
 	h *helper.Helper,
 ) (*openstack.OpenStack, error) {
 	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
 	if err != nil {
 		return nil, err
 	}
-	o, _, err := octavia.GetAdminServiceClient(ctx, h, keystoneAPI)
+	o, _, err := GetAdminServiceClient(ctx, h, keystoneAPI)
 	if err != nil {
 		return nil, err
 	}
 	return o, nil
-}
-
-// GetOwningOctaviaControllerName - Given a OctaviaHousekeeping, OctaviaHealthmanager or OctaviaWorker
-// object, returning the parent Octavia object that created it (if any)
-func GetOwningOctaviaControllerName(instance client.Object) string {
-	for _, ownerRef := range instance.GetOwnerReferences() {
-		if ownerRef.Kind == "Octavia" {
-			return ownerRef.Name
-		}
-	}
-
-	return ""
 }

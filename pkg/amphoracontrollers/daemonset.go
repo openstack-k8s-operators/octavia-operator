@@ -43,7 +43,9 @@ func DaemonSet(
 	// The API pod has an extra volume so the API and the provider agent can
 	// communicate with each other.
 	volumes := octavia.GetVolumes(instance.Name)
-	volumes = append(volumes, GetCertVolume(instance.Spec.LoadBalancerCerts)...)
+	parentOctaviaName := GetOwningOctaviaControllerName(instance)
+	certsSecretName := fmt.Sprintf("%s-certs-secret", parentOctaviaName)
+	volumes = append(volumes, GetCertVolume(certsSecretName)...)
 
 	volumeMounts := octavia.GetVolumeMounts(serviceName)
 	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)

@@ -147,11 +147,6 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=octavia-certs-secret
-	// LoadBalancerCerts - Secret containing certs for securing communication with amphora based Load Balancers
-	LoadBalancerCerts string `json:"certsSecret"`
-
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia-ssh-pubkey
 	// LoadBalancerSSHPubKey - The name of the ConfigMap containing the

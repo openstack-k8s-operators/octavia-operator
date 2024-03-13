@@ -391,7 +391,6 @@ func (r *OctaviaReconciler) reconcileUpgrade(ctx context.Context, instance *octa
 	return ctrl.Result{}, nil
 }
 
-// TODO(tweining): implement
 func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service")
@@ -474,6 +473,18 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+
+	// Amphora SSH key config for debugging
+	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
 
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
@@ -903,9 +914,6 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
 		daemonset.Spec.LbMgmtNetworks.ManageLbMgmtNetworks = instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks
 		daemonset.Spec.LbMgmtNetworks.SubnetIPVersion = instance.Spec.LbMgmtNetworks.SubnetIPVersion
-		daemonset.Spec.LoadBalancerCerts = instance.Spec.LoadBalancerCerts
-		daemonset.Spec.LoadBalancerSSHPrivKey = instance.Spec.LoadBalancerSSHPrivKey
-		daemonset.Spec.LoadBalancerSSHPubKey = instance.Spec.LoadBalancerSSHPubKey
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		daemonset.Spec.RedisHostIPs = instance.Status.RedisHostIPs
 		if len(daemonset.Spec.NodeSelector) == 0 {
