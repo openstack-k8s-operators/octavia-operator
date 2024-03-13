@@ -81,13 +81,13 @@ func DbSyncJob(
 	}
 
 	initContainerDetails := APIDetails{
-		ContainerImage:       instance.Spec.OctaviaAPI.ContainerImage,
-		DatabaseHost:         instance.Status.DatabaseHostname,
-		DatabaseName:         DatabaseName,
+		ContainerImage:          instance.Spec.OctaviaAPI.ContainerImage,
+		DatabaseHost:            instance.Status.DatabaseHostname,
+		DatabaseName:            DatabaseName,
 		PersistenceDatabaseName: PersistenceDatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         initVolumeMounts,
+		OSPSecret:               instance.Spec.Secret,
+		UserPasswordSelector:    instance.Spec.PasswordSelectors.Service,
+		VolumeMounts:            initVolumeMounts,
 	}
 	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 

@@ -23,14 +23,14 @@ import (
 
 // APIDetails information
 type APIDetails struct {
-	ContainerImage       string
-	DatabaseHost         string
-	DatabaseName         string
+	ContainerImage          string
+	DatabaseHost            string
+	DatabaseName            string
 	PersistenceDatabaseName string
-	TransportURLSecret   string
-	OSPSecret            string
-	UserPasswordSelector string
-	VolumeMounts         []corev1.VolumeMount
+	TransportURLSecret      string
+	OSPSecret               string
+	UserPasswordSelector    string
+	VolumeMounts            []corev1.VolumeMount
 }
 
 const (
@@ -52,17 +52,6 @@ func InitContainer(init APIDetails) []corev1.Container {
 	envVars["DatabaseName"] = env.SetValue(init.DatabaseName)
 
 	envs := []corev1.EnvVar{
-		{
-			Name: "DatabasePassword",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: init.OSPSecret,
-					},
-					Key: init.DBPasswordSelector,
-				},
-			},
-		},
 		{
 			Name: "AdminPassword",
 			ValueFrom: &corev1.EnvVarSource{

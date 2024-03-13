@@ -261,15 +261,12 @@ func (r *OctaviaReconciler) reconcileInit(
 	// If name is not set, it's set automatically to the name of the service ("octavia"),
 	// and it triggers a conflict in the mariadbdatabase functions when two DBs
 	// share the same "name"
-	persistentDb := mariadbv1.NewDatabaseWithNamespace(
-		octavia.PersistenceDatabaseName,
-		instance.Spec.DatabaseUser,
-		instance.Spec.Secret,
-		map[string]string{
-			"dbName": instance.Spec.DatabaseInstance,
-		},
-		"octavia-persistence",
-		instance.Namespace,
+	persistentDb := mariadbv1.NewDatabaseForAccount(
+		instance.Spec.DatabaseInstance,  // mariadb/galera service to target
+		octavia.PersistenceDatabaseName, // name used in CREATE DATABASE in mariadb
+		"octavia-persistence",           // CR name for MariaDBDatabase
+		instance.Spec.DatabaseAccount,   // CR name for MariaDBAccount
+		instance.Namespace,              // namespace
 	)
 
 	dbs := []*mariadbv1.Database{octaviaDb, persistentDb}
@@ -295,27 +292,6 @@ func (r *OctaviaReconciler) reconcileInit(
 				condition.DBReadyRunningMessage))
 			return ctrlResult, nil
 		}
-
-		// wait for the DB to be setup
-		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
-		if err != nil {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.DBReadyErrorMessage,
-				err.Error()))
-			return ctrlResult, err
-		}
-		if (ctrlResult != ctrl.Result{}) {
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.DBReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.DBReadyRunningMessage))
-			return ctrlResult, nil
-		}
-	}
 
 		// wait for the DB to be setup
 		ctrlResult, err = db.WaitForDBCreated(ctx, helper)
