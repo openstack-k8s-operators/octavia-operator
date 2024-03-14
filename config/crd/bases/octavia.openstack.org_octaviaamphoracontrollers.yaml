@@ -85,6 +85,11 @@ spec:
                   added to to /etc/<service>/<service>.conf.d directory as custom.conf
                   file.
                 type: string
+              databaseAccount:
+                default: octavia
+                description: DatabaseAccount - name of MariaDBAccount which will be
+                  used to connect for the main octavia database
+                type: string
               databaseHostname:
                 description: DatabaseHostname - Octavia DB hostname
                 type: string
@@ -92,12 +97,6 @@ spec:
                 description: MariaDB instance name Right now required by the maridb-operator
                   to get the credentials from the instance to create the DB Might
                   not be required in future
-                type: string
-              databaseUser:
-                default: octavia
-                description: 'DatabaseUser - optional username used for octavia DB,
-                  defaults to octavia TODO: -> implement needs work in mariadb-operator,
-                  right now only octavia'
                 type: string
               defaultConfigOverwrite:
                 additionalProperties:
@@ -136,10 +135,9 @@ spec:
                 type: object
               passwordSelectors:
                 default:
-                  database: OctaviaDatabasePassword
                   service: OctaviaPassword
-                description: PasswordSelectors - Selectors to identify the DB and
-                  AdminUser password from the Secret
+                description: PasswordSelectors - Selectors to identify the AdminUser
+                  password from the Secret
                 properties:
                   database:
                     default: OctaviaDatabasePassword
@@ -153,6 +151,11 @@ spec:
                       from the Secret
                     type: string
                 type: object
+              persistenceDatabaseAccount:
+                default: octavia-persistence
+                description: PersistenceDatabaseAccount - name of MariaDBAccount which
+                  will be used to connect for the persistence database
+                type: string
               redisHostIPs:
                 description: List of Redis Host IP addresses
                 items:
