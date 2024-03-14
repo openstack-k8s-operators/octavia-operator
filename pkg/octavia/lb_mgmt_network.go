@@ -43,7 +43,7 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		Name:      portName,
 		NetworkID: networkID,
@@ -69,13 +69,13 @@ func findPort(client *gophercloud.ServiceClient, portName string, networkID stri
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet, log *logr.Logger) (*ports.Port, error) {
+func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet) (*ports.Port, error) {
 	ipAddress := LbMgmtRouterPortIPPv4
 	if tenantSubnet.IPVersion == 6 {
 		ipAddress = LbMgmtRouterPortIPPv6
 	}
 
-	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress, log)
+	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress)
 	if err != nil {
 		return nil, err
 	}
@@ -444,7 +444,6 @@ func compareExternalFixedIPs(a []routers.ExternalFixedIP, b []routers.ExternalFi
 func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	gatewayNetwork *networks.Network,
 	gatewaySubnet *subnets.Subnet,
-	tenantRouterPort *ports.Port,
 	log *logr.Logger) (*routers.Router, error) {
 
 	if !router.AdminStateUp {
@@ -480,6 +479,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 		if err != nil {
 			return nil, err
 		}
+		log.Info(fmt.Sprintf("Updated octavia management router %s", router.ID))
 		return updatedRouter, nil
 	}
 
@@ -537,7 +537,7 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, log)
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -557,8 +557,9 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 	if router != nil {
-		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet,
-			tenantRouterPort, log)
+		// Note there currently doesn't seem to be a way to include the
+		// interface port ID so we'll need to add it after.
+		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -585,6 +586,8 @@ func EnsureAmphoraManagementNetwork(
 		PortID: tenantRouterPort.ID,
 	}
 	_, err = routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+	// TODO good money on this throwing an error on update if the interface
+	// is already there. I'll revisit if so and capture the error and log.
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}

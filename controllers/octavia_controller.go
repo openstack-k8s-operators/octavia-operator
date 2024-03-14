@@ -584,11 +584,23 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
+	// Mirror OctaviaAPI status' ReadyCount to this parent CR
+	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
+	//
+	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
+	conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAPIReadyCondition, condition.DeploymentReadyMessage)
+	}
+
 	// ------------------------------------------------------------------------------------------------------------
 	// Amphora reconciliation
 	// ------------------------------------------------------------------------------------------------------------
 
-	// Create load balancer management network and get its Id
+	// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
+	// multiple details.
 	networkInfo, err := octavia.EnsureAmphoraManagementNetwork(
 		ctx,
 		instance.Namespace,
@@ -601,41 +613,6 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
-
-	// Mirror OctaviaAPI status' ReadyCount to this parent CR
-	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
-	//
-	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
-	conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
-	} else {
-		instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAPIReadyCondition, condition.DeploymentReadyMessage)
-	}
-
-	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
-		instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			amphoraControllerReadyCondition(octaviav1.Housekeeping),
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			amphoraControllerErrorMessage(octaviav1.Housekeeping),
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
-	if op != controllerutil.OperationResultNone {
-		Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
-	}
-
-	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
-	conditionStatus = octaviaHousekeeping.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Housekeeping))
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
-	} else {
-		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
-	}
 
 	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
 		instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
@@ -659,6 +636,39 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(conditionStatus)
 	} else {
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.HealthManager), condition.DeploymentReadyMessage)
+	}
+
+	//
+	// We do not try and reconcile the other controller PODs until after the health manager Pods are all deployed.
+	//
+	if octaviaHealthManager.Status.ReadyCount != octaviaHealthManager.Status.DesiredNumberScheduled {
+		Log.Info("Health managers are not ready. Housekeeping and Worker services pending")
+		return ctrl.Result{}, nil
+	}
+
+	// Skip the other amphora controller pods until the health managers are all up and running.
+	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
+		instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			amphoraControllerReadyCondition(octaviav1.Housekeeping),
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			amphoraControllerErrorMessage(octaviav1.Housekeeping),
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
+	if op != controllerutil.OperationResultNone {
+		Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
+	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
+	conditionStatus = octaviaHousekeeping.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Housekeeping))
+	if conditionStatus != nil {
+		instance.Status.Conditions.Set(conditionStatus)
+	} else {
+		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
 	}
 
 	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,

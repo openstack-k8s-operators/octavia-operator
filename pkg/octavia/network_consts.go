@@ -118,4 +118,8 @@ const (
 
 	// LbMgmtRouterPortIPPv6
 	LbMgmtRouterPortIPPv6 = "fd6c:6261:6173:0001::3"
+
+	// Network attachment details
+	// LbNetworkAttachmentName
+	LbNetworkAttachmentName = "octavia"
 )

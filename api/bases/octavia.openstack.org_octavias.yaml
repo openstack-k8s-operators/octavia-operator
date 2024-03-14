@@ -1123,7 +1123,7 @@ spec:
               tenantName:
                 default: service
                 description: TenantName - the name of the OpenStack tenant that controls
-                  the Octavia resources
+                  the Octavia resources TODO(gthiemonge) same as ServiceAccount?
                 type: string
             required:
             - apacheContainerImage
@@ -1132,7 +1132,6 @@ spec:
             - rabbitMqClusterName
             - secret
             - serviceAccount
-            - tenantName
             type: object
           status:
             description: OctaviaStatus defines the observed state of Octavia

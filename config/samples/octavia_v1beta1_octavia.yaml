@@ -27,6 +27,9 @@ spec:
     customServiceConfig: |
       [DEFAULT]
       debug = true
+    networkAttachments:
+      - octavia
+
   octaviaHealthManager:
     databaseInstance: openstack
     databaseAccount: octavia
@@ -41,6 +44,8 @@ spec:
     customServiceConfig: |
       [DEFAULT]
       debug = true
+    networkAttachments:
+      - octavia
   octaviaWorker:
     databaseInstance: openstack
     databaseAccount: octavia
@@ -55,6 +60,8 @@ spec:
     customServiceConfig: |
       [DEFAULT]
       debug = true
+    networkAttachments:
+      - octavia
   octaviaAPI:
     databaseInstance: openstack
     databaseAccount: octavia

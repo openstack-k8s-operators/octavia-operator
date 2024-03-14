@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -506,6 +508,33 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			err.Error()))
 		return err
 	}
+	//
+	// TODO(beagles): Improve this with predictable IPs for the health managers because what is
+	// going to happen on start up is that health managers will restart each time a new one is deployed.
+	// The easiest strategy is to create a "hole" in the IP address range and control the
+	// allocation and configuration of an additional IP on each network attached interface. We will
+	// need a container in the Pod that has the ip command installed to do this however.
+	//
+	healthManagerIPs, err := getPodIPs(
+		fmt.Sprintf("%s-%s", parentOctaviaName, octaviav1.HealthManager),
+		instance.Namespace,
+		r.Kclient,
+	)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+
+	if healthManagerIPs == nil || len(healthManagerIPs) == 0 {
+		templateParameters["ControllerIPList"] = ""
+	} else {
+		templateParameters["ControllerIPList"] = strings.Join(healthManagerIPs, ":5555,")
+	}
 
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser
@@ -589,4 +618,40 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
+}
+
+func listHealthManagerPods(name string, ns string, client kubernetes.Interface) (*corev1.PodList, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s-%s", common.AppSelector, name, octaviav1.HealthManager),
+	}
+	pods, err := client.CoreV1().Pods(ns).List(context.Background(), listOptions)
+	if err != nil {
+		return nil, err
+	}
+	return pods, nil
+}
+
+func getPodIPs(name string, ns string, client kubernetes.Interface) ([]string, error) {
+	//
+	// Get the IPs for the network attachments for these PODs.
+	//
+	var result []string
+	pods, err := listHealthManagerPods(name, ns, client)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods.Items {
+		annotations := pod.GetAnnotations()
+		networkStatusList, err := nad.GetNetworkStatusFromAnnotation(annotations)
+		if err != nil {
+			return nil, err
+		}
+		for _, networkStatus := range networkStatusList {
+			if networkStatus.Name == octavia.LbNetworkAttachmentName {
+				result = append(result, networkStatus.IPs[0])
+			}
+		}
+	}
+	sort.Strings(result)
+	return result, nil
 }
