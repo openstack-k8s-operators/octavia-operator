@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -36,6 +37,10 @@ const (
 
 	// OctaviaWorkerContainerImage is the fall-back container image for OctaviaWorker
 	OctaviaWorkerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-worker:current-podified"
+
+	// ApacheImage - default fall-back image for Apache
+	// TODO(gthiemonge) need a more recent image?
+	ApacheContainerImage = "registry.redhat.io/rhel8/httpd-24:latest"
 )
 
 // OctaviaSpec defines the desired state of Octavia
@@ -170,6 +175,28 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:default={}
 	// AmphoraCustomFlavors - User-defined flavors for Octavia
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
+
+	// +kubebuilder:validation:Required
+	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
+	ServiceAccount string `json:"serviceAccount"`
+
+	// +kubebuilder:validation:Optional
+	// Resources - Compute Resources required by this service (Limits/Requests).
+	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Octavia Container Image URL
+	AmphoraImageContainerImage string `json:"amphoraImageContainerImage"`
+
+	// +kubebuilder:validation:Required
+	// Apache Container Image URL
+	ApacheContainerImage string `json:"apacheContainerImage"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=service
+	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
+	TenantName string `json:"tenantName"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
@@ -292,6 +319,8 @@ func SetupDefaults() {
 		HousekeepingContainerImageURL:  util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HOUSEKEEPING_IMAGE_URL_DEFAULT", OctaviaHousekeepingContainerImage),
 		HealthManagerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
 		WorkerContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
+		ApacheContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_APACHE_IMAGE_URL_DEFAULT", ApacheContainerImage),
+		// No default for AmphoraImageContainerImageURL
 	}
 
 	SetupOctaviaDefaults(octaviaDefaults)

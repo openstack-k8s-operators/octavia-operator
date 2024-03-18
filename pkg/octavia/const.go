@@ -43,4 +43,7 @@ const (
 	OctaviaPublicPort int32 = 9876
 	// OctaviaInternalPort -
 	OctaviaInternalPort int32 = 9876
+
+	// ApacheInternalPort -
+	ApacheInternalPort int32 = 8080
 )

@@ -30,6 +30,7 @@ type OctaviaDefaults struct {
 	HousekeepingContainerImageURL  string
 	HealthManagerContainerImageURL string
 	WorkerContainerImageURL        string
+	ApacheContainerImageURL        string
 }
 
 var octaviaDefaults OctaviaDefaults
