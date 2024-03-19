@@ -43,39 +43,38 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
-		Name:      portName,
 		NetworkID: networkID,
-		FixedIPs: []ports.FixedIPOpts{
-			{
-				SubnetID:  subnetID,
-				IPAddress: ipAddress,
-			},
-		},
 	}
 	allPages, err := ports.List(client, listOpts).AllPages()
 	if err != nil {
+		log.Error(err, fmt.Sprintf("Unable to list ports for %s", networkID))
 		return nil, err
 	}
 
 	allPorts, err := ports.ExtractPorts(allPages)
 	if err != nil {
+		log.Error(err, "Unable to extract port information from list")
 		return nil, err
 	}
 	if len(allPorts) > 0 {
-		return &allPorts[0], nil
+		for _, port := range allPorts {
+			if len(port.FixedIPs) > 0 && port.FixedIPs[0].IPAddress == ipAddress {
+				return &port, nil
+			}
+		}
 	}
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet) (*ports.Port, error) {
-	ipAddress := LbMgmtRouterPortIPPv4
+func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet, log *logr.Logger) (*ports.Port, error) {
+	ipAddress := LbMgmtRouterPortIPv4
 	if tenantSubnet.IPVersion == 6 {
-		ipAddress = LbMgmtRouterPortIPPv6
+		ipAddress = LbMgmtRouterPortIPv6
 	}
 
-	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress)
+	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress, log)
 	if err != nil {
 		return nil, err
 	}
@@ -85,12 +84,13 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 		//
 		return p, nil
 	}
+	log.Info("Unable to locate port, creating new one")
 	asu := true
 	createOpts := ports.CreateOpts{
 		Name:         LbMgmtRouterPortName,
 		AdminStateUp: &asu,
 		NetworkID:    tenantNetwork.ID,
-		FixedIPs: []ports.FixedIPOpts{
+		FixedIPs: []ports.IP{
 			{
 				SubnetID:  tenantSubnet.ID,
 				IPAddress: ipAddress,
@@ -99,6 +99,7 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 	}
 	p, err = ports.Create(client, createOpts).Extract()
 	if err != nil {
+		log.Error(err, "Error creating port")
 		return nil, err
 	}
 	return p, nil
@@ -375,7 +376,7 @@ func ensureLbMgmtSubnet(
 			HostRoutes: []subnets.HostRoute{
 				{
 					DestinationCIDR: LbProvSubnetCIDR,
-					NextHop:         LbMgmtRouterPortIPPv4,
+					NextHop:         LbMgmtRouterPortIPv4,
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -487,21 +488,26 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 }
 
 // findRouter is a simple helper method...
-func findRouter(client *gophercloud.ServiceClient, tenantID string) (*routers.Router, error) {
+func findRouter(client *gophercloud.ServiceClient, log *logr.Logger) (*routers.Router, error) {
 	listOpts := routers.ListOpts{
-		Name:     LbRouterName,
-		TenantID: tenantID,
+		Name: LbRouterName,
 	}
 	allPages, err := routers.List(client, listOpts).AllPages()
 	if err != nil {
+		log.Error(err, "Unable to list routers")
 		return nil, err
 	}
 	allRouters, err := routers.ExtractRouters(allPages)
 	if err != nil {
+		log.Error(err, "Unable to extract router results")
 		return nil, err
 	}
 	if len(allRouters) > 0 {
-		return &allRouters[0], nil
+		for _, router := range allRouters {
+			if router.Name == LbRouterName {
+				return &router, nil
+			}
+		}
 	}
 	return nil, nil
 }
@@ -537,7 +543,7 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet)
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -552,19 +558,19 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 
-	router, err := findRouter(client, serviceTenant.ID)
+	router, err := findRouter(client, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 	if router != nil {
-		// Note there currently doesn't seem to be a way to include the
-		// interface port ID so we'll need to add it after.
+		log.Info("Router object found, reconciling")
 		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
 		log.Info(fmt.Sprintf("Reconciled router %s (%s)", router.Name, router.ID))
 	} else {
+		log.Info("Creating octavia provider router")
 		enableSNAT := false
 		gatewayInfo := routers.GatewayInfo{
 			NetworkID:        providerNetwork.ID,
@@ -579,17 +585,22 @@ func EnsureAmphoraManagementNetwork(
 		}
 		router, err = routers.Create(client, createOpts).Extract()
 		if err != nil {
+			log.Error(err, "Unable to create router object")
 			return NetworkProvisioningSummary{}, err
 		}
 	}
-	interfaceOpts := routers.AddInterfaceOpts{
-		PortID: tenantRouterPort.ID,
-	}
-	_, err = routers.AddInterface(client, router.ID, interfaceOpts).Extract()
-	// TODO good money on this throwing an error on update if the interface
-	// is already there. I'll revisit if so and capture the error and log.
-	if err != nil {
-		return NetworkProvisioningSummary{}, err
+	if tenantRouterPort.DeviceID == "" {
+		interfaceOpts := routers.AddInterfaceOpts{
+			PortID: tenantRouterPort.ID,
+		}
+		_, err := routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
+		}
+	} else if tenantRouterPort.DeviceID != router.ID {
+		return NetworkProvisioningSummary{},
+			fmt.Errorf("Port %s has unexpected device ID %s and cannot be added to router %s", tenantRouterPort.ID,
+				tenantRouterPort.DeviceID, router.ID)
 	}
 	return NetworkProvisioningSummary{
 		TenantNetworkID:    tenantNetwork.ID,

@@ -516,9 +516,10 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	// need a container in the Pod that has the ip command installed to do this however.
 	//
 	healthManagerIPs, err := getPodIPs(
-		fmt.Sprintf("%s-%s", parentOctaviaName, octaviav1.HealthManager),
+		fmt.Sprintf("%s-%s", "octavia", octaviav1.HealthManager),
 		instance.Namespace,
 		r.Kclient,
+		&r.Log,
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -530,10 +531,24 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	if healthManagerIPs == nil || len(healthManagerIPs) == 0 {
+	// TODO(beagles): come up with a way to preallocate or ensure
+	// a stable list of IPs.
+
+	if len(healthManagerIPs) == 0 {
 		templateParameters["ControllerIPList"] = ""
+		if instance.Spec.Role != octaviav1.HealthManager {
+
+			// Only let the health manager get an empty port list until
+			// we get a way to preallocate some ports. This helps reduce
+			// churn when the Pods are getting initially created or setup.
+			return fmt.Errorf("Health manager ports are not ready yet")
+		}
 	} else {
-		templateParameters["ControllerIPList"] = strings.Join(healthManagerIPs, ":5555,")
+		withPorts := make([]string, len(healthManagerIPs))
+		for idx, val := range healthManagerIPs {
+			withPorts[idx] = fmt.Sprintf("%s:5555", val)
+		}
+		templateParameters["ControllerIPList"] = strings.Join(withPorts, ",")
 	}
 
 	spec := instance.Spec
@@ -620,10 +635,11 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Complete(r)
 }
 
-func listHealthManagerPods(name string, ns string, client kubernetes.Interface) (*corev1.PodList, error) {
+func listHealthManagerPods(name string, ns string, client kubernetes.Interface, log *logr.Logger) (*corev1.PodList, error) {
 	listOptions := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s-%s", common.AppSelector, name, octaviav1.HealthManager),
+		LabelSelector: fmt.Sprintf("%s=%s", common.AppSelector, name),
 	}
+	log.Info(fmt.Sprintf("Listing pods using label selector %s", listOptions.LabelSelector))
 	pods, err := client.CoreV1().Pods(ns).List(context.Background(), listOptions)
 	if err != nil {
 		return nil, err
@@ -631,12 +647,12 @@ func listHealthManagerPods(name string, ns string, client kubernetes.Interface) 
 	return pods, nil
 }
 
-func getPodIPs(name string, ns string, client kubernetes.Interface) ([]string, error) {
+func getPodIPs(name string, ns string, client kubernetes.Interface, log *logr.Logger) ([]string, error) {
 	//
 	// Get the IPs for the network attachments for these PODs.
 	//
 	var result []string
-	pods, err := listHealthManagerPods(name, ns, client)
+	pods, err := listHealthManagerPods(name, ns, client, log)
 	if err != nil {
 		return nil, err
 	}
@@ -644,10 +660,12 @@ func getPodIPs(name string, ns string, client kubernetes.Interface) ([]string, e
 		annotations := pod.GetAnnotations()
 		networkStatusList, err := nad.GetNetworkStatusFromAnnotation(annotations)
 		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to get network annotations from %s", annotations))
 			return nil, err
 		}
 		for _, networkStatus := range networkStatusList {
-			if networkStatus.Name == octavia.LbNetworkAttachmentName {
+			netAttachName := fmt.Sprintf("%s/%s", ns, octavia.LbNetworkAttachmentName)
+			if networkStatus.Name == netAttachName {
 				result = append(result, networkStatus.IPs[0])
 			}
 		}

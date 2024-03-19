@@ -114,10 +114,10 @@ const (
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
 
 	// LbMgmtRouterPortIPIPv4
-	LbMgmtRouterPortIPPv4 = "172.24.0.3"
+	LbMgmtRouterPortIPv4 = "172.24.0.3"
 
 	// LbMgmtRouterPortIPPv6
-	LbMgmtRouterPortIPPv6 = "fd6c:6261:6173:0001::3"
+	LbMgmtRouterPortIPv6 = "fd6c:6261:6173:0001::3"
 
 	// Network attachment details
 	// LbNetworkAttachmentName
