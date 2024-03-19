@@ -92,5 +92,11 @@ func GetVolumeMounts(serviceName string) []corev1.VolumeMount {
 			SubPath:   serviceName + "-config.json",
 			ReadOnly:  true,
 		},
+		{
+			Name:      "config-data",
+			MountPath: "/etc/my.cnf",
+			SubPath:   "my.cnf",
+			ReadOnly:  true,
+		},
 	}
 }

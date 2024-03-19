@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cert-octavia-internal-svc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cert-octavia-public-svc
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: combined-ca-bundle

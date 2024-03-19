@@ -45,6 +45,12 @@ func DbSyncJob(
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 
+	// add CA cert if defined
+	if instance.Spec.OctaviaAPI.TLS.CaBundleSecretName != "" {
+		volumes = append(volumes, instance.Spec.OctaviaAPI.TLS.CreateVolume())
+		volumeMounts = append(volumeMounts, instance.Spec.OctaviaAPI.TLS.CreateVolumeMounts(nil)...)
+	}
+
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      instance.Name + "-db-sync",
