@@ -481,6 +481,17 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
 
+	err = octavia.EnsureAmphoraCerts(ctx, instance, helper, &Log)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
 	// Amphora SSH key config for debugging
 	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
 	if err != nil {
