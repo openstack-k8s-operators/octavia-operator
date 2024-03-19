@@ -36,6 +36,8 @@ const (
 )
 
 func getVolumes(name string) []corev1.Volume {
+	var config0640AccessMode int32 = 0640
+
 	return []corev1.Volume{
 		{
 			Name: "amphora-image",
@@ -46,10 +48,9 @@ func getVolumes(name string) []corev1.Volume {
 		{
 			Name: "httpd-config",
 			VolumeSource: corev1.VolumeSource{
-				ConfigMap: &corev1.ConfigMapVolumeSource{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: fmt.Sprintf("%s-config-data", name),
-					},
+				Secret: &corev1.SecretVolumeSource{
+					DefaultMode: &config0640AccessMode,
+					SecretName:  name + "-config-data",
 				},
 			},
 		},

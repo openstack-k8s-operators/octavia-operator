@@ -110,7 +110,7 @@ func ensureAmphoraImage(
 			URI:  amphoraImage.URL,
 		}
 
-		log.Info(fmt.Sprintf("Uploading image %s", amphoraImage.Name))
+		log.Info(fmt.Sprintf("Uploading image %s %s (%s)", amphoraImage.Name, amphoraImage.ID, amphoraImage.URL))
 		err := imageimport.Create(imageClient, amphoraImage.ID, imageImportCreateOpts).ExtractErr()
 		if err != nil {
 			return false, err
@@ -216,12 +216,13 @@ func EnsureAmphoraImages(
 		var existingImageStatus string
 		if existingImage, ok := existingAmphoraImages[amphoraImage.Name]; ok {
 			existingImageStatus = string(existingImage.Status)
+			amphoraImage.ID = existingImage.ID
 		} else {
 			existingImageStatus = "none"
 		}
 		ready, err := ensureAmphoraImage(imageClient, log, amphoraImage, existingImageStatus)
 		if err != nil {
-			return false, err
+			return false, fmt.Errorf("error while uploading the amphora images: %w", err)
 		}
 		if !ready {
 			imagesReady = false

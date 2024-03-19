@@ -76,6 +76,9 @@ func (spec *OctaviaSpec) Default() {
 	if spec.OctaviaWorker.ContainerImage == "" {
 		spec.OctaviaWorker.ContainerImage = octaviaDefaults.WorkerContainerImageURL
 	}
+	if spec.ApacheContainerImage == "" {
+		spec.ApacheContainerImage = octaviaDefaults.ApacheContainerImageURL
+	}
 }
 
 // Default - set defaults for this Octavia core spec (this version is used by the OpenStackControlplane webhook)
