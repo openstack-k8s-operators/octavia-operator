@@ -151,9 +151,6 @@ type OctaviaAmphoraControllerStatus struct {
 	// Conditions
 	Conditions condition.Conditions `json:"conditions,omitempty" optional:"true"`
 
-	// Octavia Database Hostname
-	DatabaseHostname string `json:"databaseHostname,omitempty"`
-
 	// NetworkAttachment status of the deployment pods
 	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
 }
