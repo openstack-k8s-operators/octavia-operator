@@ -417,9 +417,6 @@ spec:
                   - type
                   type: object
                 type: array
-              databaseHostname:
-                description: Octavia Database Hostname
-                type: string
               hash:
                 additionalProperties:
                   type: string

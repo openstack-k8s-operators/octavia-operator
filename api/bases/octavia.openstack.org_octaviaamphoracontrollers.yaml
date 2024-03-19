@@ -288,9 +288,6 @@ spec:
                   - type
                   type: object
                 type: array
-              databaseHostname:
-                description: Octavia Database Hostname
-                type: string
               desiredNumberScheduled:
                 description: DesiredNumberScheduled - total number of the nodes which
                   should be running Daemon
