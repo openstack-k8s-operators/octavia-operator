@@ -23,6 +23,8 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
@@ -43,7 +45,7 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, portName string, networkID string, subnetID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, portName string, networkID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		NetworkID: networkID,
 	}
@@ -74,7 +76,7 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 		ipAddress = LbMgmtRouterPortIPv6
 	}
 
-	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, tenantSubnet.ID, ipAddress, log)
+	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, ipAddress, log)
 	if err != nil {
 		return nil, err
 	}
@@ -245,7 +247,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 	extTrue := true
 	if foundNetwork == nil {
 		segment := []provider.Segment{
-			provider.Segment{
+			{
 				NetworkType:     "flat",
 				PhysicalNetwork: "br-octavia",
 			},
@@ -512,6 +514,231 @@ func findRouter(client *gophercloud.ServiceClient, log *logr.Logger) (*routers.R
 	return nil, nil
 }
 
+//
+// IMPORTANT NOTE:
+// Take care to specify the project/tenant IDs when querying AND creating resources.
+// Otherwise, the project IDs on the security groups and rules may not match and
+// errors will occur as the code attempts to create duplicate rules. Ask me how I
+// know -- beagles
+//
+
+// findSecurityGroupRule is different than the other findX helper functions because of the wide variety of
+// potential values
+func findSecurityGroupRule(client *gophercloud.ServiceClient, criteria *rules.ListOpts, log *logr.Logger) (*rules.SecGroupRule, error) {
+	//
+	// Strip description out of search. While informative, we are not concerned with that field.
+	//
+	listOpts := *criteria
+	listOpts.Description = ""
+
+	allPages, err := rules.List(client, listOpts).AllPages()
+
+	if err != nil {
+		log.Error(err, "findSecurityGroupRule: Unable to find security group rule")
+		return nil, err
+	}
+	allRules, err := rules.ExtractRules(allPages)
+	if err != nil {
+		log.Error(err, "findSecurityGroupRule: error extracting security group rule")
+		return nil, err
+	}
+	if len(allRules) != 0 {
+		return &allRules[0], nil
+	}
+
+	return nil, nil
+}
+
+func strToRuleEtherType(v string) rules.RuleEtherType {
+	if v == "IPv6" {
+		return rules.EtherType6
+	}
+	return rules.EtherType4
+}
+
+func strToRuleProtocol(p string) rules.RuleProtocol {
+	switch p {
+	case "tcp":
+		return rules.ProtocolTCP
+	case "udp":
+		return rules.ProtocolUDP
+	}
+	return ""
+}
+
+func ensureSecurityGroupRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, rulesDefinitions []rules.ListOpts, log *logr.Logger) error {
+	for _, r := range rulesDefinitions {
+		r.TenantID = securityGroup.TenantID
+		r.SecGroupID = securityGroup.ID
+		r.Direction = "ingress"
+		rule, err := findSecurityGroupRule(client, &r, log)
+		// Don't break on error if not found, but create the rest.
+		if err != nil {
+			log.Error(err, fmt.Sprintf("ensureSecurityGroupRules: error searching for %s", r.Description))
+			continue
+		}
+		if rule != nil {
+			// There is a rule that matches this description, carry on.
+			continue
+		}
+		//
+		// Rule not found. Create a new one.
+		createOpts := rules.CreateOpts{
+			Description:  r.Description,
+			EtherType:    strToRuleEtherType(r.EtherType),
+			PortRangeMax: r.PortRangeMax,
+			PortRangeMin: r.PortRangeMin,
+			Protocol:     strToRuleProtocol(r.Protocol),
+			SecGroupID:   securityGroup.ID,
+			Direction:    rules.DirIngress,
+			ProjectID:    securityGroup.TenantID,
+		}
+		_, err = rules.Create(client, createOpts).Extract()
+		if err != nil {
+			log.Error(err, fmt.Sprintf("ensureSecurityGroupRules: error creating rule %s", r.Description))
+		}
+	}
+	return nil
+}
+
+func ensureMgmtRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
+	rulesDefinitions := []rules.ListOpts{
+		{
+			Description:  "ssh port IPv4 rule",
+			PortRangeMax: 22,
+			PortRangeMin: 22,
+			EtherType:    "IPv4",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "ssh port IPv6 rule",
+			PortRangeMax: 22,
+			PortRangeMin: 22,
+			EtherType:    "IPv6",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "amphora agent port IPv4 rule",
+			PortRangeMax: 9443,
+			PortRangeMin: 9443,
+			EtherType:    "IPv4",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "amphora agent port IPv6 rule",
+			PortRangeMax: 9443,
+			PortRangeMin: 9443,
+			EtherType:    "IPv6",
+			Protocol:     "tcp",
+		},
+	}
+	return ensureSecurityGroupRules(client, securityGroup, rulesDefinitions, log)
+}
+
+func ensureHealthMgrRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
+	healthManagerRules := []rules.ListOpts{
+		{
+			Description:  "health manager status port IPv4 rule",
+			PortRangeMax: 5555,
+			PortRangeMin: 5555,
+			EtherType:    "IPv4",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "health manager status port IPv6 rule",
+			PortRangeMax: 5555,
+			PortRangeMin: 5555,
+			EtherType:    "IPv6",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "log offloading udp IPv4 rule",
+			PortRangeMax: 514,
+			PortRangeMin: 514,
+			EtherType:    "IPv4",
+			Protocol:     "udp",
+		},
+		{
+			Description:  "log offloading udp IPv6 rule",
+			PortRangeMax: 514,
+			PortRangeMin: 514,
+			EtherType:    "IPv6",
+			Protocol:     "udp",
+		},
+	}
+	return ensureSecurityGroupRules(client, securityGroup, healthManagerRules, log)
+}
+
+func findSecurityGroup(client *gophercloud.ServiceClient, tenantID string, groupName string, log *logr.Logger) (*groups.SecGroup, error) {
+	listOpts := groups.ListOpts{
+		TenantID: tenantID,
+	}
+	allPages, err := groups.List(client, listOpts).AllPages()
+	if err != nil {
+		log.Error(err, "findSecurityGroup: Unable to find security groups")
+		return nil, err
+	}
+	allGroups, err := groups.ExtractGroups(allPages)
+	if err != nil {
+		log.Error(err, "findSecurityGroup: error extracting security groups")
+		return nil, err
+	}
+	for _, group := range allGroups {
+		if group.Name == groupName {
+			return &group, nil
+		}
+	}
+	return nil, nil
+}
+
+func ensureLbMgmtSecurityGroup(client *gophercloud.ServiceClient, tenantID string, log *logr.Logger) error {
+	secGroup, err := findSecurityGroup(client, tenantID, LbMgmtNetworkSecurityGroupName, log)
+	if err != nil {
+		return err
+	}
+	if secGroup == nil {
+		log.Info(fmt.Sprintf("ensureLbMgmtSecurityGroup: security group %s not found, creating...", LbMgmtNetworkSecurityGroupName))
+		createOpts := groups.CreateOpts{
+			Name:     LbMgmtNetworkSecurityGroupName,
+			TenantID: tenantID,
+		}
+		secGroup, err = groups.Create(client, createOpts).Extract()
+		if err != nil {
+			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create router %s",
+				LbMgmtHealthManagerSecurityGroupName))
+			return err
+		}
+	}
+
+	err = ensureMgmtRules(client, secGroup, log)
+	if err != nil {
+		return err
+	}
+
+	secGroup, err = findSecurityGroup(client, tenantID, LbMgmtHealthManagerSecurityGroupName, log)
+	if err != nil {
+		return err
+	}
+	if secGroup == nil {
+		log.Info(fmt.Sprintf("ensureLbMgmtSecurityGroup: security group %s not found, creating...", LbMgmtHealthManagerSecurityGroupName))
+		createOpts := groups.CreateOpts{
+			Name:     LbMgmtHealthManagerSecurityGroupName,
+			TenantID: tenantID,
+		}
+		secGroup, err = groups.Create(client, createOpts).Extract()
+		if err != nil {
+			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create router %s",
+				LbMgmtHealthManagerSecurityGroupName))
+			return err
+		}
+	}
+	err = ensureHealthMgrRules(client, secGroup, log)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // EnsureAmphoraManagementNetwork - retrieve, create and reconcile the Octavia management network for the in cluster link to the
 // management tenant network.
 func EnsureAmphoraManagementNetwork(
@@ -602,6 +829,11 @@ func EnsureAmphoraManagementNetwork(
 			fmt.Errorf("Port %s has unexpected device ID %s and cannot be added to router %s", tenantRouterPort.ID,
 				tenantRouterPort.DeviceID, router.ID)
 	}
+	err = ensureLbMgmtSecurityGroup(client, tenantNetwork.TenantID, log)
+	if err != nil {
+		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
+	}
+
 	return NetworkProvisioningSummary{
 		TenantNetworkID:    tenantNetwork.ID,
 		TenantSubnetID:     tenantSubnet.ID,

@@ -113,13 +113,23 @@ const (
 	// LbMgmtRouterPortName
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
 
-	// LbMgmtRouterPortIPIPv4
+	// LbMgmtRouterPortIPv4
 	LbMgmtRouterPortIPv4 = "172.24.0.3"
 
-	// LbMgmtRouterPortIPPv6
+	// LbMgmtRouterPortIPv6
 	LbMgmtRouterPortIPv6 = "fd6c:6261:6173:0001::3"
 
 	// Network attachment details
 	// LbNetworkAttachmentName
 	LbNetworkAttachmentName = "octavia"
+
+	//
+	// Security group constants.
+	//
+
+	// LbMgmtNetworkSecurityGroup
+	LbMgmtNetworkSecurityGroupName = "lb-mgmt-sec-grp"
+
+	// LbMgmtHealthManagerSecurityGroup
+	LbMgmtHealthManagerSecurityGroupName = "lb-health-mgr-sec-grp"
 )
