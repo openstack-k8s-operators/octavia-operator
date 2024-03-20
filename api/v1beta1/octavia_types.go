@@ -156,6 +156,12 @@ type OctaviaSpecBase struct {
 	DefaultConfigOverwrite map[string]string `json:"defaultConfigOverwrite,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=service
+	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
+	// TODO(gthiemonge) same as ServiceAccount?
+	TenantName string `json:"tenantName"`
+
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 
@@ -192,11 +198,6 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:validation:Required
 	// Apache Container Image URL
 	ApacheContainerImage string `json:"apacheContainerImage"`
-
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=service
-	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
-	TenantName string `json:"tenantName"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret

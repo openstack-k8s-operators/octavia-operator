@@ -13,7 +13,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package amphoracontrollers
+package octavia
+
+// NOTE: Strictly speaking, these don't have to be package scope constants, but having them externally
+// accessible might aide constructing functional tests later on.
 
 const (
 	// Common consts for Management network
@@ -36,7 +39,7 @@ const (
 	LbMgmtSubnetCIDR = "172.24.0.0/16"
 
 	// LbMgmtSubnetAllocationPoolStart -
-	LbMgmtSubnetAllocationPoolStart = "172.24.0.2"
+	LbMgmtSubnetAllocationPoolStart = "172.24.0.5"
 
 	// LbMgmtSubnetAllocationPoolEnd -
 	LbMgmtSubnetAllocationPoolEnd = "172.24.255.254"
@@ -52,7 +55,7 @@ const (
 	LbMgmtSubnetIPv6CIDR = "fd6c:6261:6173:0001::/64"
 
 	// LbMgmtSubnetIPv6AllocationPoolStart -
-	LbMgmtSubnetIPv6AllocationPoolStart = "fd6c:6261:6173:0001::2"
+	LbMgmtSubnetIPv6AllocationPoolStart = "fd6c:6261:6173:0001::5"
 
 	// LbMgmtSubnetIPv6AllocationPoolEnd -
 	LbMgmtSubnetIPv6AllocationPoolEnd = "fd6c:6261:6173:0001:ffff:ffff:ffff:ffff"
@@ -65,4 +68,58 @@ const (
 
 	// LbMgmtSubnetIPv6GatewayIP -
 	LbMgmtSubnetIPv6GatewayIP = ""
+
+	// Common consts for Management provider network
+
+	// LbProvNetName -
+	LbProvNetName = "octavia-provider-net"
+
+	// LbProvNetDescription -
+	LbProvNetDescription = "LBaaS Management Provider Network"
+
+	// LbProvSubnetName -
+	LbProvSubnetName = "octavia-provider-subnet"
+
+	// LbProvSubnetDescription -
+	LbProvSubnetDescription = "LBaaS Management Provider Subnet"
+
+	// IPv4 consts
+
+	// LbProvSubnetCIDR -
+	LbProvSubnetCIDR = "172.23.0.0/24"
+
+	// LbProvSubnetAllocationPoolStart -
+	LbProvSubnetAllocationPoolStart = "172.23.0.5"
+
+	// LbProvSubnetAllocationPoolEnd -
+	LbProvSubnetAllocationPoolEnd = "172.23.0.25"
+
+	// LbProvSubnetGatewayIP -
+	LbProvSubnetGatewayIP = "172.23.0.1"
+
+	// TODO(beagles): support IPv6 for the provider network.
+	// LbRouterName -
+	LbRouterName = "octavia-link-router"
+
+	// LbProvBridgeName -
+	LbProvBridgeName = "br-octavia"
+
+	// LbProvNetAttachName -
+	LbProvNetAttachName = "octavia"
+
+	// LbRouterFixedIPAddress
+	LbRouterFixedIPAddress = "172.23.0.5"
+
+	// LbMgmtRouterPortName
+	LbMgmtRouterPortName = "lb-mgmt-router-port"
+
+	// LbMgmtRouterPortIPIPv4
+	LbMgmtRouterPortIPv4 = "172.24.0.3"
+
+	// LbMgmtRouterPortIPPv6
+	LbMgmtRouterPortIPv6 = "fd6c:6261:6173:0001::3"
+
+	// Network attachment details
+	// LbNetworkAttachmentName
+	LbNetworkAttachmentName = "octavia"
 )

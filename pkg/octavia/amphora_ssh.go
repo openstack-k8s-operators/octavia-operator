@@ -113,7 +113,7 @@ func uploadKeypair(
 	instance *octaviav1.Octavia,
 	h *helper.Helper,
 	pubKey string) error {
-	osClient, err := GetOpenstackClient(ctx, instance, h)
+	osClient, err := GetOpenstackClient(ctx, instance.Namespace, h)
 	if err != nil {
 		return fmt.Errorf("Error getting openstack client: %w", err)
 	}

@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -43,6 +44,7 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -253,13 +255,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
 
-	// Create load balancer management network and get its Id
-	networkID, err := amphoracontrollers.EnsureLbMgmtNetworks(ctx, instance, &r.Log, helper)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-	r.Log.Info(fmt.Sprintf("Using management network \"%s\"", networkID))
-
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -267,7 +262,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
 	templateVars := OctaviaTemplateVars{
-		LbMgmtNetworkID:        networkID,
+		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
 		AmphoraDefaultFlavorID: defaultFlavorID,
 	}
 
@@ -490,7 +485,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	parentOctaviaName := amphoracontrollers.GetOwningOctaviaControllerName(
+	parentOctaviaName := octavia.GetOwningOctaviaControllerName(
 		instance)
 	serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", parentOctaviaName)
 	caPassSecret, _, err := secret.GetSecret(
@@ -512,6 +507,48 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			condition.InputReadyErrorMessage,
 			err.Error()))
 		return err
+	}
+	//
+	// TODO(beagles): Improve this with predictable IPs for the health managers because what is
+	// going to happen on start up is that health managers will restart each time a new one is deployed.
+	// The easiest strategy is to create a "hole" in the IP address range and control the
+	// allocation and configuration of an additional IP on each network attached interface. We will
+	// need a container in the Pod that has the ip command installed to do this however.
+	//
+	healthManagerIPs, err := getPodIPs(
+		fmt.Sprintf("%s-%s", "octavia", octaviav1.HealthManager),
+		instance.Namespace,
+		r.Kclient,
+		&r.Log,
+	)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+
+	// TODO(beagles): come up with a way to preallocate or ensure
+	// a stable list of IPs.
+
+	if len(healthManagerIPs) == 0 {
+		templateParameters["ControllerIPList"] = ""
+		if instance.Spec.Role != octaviav1.HealthManager {
+
+			// Only let the health manager get an empty port list until
+			// we get a way to preallocate some ports. This helps reduce
+			// churn when the Pods are getting initially created or setup.
+			return fmt.Errorf("Health manager ports are not ready yet")
+		}
+	} else {
+		withPorts := make([]string, len(healthManagerIPs))
+		for idx, val := range healthManagerIPs {
+			withPorts[idx] = fmt.Sprintf("%s:5555", val)
+		}
+		templateParameters["ControllerIPList"] = strings.Join(withPorts, ",")
 	}
 
 	spec := instance.Spec
@@ -596,4 +633,43 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.DaemonSet{}).
 		Complete(r)
+}
+
+func listHealthManagerPods(name string, ns string, client kubernetes.Interface, log *logr.Logger) (*corev1.PodList, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", common.AppSelector, name),
+	}
+	log.Info(fmt.Sprintf("Listing pods using label selector %s", listOptions.LabelSelector))
+	pods, err := client.CoreV1().Pods(ns).List(context.Background(), listOptions)
+	if err != nil {
+		return nil, err
+	}
+	return pods, nil
+}
+
+func getPodIPs(name string, ns string, client kubernetes.Interface, log *logr.Logger) ([]string, error) {
+	//
+	// Get the IPs for the network attachments for these PODs.
+	//
+	var result []string
+	pods, err := listHealthManagerPods(name, ns, client, log)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range pods.Items {
+		annotations := pod.GetAnnotations()
+		networkStatusList, err := nad.GetNetworkStatusFromAnnotation(annotations)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to get network annotations from %s", annotations))
+			return nil, err
+		}
+		for _, networkStatus := range networkStatusList {
+			netAttachName := fmt.Sprintf("%s/%s", ns, octavia.LbNetworkAttachmentName)
+			if networkStatus.Name == netAttachName {
+				result = append(result, networkStatus.IPs[0])
+			}
+		}
+	}
+	sort.Strings(result)
+	return result, nil
 }

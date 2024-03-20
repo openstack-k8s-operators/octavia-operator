@@ -336,7 +336,6 @@ func (in *OctaviaAmphoraControllerSpecCore) DeepCopyInto(out *OctaviaAmphoraCont
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	out.LbMgmtNetworks = in.LbMgmtNetworks
 	if in.AmphoraCustomFlavors != nil {
 		in, out := &in.AmphoraCustomFlavors, &out.AmphoraCustomFlavors
 		*out = make([]OctaviaAmphoraFlavor, len(*in))

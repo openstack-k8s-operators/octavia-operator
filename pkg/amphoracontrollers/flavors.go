@@ -258,7 +258,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 //
 // returns the UUID of the default Nova flavor
 func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
-	osclient, err := GetOpenstackClient(ctx, instance, helper)
+	osclient, err := octavia.GetOpenstackClient(ctx, instance.Namespace, helper)
 	if err != nil {
 		return "", fmt.Errorf("Error while getting a service client when creating flavors: %w", err)
 	}

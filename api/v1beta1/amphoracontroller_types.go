@@ -123,8 +123,8 @@ type OctaviaAmphoraControllerSpecCore struct {
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
-	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
+	// +kubebuilder:default=""
+	LbMgmtNetworkID string `json:"lbMgmtNetworkID"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={}
