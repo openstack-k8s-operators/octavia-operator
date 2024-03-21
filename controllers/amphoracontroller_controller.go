@@ -65,6 +65,7 @@ type OctaviaAmphoraControllerReconciler struct {
 type OctaviaTemplateVars struct {
 	LbMgmtNetworkID        string
 	AmphoraDefaultFlavorID string
+	LbSecurityGroupID      string
 }
 
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
@@ -264,6 +265,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	templateVars := OctaviaTemplateVars{
 		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
 		AmphoraDefaultFlavorID: defaultFlavorID,
+		LbSecurityGroupID:      instance.Spec.LbSecurityGroupID,
 	}
 
 	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, templateVars, ospSecret)
@@ -557,6 +559,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
+	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
 	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
 	templateParameters["NovaSshKeyPair"] = octavia.NovaKeyPairName
 	serverCAPassphrase := caPassSecret.Data["server-ca-passphrase"]

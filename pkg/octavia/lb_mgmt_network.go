@@ -38,6 +38,7 @@ type NetworkProvisioningSummary struct {
 	TenantRouterPortID string
 	ProviderNetworkID  string
 	RouterID           string
+	SecurityGroupID    string
 }
 
 //
@@ -601,6 +602,8 @@ func ensureSecurityGroupRules(client *gophercloud.ServiceClient, securityGroup *
 	return nil
 }
 
+type ensureRules func(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error
+
 func ensureMgmtRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
 	rulesDefinitions := []rules.ListOpts{
 		{
@@ -665,6 +668,20 @@ func ensureHealthMgrRules(client *gophercloud.ServiceClient, securityGroup *grou
 			EtherType:    "IPv6",
 			Protocol:     "udp",
 		},
+		{
+			Description:  "log offloading udp IPv4 rule",
+			PortRangeMax: 514,
+			PortRangeMin: 514,
+			EtherType:    "IPv4",
+			Protocol:     "tcp",
+		},
+		{
+			Description:  "log offloading udp IPv6 rule",
+			PortRangeMax: 514,
+			PortRangeMin: 514,
+			EtherType:    "IPv6",
+			Protocol:     "tcp",
+		},
 	}
 	return ensureSecurityGroupRules(client, securityGroup, healthManagerRules, log)
 }
@@ -691,52 +708,37 @@ func findSecurityGroup(client *gophercloud.ServiceClient, tenantID string, group
 	return nil, nil
 }
 
-func ensureLbMgmtSecurityGroup(client *gophercloud.ServiceClient, tenantID string, log *logr.Logger) error {
-	secGroup, err := findSecurityGroup(client, tenantID, LbMgmtNetworkSecurityGroupName, log)
+func ensureSecurityGroup(
+	client *gophercloud.ServiceClient,
+	tenantID string,
+	groupName string,
+	ruleFn ensureRules,
+	log *logr.Logger) (
+	string, error) {
+
+	secGroup, err := findSecurityGroup(client, tenantID, groupName, log)
 	if err != nil {
-		return err
+		return "", err
 	}
 	if secGroup == nil {
-		log.Info(fmt.Sprintf("ensureLbMgmtSecurityGroup: security group %s not found, creating...", LbMgmtNetworkSecurityGroupName))
+		log.Info(fmt.Sprintf("ensureSecurityGroup: security group %s not found, creating...", groupName))
 		createOpts := groups.CreateOpts{
-			Name:     LbMgmtNetworkSecurityGroupName,
+			Name:     groupName,
 			TenantID: tenantID,
 		}
 		secGroup, err = groups.Create(client, createOpts).Extract()
 		if err != nil {
-			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create router %s",
-				LbMgmtHealthManagerSecurityGroupName))
-			return err
+			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create security group %s",
+				groupName))
+			return "", err
 		}
 	}
 
-	err = ensureMgmtRules(client, secGroup, log)
+	err = ruleFn(client, secGroup, log)
 	if err != nil {
-		return err
+		return "", err
 	}
-
-	secGroup, err = findSecurityGroup(client, tenantID, LbMgmtHealthManagerSecurityGroupName, log)
-	if err != nil {
-		return err
-	}
-	if secGroup == nil {
-		log.Info(fmt.Sprintf("ensureLbMgmtSecurityGroup: security group %s not found, creating...", LbMgmtHealthManagerSecurityGroupName))
-		createOpts := groups.CreateOpts{
-			Name:     LbMgmtHealthManagerSecurityGroupName,
-			TenantID: tenantID,
-		}
-		secGroup, err = groups.Create(client, createOpts).Extract()
-		if err != nil {
-			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create router %s",
-				LbMgmtHealthManagerSecurityGroupName))
-			return err
-		}
-	}
-	err = ensureHealthMgrRules(client, secGroup, log)
-	if err != nil {
-		return err
-	}
-	return nil
+	return secGroup.ID, nil
 }
 
 // EnsureAmphoraManagementNetwork - retrieve, create and reconcile the Octavia management network for the in cluster link to the
@@ -829,7 +831,11 @@ func EnsureAmphoraManagementNetwork(
 			fmt.Errorf("Port %s has unexpected device ID %s and cannot be added to router %s", tenantRouterPort.ID,
 				tenantRouterPort.DeviceID, router.ID)
 	}
-	err = ensureLbMgmtSecurityGroup(client, tenantNetwork.TenantID, log)
+	lbMgmtSecurityGroupID, err := ensureSecurityGroup(client, tenantNetwork.TenantID, LbMgmtNetworkSecurityGroupName, ensureMgmtRules, log)
+	if err != nil {
+		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
+	}
+	_, err = ensureSecurityGroup(client, tenantNetwork.TenantID, LbMgmtHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
 	}
@@ -840,5 +846,6 @@ func EnsureAmphoraManagementNetwork(
 		TenantRouterPortID: tenantRouterPort.ID,
 		ProviderNetworkID:  providerNetwork.ID,
 		RouterID:           router.ID,
+		SecurityGroupID:    lbMgmtSecurityGroupID,
 	}, nil
 }
