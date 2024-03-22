@@ -123,7 +123,15 @@ func uploadKeypair(
 		return fmt.Errorf("Error getting compute client: %w", err)
 	}
 
-	allPages, err := keypairs.List(computeClient, nil).AllPages()
+	octaviaUser, err := GetUser(osClient, instance.Spec.ServiceUser)
+	if err != nil {
+		return fmt.Errorf("Error getting user details from openstack client: %w", err)
+	}
+
+	listOpts := keypairs.ListOpts{
+		UserID: octaviaUser.ID,
+	}
+	allPages, err := keypairs.List(computeClient, listOpts).AllPages()
 	if err != nil {
 		return fmt.Errorf("Could not list keypairs: %w", err)
 	}
@@ -142,7 +150,10 @@ func uploadKeypair(
 	}
 
 	if keypairExists {
-		err := keypairs.Delete(computeClient, NovaKeyPairName, nil).ExtractErr()
+		deleteOpts := keypairs.DeleteOpts{
+			UserID: octaviaUser.ID,
+		}
+		err := keypairs.Delete(computeClient, NovaKeyPairName, deleteOpts).ExtractErr()
 		if err != nil {
 			return fmt.Errorf("Error deleting the existing SSH keypair for amphorae: %w", err)
 		}
@@ -152,6 +163,7 @@ func uploadKeypair(
 		Name:      NovaKeyPairName,
 		Type:      "ssh",
 		PublicKey: pubKey,
+		UserID:    octaviaUser.ID,
 	}
 	_, err = keypairs.Create(computeClient, createOpts).Extract()
 	if err != nil {

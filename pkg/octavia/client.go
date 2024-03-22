@@ -22,6 +22,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	gophercloudopenstack "github.com/gophercloud/gophercloud/openstack"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -140,6 +141,22 @@ func GetProject(openstack *openstack.OpenStack, projectName string) (*projects.P
 		return nil, fmt.Errorf("Cannot find project \"%s\"", projectName)
 	}
 	return &allProjects[0], nil
+}
+
+// GetUser -
+func GetUser(openstack *openstack.OpenStack, userName string) (*users.User, error) {
+	allPages, err := users.List(openstack.GetOSClient(), users.ListOpts{Name: userName}).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allUsers, err := users.ExtractUsers(allPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(allUsers) == 0 {
+		return nil, fmt.Errorf("Cannot find user \"%s\"", userName)
+	}
+	return &allUsers[0], nil
 }
 
 // GetNetworkClient -
