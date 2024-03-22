@@ -89,7 +89,7 @@ const (
 	LbProvSubnetCIDR = "172.23.0.0/24"
 
 	// LbProvSubnetAllocationPoolStart -
-	LbProvSubnetAllocationPoolStart = "172.23.0.5"
+	LbProvSubnetAllocationPoolStart = "172.23.0.10"
 
 	// LbProvSubnetAllocationPoolEnd -
 	LbProvSubnetAllocationPoolEnd = "172.23.0.25"
@@ -101,11 +101,8 @@ const (
 	// LbRouterName -
 	LbRouterName = "octavia-link-router"
 
-	// LbProvBridgeName -
-	LbProvBridgeName = "br-octavia"
-
-	// LbProvNetAttachName -
-	LbProvNetAttachName = "octavia"
+	// LbProvPhysicalNet -
+	LbProvPhysicalNet = "octavia"
 
 	// LbRouterFixedIPAddress
 	LbRouterFixedIPAddress = "172.23.0.5"

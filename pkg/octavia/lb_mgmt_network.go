@@ -250,7 +250,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 		segment := []provider.Segment{
 			{
 				NetworkType:     "flat",
-				PhysicalNetwork: "br-octavia",
+				PhysicalNetwork: LbProvPhysicalNet,
 			},
 		}
 
@@ -469,7 +469,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	//
 	gatewayInfo := router.GatewayInfo
 	if gatewayNetwork.ID != gatewayInfo.NetworkID || *gatewayInfo.EnableSNAT ||
-		compareExternalFixedIPs(gatewayInfo.ExternalFixedIPs, fixedIPs) {
+		!compareExternalFixedIPs(gatewayInfo.ExternalFixedIPs, fixedIPs) {
 		gwInfo := routers.GatewayInfo{
 			NetworkID:        gatewayNetwork.ID,
 			EnableSNAT:       &enableSNAT,
