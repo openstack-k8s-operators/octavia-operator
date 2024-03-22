@@ -492,18 +492,6 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	// Amphora SSH key config for debugging
-	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-
 	if err = octavia.EnsureQuotas(ctx, instance, &r.Log, helper); err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -712,6 +700,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	err = mariadbv1.DeleteUnusedMariaDBAccountFinalizers(ctx, helper, octavia.PersistenceDatabaseCRName, instance.Spec.PersistenceDatabaseAccount, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	// Amphora SSH key config for debugging
+	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
