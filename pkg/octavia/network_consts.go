@@ -89,26 +89,23 @@ const (
 	LbProvSubnetCIDR = "172.23.0.0/24"
 
 	// LbProvSubnetAllocationPoolStart -
-	LbProvSubnetAllocationPoolStart = "172.23.0.5"
+	LbProvSubnetAllocationPoolStart = "172.23.0.100"
 
 	// LbProvSubnetAllocationPoolEnd -
-	LbProvSubnetAllocationPoolEnd = "172.23.0.25"
+	LbProvSubnetAllocationPoolEnd = "172.23.0.125"
 
 	// LbProvSubnetGatewayIP -
-	LbProvSubnetGatewayIP = "172.23.0.1"
+	LbProvSubnetGatewayIP = ""
 
 	// TODO(beagles): support IPv6 for the provider network.
 	// LbRouterName -
 	LbRouterName = "octavia-link-router"
 
-	// LbProvBridgeName -
-	LbProvBridgeName = "br-octavia"
-
-	// LbProvNetAttachName -
-	LbProvNetAttachName = "octavia"
+	// LbProvPhysicalNet -
+	LbProvPhysicalNet = "octavia"
 
 	// LbRouterFixedIPAddress
-	LbRouterFixedIPAddress = "172.23.0.5"
+	LbRouterFixedIPAddress = "172.23.0.150"
 
 	// LbMgmtRouterPortName
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
@@ -132,4 +129,10 @@ const (
 
 	// LbMgmtHealthManagerSecurityGroup
 	LbMgmtHealthManagerSecurityGroupName = "lb-health-mgr-sec-grp"
+
+	// LbMgmtNetworkSecurityGroup
+	LbProvNetworkSecurityGroupName = "lb-prov-sec-grp"
+
+	// LbMgmtHealthManagerSecurityGroup
+	LbProvHealthManagerSecurityGroupName = "lb-health-prov-sec-grp"
 )

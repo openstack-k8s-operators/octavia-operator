@@ -46,4 +46,7 @@ const (
 
 	// ApacheInternalPort -
 	ApacheInternalPort int32 = 80
+
+	// AdminTenantName
+	AdminTenant = "admin"
 )
