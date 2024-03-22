@@ -624,7 +624,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
-	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
+	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
 		instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -657,7 +657,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	// Skip the other amphora controller pods until the health managers are all up and running.
-	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
+	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
 		instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -681,7 +681,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
 	}
 
-	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo.TenantNetworkID,
+	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
 		instance.Spec.OctaviaWorker, octaviav1.Worker)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -1236,7 +1236,7 @@ func (r *OctaviaReconciler) redisCreateOrUpdate(
 
 func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
-	tenantNetworkID string,
+	networkInfo octavia.NetworkProvisioningSummary,
 	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
 	role string,
 ) (*octaviav1.OctaviaAmphoraController,
@@ -1260,7 +1260,8 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
-		daemonset.Spec.LbMgmtNetworkID = tenantNetworkID
+		daemonset.Spec.LbMgmtNetworkID = networkInfo.TenantNetworkID
+		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		daemonset.Spec.RedisHostIPs = instance.Status.RedisHostIPs
 		if len(daemonset.Spec.NodeSelector) == 0 {

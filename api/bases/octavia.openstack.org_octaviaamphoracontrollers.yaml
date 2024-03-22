@@ -109,6 +109,9 @@ spec:
               lbMgmtNetworkID:
                 default: ""
                 type: string
+              lbSecurityGroupID:
+                default: ""
+                type: string
               networkAttachments:
                 description: NetworkAttachments is a list of NetworkAttachment resource
                   names to expose the services to the given network

@@ -127,6 +127,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	LbMgmtNetworkID string `json:"lbMgmtNetworkID"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	LbSecurityGroupID string `json:"lbSecurityGroupID"`
+
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default={}
 	// AmphoraCustomFlavors - User-defined flavors for Octavia
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`

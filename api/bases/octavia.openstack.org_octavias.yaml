@@ -522,6 +522,9 @@ spec:
                   lbMgmtNetworkID:
                     default: ""
                     type: string
+                  lbSecurityGroupID:
+                    default: ""
+                    type: string
                   networkAttachments:
                     description: NetworkAttachments is a list of NetworkAttachment
                       resource names to expose the services to the given network
@@ -708,6 +711,9 @@ spec:
                   lbMgmtNetworkID:
                     default: ""
                     type: string
+                  lbSecurityGroupID:
+                    default: ""
+                    type: string
                   networkAttachments:
                     description: NetworkAttachments is a list of NetworkAttachment
                       resource names to expose the services to the given network
@@ -892,6 +898,9 @@ spec:
                       service config dir in /etc/<service> . TODO: -> implement'
                     type: object
                   lbMgmtNetworkID:
+                    default: ""
+                    type: string
+                  lbSecurityGroupID:
                     default: ""
                     type: string
                   networkAttachments:
