@@ -44,6 +44,7 @@ import (
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "k8s.io/api/apps/v1"
 	batchv1 "k8s.io/api/batch/v1"
@@ -920,9 +921,10 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 			Selector:  serviceLabels,
 			Ports: []corev1.ServicePort{
 				{
-					Name:     "octavia-image-upload-internal",
-					Port:     octavia.ApacheInternalPort,
-					Protocol: corev1.ProtocolTCP,
+					Name:       "octavia-image-upload-internal",
+					Port:       octavia.ApacheInternalPort,
+					TargetPort: intstr.FromInt(8080),
+					Protocol:   corev1.ProtocolTCP,
 				},
 			},
 		}),
@@ -1075,7 +1077,6 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 		),
 	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
-	templateParameters["ApachePort"] = octavia.ApacheInternalPort
 
 	cms := []util.Template{
 		// ScriptsConfigMap
