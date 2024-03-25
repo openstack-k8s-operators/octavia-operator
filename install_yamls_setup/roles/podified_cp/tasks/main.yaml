@@ -93,17 +93,6 @@
     state: link
   tags: crc
 
-- name: Create devsetup using make
-  shell:
-    cmd: |
-      set +ex
-      eval $(crc oc-env)
-      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      make crc_storage
-      make input
-    chdir: "~/install_yamls"
-  tags: crc
-
 - name: Run make crc_attach_default_interface
   shell:
     cmd: |
@@ -112,6 +101,7 @@
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make attach_default_interface_cleanup
       make crc_attach_default_interface
+      EDPM_TOTAL_NODES=2 make edpm_compute
       exit 0
     chdir: "~/install_yamls/devsetup"
   tags: crc
@@ -139,6 +129,8 @@
       set +ex
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      make crc_storage
+      make input
       make openstack_wait 2>&1 | tee make_openstack.log
       sleep 20
       TIMEOUT=600 make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
