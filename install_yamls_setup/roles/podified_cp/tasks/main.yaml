@@ -16,23 +16,56 @@
 - name: Install required packages
   ansible.builtin.package:
     name:
-      - ansible-core
+      - ansible
       - gcc
       - git-core
       - make
       - podman
       - python3
       - python3-pip
-      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
     state: latest
   become: yes
+  tags: install
+
+- name: Install ansible
+  ansible.builtin.package:
+    name:
+      - ansible
+    state: latest
+  become: yes
+  when:
+    - (ansible_distribution == 'CentOS' or
+       ansible_distribution == 'Rocky' or
+       ansible_distribution == 'RedHat')
+    - ansible_distribution_major_version | int == 8
+  tags: install
+
+- name: Install ansible-core
+  ansible.builtin.package:
+    name:
+      - ansible-core
+    state: latest
+  become: yes
+  when:
+    - (ansible_distribution == 'CentOS' or
+       ansible_distribution == 'Rocky' or
+       ansible_distribution == 'RedHat')
+    - ansible_distribution_major_version | int >= 9
+  tags: install
+
+- name: Install kubefwd_amd64
+  ansible.builtin.dnf:
+    name:
+      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
+    disable_gpg_check: True
+  become: yes
+  when: ansible_os_family == 'RedHat'
   tags: install
 
 - name: Install some extra packages
   ansible.builtin.package:
     name:
       - bash-completion
-      - delve
       - tmux
       - vim
     state: latest
@@ -101,7 +134,7 @@
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make attach_default_interface_cleanup
       make crc_attach_default_interface
-      EDPM_TOTAL_NODES=2 make edpm_compute
+      EDPM_TOTAL_NODES=1 EDPM_COMPUTE_VCPUS=16 EDPM_COMPUTE_RAM=100 EDPM_COMPUTE_DISK_SIZE=100 make edpm_compute
       exit 0
     chdir: "~/install_yamls/devsetup"
   tags: crc
@@ -135,6 +168,7 @@
       sleep 20
       TIMEOUT=600 make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
       sleep 20
+      TIMEOUT=600 DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
 
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
@@ -160,12 +194,17 @@
     path: ~/.bashrc
     line: "{{ item }}"
   with_items:
-    - export PATH=$PATH:~/.crc/bin/oc
+    - export GOPATH=$HOME/go
+    - export PATH=$PATH:$GOPATH/bin:~/.crc/bin/oc
     - export OS_CLOUD=default
     - export OS_PASSWORD=12345678
     - export EDPM_COMPUTE_CEPH_ENABLED=false
     - export BMO_SETUP=false
     - export KUBECONFIG=~/.kube/config
+  tags: config
+
+- name: Install delve debugger
+  command: go install github.com/go-delve/delve/cmd/dlv@latest
   tags: config
 
 - name: Copy ~/.tmux.conf
