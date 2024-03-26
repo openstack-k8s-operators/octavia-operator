@@ -21,6 +21,8 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 
@@ -41,7 +43,7 @@ func Deployment(
 	configHash string,
 	labels map[string]string,
 	annotations map[string]string,
-) *appsv1.Deployment {
+) (*appsv1.Deployment, error) {
 	runAsUser := int64(0)
 	initVolumeMounts := octavia.GetInitVolumeMounts()
 
@@ -69,6 +71,40 @@ func Deployment(
 	readinessProbe.HTTPGet = &corev1.HTTPGetAction{
 		Path: "/healthcheck",
 		Port: intstr.IntOrString{Type: intstr.Int, IntVal: int32(octavia.OctaviaPublicPort)},
+	}
+
+	if instance.Spec.TLS.API.Enabled(service.EndpointPublic) {
+		livenessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+		readinessProbe.HTTPGet.Scheme = corev1.URISchemeHTTPS
+	}
+
+	// create Volume and VolumeMounts
+	volumes := getVolumes(instance.Name)
+	volumeMounts := getVolumeMounts("octavia-api")
+
+	// add CA cert if defined
+	if instance.Spec.TLS.CaBundleSecretName != "" {
+		volumes = append(volumes, instance.Spec.TLS.CreateVolume())
+		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
+	}
+
+	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
+		if instance.Spec.TLS.API.Enabled(endpt) {
+			var tlsEndptCfg tls.GenericService
+			switch endpt {
+			case service.EndpointPublic:
+				tlsEndptCfg = instance.Spec.TLS.API.Public
+			case service.EndpointInternal:
+				tlsEndptCfg = instance.Spec.TLS.API.Internal
+			}
+
+			svc, err := tlsEndptCfg.ToService()
+			if err != nil {
+				return nil, err
+			}
+			volumes = append(volumes, svc.CreateVolume(endpt.String()))
+			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
+		}
 	}
 
 	envVars := map[string]env.Setter{}
@@ -111,7 +147,7 @@ func Deployment(
 								RunAsUser: &runAsUser,
 							},
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   getVolumeMounts("octavia-api"),
+							VolumeMounts:   volumeMounts,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
@@ -126,7 +162,7 @@ func Deployment(
 							LivenessProbe:  livenessProbe,
 						},
 					},
-					Volumes: getVolumes(instance.Name),
+					Volumes: volumes,
 				},
 			},
 		},
@@ -156,5 +192,5 @@ func Deployment(
 	}
 	deployment.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 
-	return deployment
+	return deployment, nil
 }

@@ -1,0 +1,76 @@
+apiVersion: octavia.openstack.org/v1beta1
+kind: Octavia
+metadata:
+  name: octavia
+spec:
+  databaseInstance: openstack
+  databaseUser: octavia
+  serviceUser: octavia
+  rabbitMqClusterName: rabbitmq
+  secret: osp-secret
+  preserveJobs: false
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  octaviaHousekeeping:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: housekeeping
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+    tls:
+      caBundleSecretName: combined-ca-bundle
+  octaviaHealthManager:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: healthmanager
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+    tls:
+      caBundleSecretName: combined-ca-bundle
+  octaviaWorker:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: worker
+    certssecret: octavia-amp-cert-data
+    certspassphrasesecret: octavia-ca-passphrase
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+    tls:
+      caBundleSecretName: combined-ca-bundle
+  octaviaAPI:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+    tls:
+      api:
+        internal:
+          secretName: cert-octavia-internal-svc
+        public:
+          secretName: cert-octavia-public-svc
+      caBundleSecretName: combined-ca-bundle
