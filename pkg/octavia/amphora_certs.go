@@ -84,7 +84,7 @@ func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
 	return priv, privPEM.Bytes(), nil
 }
 
-func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error) {
+func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, *x509.Certificate, error) {
 	caTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(2019),
 		Subject:               subjectDefault,
@@ -99,7 +99,7 @@ func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error
 	caBytes, err := x509.CreateCertificate(
 		rand.Reader, caTemplate, caTemplate, &caPrivKey.PublicKey, caPrivKey)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	caCertPEM := new(bytes.Buffer)
 	err = pem.Encode(caCertPEM, &pem.Block{
@@ -107,13 +107,13 @@ func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error
 		Bytes: caBytes,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return caCertPEM.Bytes(), nil
+	return caCertPEM.Bytes(), caTemplate, nil
 }
 
 // Create a certificate and key for the client and sign it with the CA
-func generateClientCert(caCertPEM []byte, caPrivKey *rsa.PrivateKey) ([]byte, error) {
+func generateClientCert(caCertPEM []byte, caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKey, caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error) {
 
 	certTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(2019),
@@ -125,9 +125,10 @@ func generateClientCert(caCertPEM []byte, caPrivKey *rsa.PrivateKey) ([]byte, er
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageClientAuth, x509.ExtKeyUsageEmailProtection},
 	}
+	certTemplate.Subject.CommonName = commonName
 
 	certBytes, err := x509.CreateCertificate(
-		rand.Reader, certTemplate, certTemplate, &caPrivKey.PublicKey, caPrivKey)
+		rand.Reader, certTemplate, caTemplate, &certPrivKey.PublicKey, caPrivKey)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func EnsureAmphoraCerts(
 		if err != nil {
 			return fmt.Errorf("Error while generating server CA key: %w", err)
 		}
-		serverCACert, err := generateCACert(serverCAKey, "Octavia server CA")
+		serverCACert, _, err := generateCACert(serverCAKey, "Octavia server CA")
 		if err != nil {
 			return fmt.Errorf("Error while generating server CA certificate: %w", err)
 		}
@@ -182,7 +183,7 @@ func EnsureAmphoraCerts(
 		if err != nil {
 			return fmt.Errorf("Error while generating client CA key: %w", err)
 		}
-		clientCACert, err := generateCACert(clientCAKey, "Octavia client CA")
+		clientCACert, clientCATemplate, err := generateCACert(clientCAKey, "Octavia client CA")
 		if err != nil {
 			return fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
 		}
@@ -191,7 +192,7 @@ func EnsureAmphoraCerts(
 		if err != nil {
 			return fmt.Errorf("Error while generating amphora client key: %w", err)
 		}
-		clientCert, err := generateClientCert(clientCACert, clientKey)
+		clientCert, err := generateClientCert(clientCACert, clientCATemplate, clientKey, clientCAKey, "Octavia controller")
 		if err != nil {
 			return fmt.Errorf("Error while generating amphora client certificate: %w", err)
 		}
