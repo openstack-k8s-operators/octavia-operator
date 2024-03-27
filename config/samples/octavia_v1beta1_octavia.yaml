@@ -20,8 +20,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: housekeeping
-    certsSecret: octavia-amp-cert-data
-    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -29,7 +27,6 @@ spec:
       debug = true
     networkAttachments:
       - octavia
-
   octaviaHealthManager:
     databaseInstance: openstack
     databaseAccount: octavia
@@ -37,8 +34,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: healthmanager
-    certsSecret: octavia-amp-cert-data
-    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
@@ -53,8 +48,6 @@ spec:
     serviceUser: octavia
     serviceAccount: octavia
     role: worker
-    certsSecret: octavia-amp-cert-data
-    certsPassphraseSecret: octavia-ca-passphrase
     secret: osp-secret
     preserveJobs: false
     customServiceConfig: |
