@@ -152,6 +152,9 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 		// update the overall status condition if service is ready
 		if instance.IsReady() {
 			instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
+		} else {
+			instance.Status.Conditions.MarkUnknown(condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
+			instance.Status.Conditions.Set(instance.Status.Conditions.Mirror(condition.ReadyCondition))
 		}
 
 		if err := helper.SetAfter(instance); err != nil {
@@ -331,6 +334,17 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
+
+	if len(instance.Spec.NetworkAttachments) == 0 {
+		err := fmt.Errorf("NetworkAttachments list is empty")
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err))
+		return ctrl.Result{}, err
+	}
 
 	for _, networkAttachment := range instance.Spec.NetworkAttachments {
 		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)

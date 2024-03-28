@@ -193,5 +193,6 @@ func init() {
 
 // IsReady - returns true if service is ready to work
 func (instance OctaviaAmphoraController) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
+	return instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition) &&
+		instance.Status.Conditions.IsTrue(condition.NetworkAttachmentsReadyCondition)
 }
