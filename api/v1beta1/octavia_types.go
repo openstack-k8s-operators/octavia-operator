@@ -158,7 +158,6 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=service
 	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
-	// TODO(gthiemonge) same as ServiceAccount?
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
@@ -181,10 +180,6 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:default={}
 	// AmphoraCustomFlavors - User-defined flavors for Octavia
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
-
-	// +kubebuilder:validation:Required
-	// ServiceAccount - service account name used internally to provide Octavia services the default SA name
-	ServiceAccount string `json:"serviceAccount"`
 
 	// +kubebuilder:validation:Optional
 	// Resources - Compute Resources required by this service (Limits/Requests).

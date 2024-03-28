@@ -1164,10 +1164,6 @@ spec:
                 description: Secret containing OpenStack password information for
                   octavia's keystone password; no longer used for database password
                 type: string
-              serviceAccount:
-                description: ServiceAccount - service account name used internally
-                  to provide Octavia services the default SA name
-                type: string
               serviceUser:
                 default: octavia
                 description: ServiceUser - service user name
@@ -1186,7 +1182,7 @@ spec:
               tenantName:
                 default: service
                 description: TenantName - the name of the OpenStack tenant that controls
-                  the Octavia resources TODO(gthiemonge) same as ServiceAccount?
+                  the Octavia resources
                 type: string
             required:
             - apacheContainerImage
@@ -1194,7 +1190,6 @@ spec:
             - octaviaAPI
             - rabbitMqClusterName
             - secret
-            - serviceAccount
             type: object
           status:
             description: OctaviaStatus defines the observed state of Octavia
