@@ -224,6 +224,78 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		}
 	}
 
+	// Prepare NetworkAttachments first, it must be done before generating the
+	// configuration as the config uses IP addresses of the attachments.
+	if len(instance.Spec.NetworkAttachments) == 0 {
+		err := fmt.Errorf("NetworkAttachments list is empty")
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err))
+		return ctrl.Result{}, err
+	}
+
+	for _, networkAttachment := range instance.Spec.NetworkAttachments {
+		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.NetworkAttachmentsReadyCondition,
+					condition.RequestedReason,
+					condition.SeverityInfo,
+					condition.NetworkAttachmentsReadyWaitingMessage,
+					networkAttachment))
+				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", networkAttachment)
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	}
+
+	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
+			instance.Spec.NetworkAttachments, err)
+	}
+
+	serviceLabels := map[string]string{
+		common.AppSelector: instance.ObjectMeta.Name,
+	}
+
+	// verify if network attachment matches expectations
+	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
+		ctx,
+		helper,
+		instance.Spec.NetworkAttachments,
+		serviceLabels,
+		instance.Status.ReadyCount,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	instance.Status.NetworkAttachments = networkAttachmentStatus
+	if networkReady {
+		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+	} else {
+		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err.Error()))
+
+		return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
+	}
+
 	// Handle config map
 	configMapVars := make(map[string]env.Setter)
 
@@ -335,45 +407,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
-	if len(instance.Spec.NetworkAttachments) == 0 {
-		err := fmt.Errorf("NetworkAttachments list is empty")
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err))
-		return ctrl.Result{}, err
-	}
-
-	for _, networkAttachment := range instance.Spec.NetworkAttachments {
-		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
-		if err != nil {
-			if k8s_errors.IsNotFound(err) {
-				instance.Status.Conditions.Set(condition.FalseCondition(
-					condition.NetworkAttachmentsReadyCondition,
-					condition.RequestedReason,
-					condition.SeverityInfo,
-					condition.NetworkAttachmentsReadyWaitingMessage,
-					networkAttachment))
-				return ctrl.Result{RequeueAfter: time.Second * 10}, fmt.Errorf("network-attachment-definition %s not found", networkAttachment)
-			}
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.NetworkAttachmentsReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.NetworkAttachmentsReadyErrorMessage,
-				err.Error()))
-			return ctrl.Result{}, err
-		}
-	}
-
-	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.NetworkAttachments)
-	if err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
-			instance.Spec.NetworkAttachments, err)
-	}
-
 	// Handle service update
 	ctrlResult, err := r.reconcileUpdate(ctx, instance, helper)
 	if err != nil {
@@ -393,10 +426,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	//
 	// normal reconcile tasks
 	//
-
-	serviceLabels := map[string]string{
-		common.AppSelector: instance.ObjectMeta.Name,
-	}
 
 	// Define a new DaemonSet object
 	dset := daemonset.NewDaemonSet(
@@ -424,33 +453,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 			condition.SeverityInfo,
 			condition.DeploymentReadyRunningMessage))
 		return ctrlResult, nil
-	}
-
-	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
-		ctx,
-		helper,
-		instance.Spec.NetworkAttachments,
-		serviceLabels,
-		instance.Status.ReadyCount,
-	)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	instance.Status.NetworkAttachments = networkAttachmentStatus
-	if networkReady {
-		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
-	} else {
-		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err.Error()))
-
-		return ctrl.Result{}, err
 	}
 
 	instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
@@ -603,14 +605,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	// a stable list of IPs.
 
 	if len(healthManagerIPs) == 0 {
-		templateParameters["ControllerIPList"] = ""
-		if instance.Spec.Role != octaviav1.HealthManager {
-
-			// Only let the health manager get an empty port list until
-			// we get a way to preallocate some ports. This helps reduce
-			// churn when the Pods are getting initially created or setup.
-			return fmt.Errorf("Health manager ports are not ready yet")
-		}
+		return fmt.Errorf("Health manager ports are not ready yet")
 	} else {
 		withPorts := make([]string, len(healthManagerIPs))
 		for idx, val := range healthManagerIPs {
@@ -735,8 +730,9 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 func listHealthManagerPods(name string, ns string, client kubernetes.Interface, log *logr.Logger) (*corev1.PodList, error) {
 	listOptions := metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", common.AppSelector, name),
+		FieldSelector: "status.phase==Running",
 	}
-	log.Info(fmt.Sprintf("Listing pods using label selector %s", listOptions.LabelSelector))
+	log.Info(fmt.Sprintf("Listing pods using label selector %s and field selector %s", listOptions.LabelSelector, listOptions.FieldSelector))
 	pods, err := client.CoreV1().Pods(ns).List(context.Background(), listOptions)
 	if err != nil {
 		return nil, err
