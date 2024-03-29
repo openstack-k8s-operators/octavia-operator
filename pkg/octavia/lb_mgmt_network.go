@@ -32,6 +32,8 @@ import (
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
 
+// NetworkProvisioningSummary -
+// Type for conveying the results of the EnsureAmphoraManagementNetwork call.
 type NetworkProvisioningSummary struct {
 	TenantNetworkID         string
 	TenantSubnetID          string
@@ -896,4 +898,41 @@ func EnsureAmphoraManagementNetwork(
 		ManagementSubnetCIDR:    networkParameters.TenantCIDR.String(),
 		ManagementSubnetGateway: networkParameters.ProviderGateway.String(),
 	}, nil
+}
+
+// GetPredictableIPAM returns a struct describing the available IP range. If the
+// IP pool size does not fit in given networkParameters CIDR it will return an
+// error instead.
+func GetPredictableIPAM(networkParameters *NetworkParameters) (*NADIpam, error) {
+	predParams := &NADIpam{}
+	predParams.CIDR = networkParameters.ProviderCIDR
+	predParams.RangeStart = networkParameters.ProviderAllocationEnd.Next()
+	endRange := predParams.RangeStart
+	for i := 0; i < LbProvPredictablePoolSize; i++ {
+		if !predParams.CIDR.Contains(endRange) {
+			return nil, fmt.Errorf("predictable IPs: cannot allocate %d IP addresses in %s", LbProvPredictablePoolSize, predParams.CIDR)
+		}
+		endRange = endRange.Next()
+	}
+	predParams.RangeEnd = endRange
+	return predParams, nil
+}
+
+// GetNextIP picks the next available IP from the range defined by a NADIpam,
+// skipping ones that are already used appear as keys in the currentValues map.
+func GetNextIP(predParams *NADIpam, currentValues map[string]bool) (string, error) {
+	candidateAddress := predParams.RangeStart
+	for alloced := true; alloced; {
+
+		if _, ok := currentValues[candidateAddress.String()]; ok {
+			if candidateAddress == predParams.RangeEnd {
+				return "", fmt.Errorf("predictable IPs: out of available addresses")
+			}
+			candidateAddress = candidateAddress.Next()
+		} else {
+			alloced = false
+		}
+	}
+	currentValues[candidateAddress.String()] = true
+	return candidateAddress.String(), nil
 }

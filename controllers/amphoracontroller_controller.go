@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -44,7 +43,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -577,46 +575,23 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			err.Error()))
 		return err
 	}
+
 	//
-	// TODO(beagles): Improve this with predictable IPs for the health managers because what is
-	// going to happen on start up is that health managers will restart each time a new one is deployed.
-	// The easiest strategy is to create a "hole" in the IP address range and control the
-	// allocation and configuration of an additional IP on each network attached interface. We will
-	// need a container in the Pod that has the ip command installed to do this however.
+	// Get the predicatable IPs from the HmConfigMap
 	//
-	healthManagerIPs, err := getPodIPs(
-		fmt.Sprintf("%s-%s", "octavia", octaviav1.HealthManager),
-		instance.Namespace,
-		r.Kclient,
-		&r.Log,
-	)
+	hmMap := &corev1.ConfigMap{}
+	err = helper.GetClient().Get(ctx, types.NamespacedName{Name: octavia.HmConfigMap, Namespace: instance.GetNamespace()}, hmMap)
 	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
 		return err
 	}
-
-	// TODO(beagles): come up with a way to preallocate or ensure
-	// a stable list of IPs.
-
-	if instance.Spec.Role == octaviav1.HealthManager {
-		// TODO(gthiemonge) This is fine to leave this list empty in the HM when
-		// we use redis, because the HM doesn't create any LBs, but if we drop
-		// redis, failovers will be triggered in the HM
-		templateParameters["ControllerIPList"] = ""
-	} else if len(healthManagerIPs) == 0 {
-		return fmt.Errorf("Health manager ports are not ready yet")
-	} else {
-		withPorts := make([]string, len(healthManagerIPs))
-		for idx, val := range healthManagerIPs {
-			withPorts[idx] = fmt.Sprintf("%s:5555", val)
+	var ipAddresses []string
+	for key, val := range hmMap.Data {
+		if strings.HasPrefix(key, "hm_") {
+			ipAddresses = append(ipAddresses, fmt.Sprintf("%s:5555", val))
 		}
-		templateParameters["ControllerIPList"] = strings.Join(withPorts, ",")
 	}
+	ipAddressString := strings.Join(ipAddresses, ",")
+	templateParameters["ControllerIPList"] = ipAddressString
 
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser
@@ -725,46 +700,6 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
 		Complete(r)
-}
-
-func listHealthManagerPods(name string, ns string, client kubernetes.Interface, log *logr.Logger) (*corev1.PodList, error) {
-	listOptions := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("%s=%s", common.AppSelector, name),
-		FieldSelector: "status.phase==Running",
-	}
-	log.Info(fmt.Sprintf("Listing pods using label selector %s and field selector %s", listOptions.LabelSelector, listOptions.FieldSelector))
-	pods, err := client.CoreV1().Pods(ns).List(context.Background(), listOptions)
-	if err != nil {
-		return nil, err
-	}
-	return pods, nil
-}
-
-func getPodIPs(name string, ns string, client kubernetes.Interface, log *logr.Logger) ([]string, error) {
-	//
-	// Get the IPs for the network attachments for these PODs.
-	//
-	var result []string
-	pods, err := listHealthManagerPods(name, ns, client, log)
-	if err != nil {
-		return nil, err
-	}
-	for _, pod := range pods.Items {
-		annotations := pod.GetAnnotations()
-		networkStatusList, err := nad.GetNetworkStatusFromAnnotation(annotations)
-		if err != nil {
-			log.Error(err, fmt.Sprintf("Unable to get network annotations from %s", annotations))
-			return nil, err
-		}
-		for _, networkStatus := range networkStatusList {
-			netAttachName := fmt.Sprintf("%s/%s", ns, octavia.LbNetworkAttachmentName)
-			if networkStatus.Name == netAttachName {
-				result = append(result, networkStatus.IPs[0])
-			}
-		}
-	}
-	sort.Strings(result)
-	return result, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
