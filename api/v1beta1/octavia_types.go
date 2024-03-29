@@ -39,8 +39,7 @@ const (
 	OctaviaWorkerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-worker:current-podified"
 
 	// ApacheImage - default fall-back image for Apache
-	// TODO(gthiemonge) need a more recent image?
-	ApacheContainerImage = "registry.redhat.io/rhel8/httpd-24:latest"
+	ApacheContainerImage = "registry.redhat.io/ubi9/httpd-24:latest"
 )
 
 // OctaviaSpec defines the desired state of Octavia
