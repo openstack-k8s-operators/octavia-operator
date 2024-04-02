@@ -221,6 +221,7 @@ const (
 	caBundleSecretNameField = ".spec.tls.caBundleSecretName"
 	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
+	tlsOvnField             = ".spec.tls.ovn.secretName"
 )
 
 var (
@@ -229,6 +230,7 @@ var (
 		caBundleSecretNameField,
 		tlsAPIInternalField,
 		tlsAPIPublicField,
+		tlsOvnField,
 	}
 )
 
