@@ -17,6 +17,7 @@ package octavia
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/gophercloud/gophercloud"
@@ -44,6 +45,18 @@ func GetAdminServiceClient(
 		return nil, ctrl.Result{}, err
 	}
 
+	parsedAuthURL, err := url.Parse(authURL)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+
+	tlsConfig := &openstack.TLSConfig{}
+	if parsedAuthURL.Scheme == "https" {
+		// TODO: (mschuppert) for now just set to insecure, when keystone got
+		// enabled for internal tls, get the CA secret name from the keystoneAPI
+		tlsConfig.Insecure = true
+	}
+
 	// get the password of the admin user from Spec.Secret
 	// using PasswordSelectors.Admin
 	authPassword, ctrlResult, err := secret.GetDataFromSecret(
@@ -66,6 +79,7 @@ func GetAdminServiceClient(
 		TenantName: keystoneAPI.Spec.AdminProject,
 		DomainName: "Default",
 		Region:     keystoneAPI.Spec.Region,
+		TLS:        tlsConfig,
 	}
 
 	os, err := openstack.NewOpenStack(
@@ -92,6 +106,18 @@ func GetServiceClient(
 		return nil, ctrl.Result{}, err
 	}
 
+	parsedAuthURL, err := url.Parse(authURL)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+
+	tlsConfig := &openstack.TLSConfig{}
+	if parsedAuthURL.Scheme == "https" {
+		// TODO: (mschuppert) for now just set to insecure, when keystone got
+		// enabled for internal tls, get the CA secret name from the keystoneAPI
+		tlsConfig.Insecure = true
+	}
+
 	// get the password of the admin user from Spec.Secret
 	// using PasswordSelectors.Admin
 	authPassword, ctrlResult, err := secret.GetDataFromSecret(
@@ -114,6 +140,7 @@ func GetServiceClient(
 		TenantName: octavia.Spec.TenantName,
 		DomainName: "Default",
 		Region:     keystoneAPI.Spec.Region,
+		TLS:        tlsConfig,
 	}
 
 	os, err := openstack.NewOpenStack(
