@@ -129,7 +129,7 @@
 - name: Run make crc_attach_default_interface
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make attach_default_interface_cleanup
@@ -144,7 +144,7 @@
 - name: Add docker.io credentials to pull-secret in OSP cluster
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc get secret/pull-secret -n openshift-config \
         --template='{{ '{{' }} index .data ".dockerconfigjson" | base64decode{{ '}}' }}' \
@@ -159,16 +159,16 @@
 - name: Deploy openstack operators
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make crc_storage
       make input
       make openstack_wait 2>&1 | tee make_openstack.log
       sleep 20
-      TIMEOUT=600 make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
+      TIMEOUT=600s make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
       sleep 20
-      TIMEOUT=600 DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
+      TIMEOUT=600s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
 
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
