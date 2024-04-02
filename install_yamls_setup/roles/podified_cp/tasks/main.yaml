@@ -156,6 +156,20 @@
         --from-file=.dockerconfigjson=pull-secret.json
   tags: pull-secret
 
+- name: Add exports to .bashrc
+  lineinfile:
+    path: ~/.bashrc
+    line: "{{ item }}"
+  with_items:
+    - export GOPATH=$HOME/go
+    - export PATH=$PATH:~/bin:$GOPATH/bin:~/.crc/bin/oc
+    - export OS_CLOUD=default
+    - export OS_PASSWORD=12345678
+    - export EDPM_COMPUTE_CEPH_ENABLED=false
+    - export BMO_SETUP=false
+    - export KUBECONFIG=~/.kube/config
+  tags: config
+
 - name: Deploy openstack operators
   shell:
     cmd: |
@@ -166,10 +180,13 @@
       make input
       make openstack_wait 2>&1 | tee make_openstack.log
       sleep 20
-      TIMEOUT=600s make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
+      TIMEOUT=800s make openstack_wait_deploy 2>&1 | \
+          tee make_openstack_deploy.log
       sleep 20
-      TIMEOUT=600s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
+      TIMEOUT=800s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
 
+      oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type json \
+                -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
       sleep 10
@@ -188,20 +205,6 @@
     #creates: "/etc/bash_completion.d/oc_completion"
     chdir: "~/install_yamls"
   tags: crc
-
-- name: Add exports to .bashrc
-  lineinfile:
-    path: ~/.bashrc
-    line: "{{ item }}"
-  with_items:
-    - export GOPATH=$HOME/go
-    - export PATH=$PATH:$GOPATH/bin:~/.crc/bin/oc
-    - export OS_CLOUD=default
-    - export OS_PASSWORD=12345678
-    - export EDPM_COMPUTE_CEPH_ENABLED=false
-    - export BMO_SETUP=false
-    - export KUBECONFIG=~/.kube/config
-  tags: config
 
 - name: Install delve debugger
   command: go install github.com/go-delve/delve/cmd/dlv@latest
