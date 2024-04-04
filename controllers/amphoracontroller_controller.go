@@ -304,33 +304,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		common.AppSelector: instance.ObjectMeta.Name,
 	}
 
-	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
-		ctx,
-		helper,
-		instance.Spec.NetworkAttachments,
-		serviceLabels,
-		instance.Status.ReadyCount,
-	)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	instance.Status.NetworkAttachments = networkAttachmentStatus
-	if networkReady {
-		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
-	} else {
-		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err.Error()))
-
-		return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
-	}
-
 	// Handle config map
 	configMapVars := make(map[string]env.Setter)
 
@@ -490,6 +463,33 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrlResult, nil
 	}
 
+	// verify if network attachment matches expectations
+	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
+		ctx,
+		helper,
+		instance.Spec.NetworkAttachments,
+		serviceLabels,
+		instance.Status.ReadyCount,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	instance.Status.NetworkAttachments = networkAttachmentStatus
+	if networkReady {
+		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+	} else {
+		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.NetworkAttachmentsReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.NetworkAttachmentsReadyErrorMessage,
+			err.Error()))
+
+		return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
+	}
+
 	instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
 	// TODO(gthiemonge) change for NumberReady?
 	instance.Status.ReadyCount = dset.GetDaemonSet().Status.NumberReady
@@ -645,7 +645,12 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	// TODO(beagles): come up with a way to preallocate or ensure
 	// a stable list of IPs.
 
-	if len(healthManagerIPs) == 0 {
+	if instance.Spec.Role == octaviav1.HealthManager {
+		// TODO(gthiemonge) This is fine to leave this list empty in the HM when
+		// we use redis, because the HM doesn't create any LBs, but if we drop
+		// redis, failovers will be triggered in the HM
+		templateParameters["ControllerIPList"] = ""
+	} else if len(healthManagerIPs) == 0 {
 		return fmt.Errorf("Health manager ports are not ready yet")
 	} else {
 		withPorts := make([]string, len(healthManagerIPs))
