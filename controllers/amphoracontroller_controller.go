@@ -162,6 +162,7 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 	)
 
 	instance.Status.Conditions.Init(&cl)
+	instance.Status.ObservedGeneration = instance.Generation
 
 	if isNewInstance {
 		if err := r.Status().Update(ctx, instance); err != nil {
@@ -463,40 +464,42 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrlResult, nil
 	}
 
-	// verify if network attachment matches expectations
-	networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
-		ctx,
-		helper,
-		instance.Spec.NetworkAttachments,
-		serviceLabels,
-		instance.Status.ReadyCount,
-	)
-	if err != nil {
-		return ctrl.Result{}, err
+	if dset.GetDaemonSet().Generation == dset.GetDaemonSet().Status.ObservedGeneration {
+		instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
+		// TODO(gthiemonge) change for NumberReady?
+		instance.Status.ReadyCount = dset.GetDaemonSet().Status.NumberReady
+
+		// verify if network attachment matches expectations
+		networkReady, networkAttachmentStatus, err := nad.VerifyNetworkStatusFromAnnotation(
+			ctx,
+			helper,
+			instance.Spec.NetworkAttachments,
+			serviceLabels,
+			instance.Status.ReadyCount,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		instance.Status.NetworkAttachments = networkAttachmentStatus
+		if networkReady {
+			instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+		} else {
+			err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+
+			return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
+		}
+
+		if instance.Status.ReadyCount == instance.Status.DesiredNumberScheduled {
+			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+		}
 	}
-
-	instance.Status.NetworkAttachments = networkAttachmentStatus
-	if networkReady {
-		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
-	} else {
-		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err.Error()))
-
-		return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
-	}
-
-	instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
-	// TODO(gthiemonge) change for NumberReady?
-	instance.Status.ReadyCount = dset.GetDaemonSet().Status.NumberReady
-	if instance.Status.ReadyCount == instance.Status.DesiredNumberScheduled {
-		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
-	}
-
 	// create DaemonSet - end
 
 	// We reached the end of the Reconcile, update the Ready condition based on
