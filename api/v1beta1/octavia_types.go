@@ -267,9 +267,6 @@ type OctaviaStatus struct {
 	// ReadyCount of octavia HealthManager instances
 	OctaviaHealthManagerReadyCount int32 `json:"healthmanagerreadyCount,omitempty"`
 
-	// List of Redis Host IP addresses
-	RedisHostIPs []string `json:"redisHostIPs,omitempty"`
-
 	// ObservedGeneration - the most recent generation observed for this
 	// service. If the observed generation is less than the spec generation,
 	// then the controller has not processed the latest changes injected by

@@ -342,11 +342,6 @@ func (in *OctaviaAmphoraControllerSpecCore) DeepCopyInto(out *OctaviaAmphoraCont
 		*out = make([]OctaviaAmphoraFlavor, len(*in))
 		copy(*out, *in)
 	}
-	if in.RedisHostIPs != nil {
-		in, out := &in.RedisHostIPs, &out.RedisHostIPs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
 	out.TLS = in.TLS
 }
 
@@ -574,11 +569,6 @@ func (in *OctaviaStatus) DeepCopyInto(out *OctaviaStatus) {
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
-	}
-	if in.RedisHostIPs != nil {
-		in, out := &in.RedisHostIPs, &out.RedisHostIPs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
 	}
 }
 
