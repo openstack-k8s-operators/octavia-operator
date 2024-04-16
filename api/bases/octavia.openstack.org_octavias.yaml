@@ -599,11 +599,6 @@ spec:
                     description: PersistenceDatabaseAccount - name of MariaDBAccount
                       which will be used to connect for the persistence database
                     type: string
-                  redisHostIPs:
-                    description: List of Redis Host IP addresses
-                    items:
-                      type: string
-                    type: array
                   resources:
                     description: Resources - Compute Resources required by this service
                       (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -796,11 +791,6 @@ spec:
                     description: PersistenceDatabaseAccount - name of MariaDBAccount
                       which will be used to connect for the persistence database
                     type: string
-                  redisHostIPs:
-                    description: List of Redis Host IP addresses
-                    items:
-                      type: string
-                    type: array
                   resources:
                     description: Resources - Compute Resources required by this service
                       (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -993,11 +983,6 @@ spec:
                     description: PersistenceDatabaseAccount - name of MariaDBAccount
                       which will be used to connect for the persistence database
                     type: string
-                  redisHostIPs:
-                    description: List of Redis Host IP addresses
-                    items:
-                      type: string
-                    type: array
                   resources:
                     description: Resources - Compute Resources required by this service
                       (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -1274,11 +1259,6 @@ spec:
                   ContainerImage)
                 format: int64
                 type: integer
-              redisHostIPs:
-                description: List of Redis Host IP addresses
-                items:
-                  type: string
-                type: array
               transportURLSecret:
                 description: TransportURLSecret - Secret containing RabbitMQ transportURL
                 type: string

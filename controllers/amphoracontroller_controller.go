@@ -678,7 +678,6 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	}
 	// TODO(gthiemonge) store keys/passwords/passphrases in a specific config file stored in a secret
 	templateParameters["HeartbeatKey"] = string(ospSecret.Data["OctaviaHeartbeatKey"])
-	templateParameters["JobboardBackendHosts"] = strings.Join(spec.RedisHostIPs[:], ",")
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
