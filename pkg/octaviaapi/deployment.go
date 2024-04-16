@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/utils/ptr"
 )
 
 const (
@@ -105,6 +106,15 @@ func Deployment(
 			volumes = append(volumes, svc.CreateVolume(endpt.String()))
 			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
 		}
+	}
+
+	if instance.Spec.TLS.Ovn.Enabled() {
+		svc := tls.Service{
+			SecretName: *instance.Spec.TLS.Ovn.SecretName,
+			CaMount:    ptr.To("/var/lib/config-data/tls/certs/ovndbca.crt"),
+		}
+		volumes = append(volumes, svc.CreateVolume("ovndb"))
+		volumeMounts = append(volumeMounts, svc.CreateVolumeMounts("ovndb")...)
 	}
 
 	envVars := map[string]env.Setter{}

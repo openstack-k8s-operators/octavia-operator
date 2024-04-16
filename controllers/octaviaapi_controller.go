@@ -246,6 +246,18 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
+	// index tlsOvnField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, tlsOvnField, func(rawObj client.Object) []string {
+		// Extract the secret name from the spec, if one is provided
+		cr := rawObj.(*octaviav1.OctaviaAPI)
+		if cr.Spec.TLS.Ovn.SecretName == nil {
+			return nil
+		}
+		return []string{*cr.Spec.TLS.Ovn.SecretName}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -946,6 +958,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	if err != nil {
 		return err
 	}
+	templateParameters["OVNDB_TLS"] = instance.Spec.TLS.Ovn.Enabled()
 
 	// create httpd  vhost template parameters
 	httpdVhostConfig := map[string]interface{}{}

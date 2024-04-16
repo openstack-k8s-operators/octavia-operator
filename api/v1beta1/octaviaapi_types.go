@@ -140,7 +140,22 @@ type OctaviaAPISpecCore struct {
 	// +kubebuilder:validation:Optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
-	TLS tls.API `json:"tls,omitempty"`
+	TLS OctaviaApiTLS `json:"tls,omitempty"`
+}
+
+type OctaviaApiTLS struct {
+	// +kubebuilder:validation:optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// API tls type which encapsulates for API services
+	API tls.APIService `json:"api,omitempty"`
+	// +kubebuilder:validation:optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Secret containing CA bundle
+	tls.Ca `json:",inline"`
+	// +kubebuilder:validation:optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Ovn GenericService - holds the secret for the OvnDb client cert
+	Ovn tls.GenericService `json:"ovn,omitempty"`
 }
 
 // APIOverrideSpec to override the generated manifest of several child resources.
