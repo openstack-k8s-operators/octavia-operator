@@ -88,8 +88,10 @@ func ensureAmphoraImage(
 			ContainerFormat: "bare",
 			DiskFormat:      "qcow2",
 			Properties: map[string]string{
-				"hw_architecture": "x86_64",
-				"image_checksum":  amphoraImage.Checksum,
+				// TODO(gthiemonge) hw_architecture is not set due to a bug in
+				// placement/nova (OSPRH-6215)
+				//"hw_architecture": "x86_64",
+				"image_checksum": amphoraImage.Checksum,
 			},
 		}
 
