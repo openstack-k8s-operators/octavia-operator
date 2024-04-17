@@ -194,6 +194,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 	)
 
 	instance.Status.Conditions.Init(&cl)
+	instance.Status.ObservedGeneration = instance.Generation
 
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
 	if instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer()) || isNewInstance {
@@ -599,19 +600,34 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if op != controllerutil.OperationResultNone {
-		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	// Check the underlying OctaviaAPI condition according to the
+	// ObservedGeneration
+	apiObsGen, err := r.checkOctaviaAPIGeneration(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAPIReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAPIReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, nil
 	}
-
-	// Mirror OctaviaAPI status' ReadyCount to this parent CR
-	// TODO(beagles): We need to have a way to aggregate conditions from the other services into this
-	//
-	instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
-	conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
+	if !apiObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			octaviav1.OctaviaAPIReadyCondition,
+			condition.InitReason,
+			octaviav1.OctaviaAPIReadyInitMessage,
+		))
 	} else {
-		instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAPIReadyCondition, condition.DeploymentReadyMessage)
+		// Mirror OctaviaAPI status' ReadyCount to this parent CR
+		instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
+		conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
+		if conditionStatus != nil {
+			instance.Status.Conditions.Set(conditionStatus)
+		}
+	}
+	if op != controllerutil.OperationResultNone && apiObsGen {
+		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// ------------------------------------------------------------------------------------------------------------
@@ -644,17 +660,34 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-
-	if op != controllerutil.OperationResultNone {
-		Log.Info(fmt.Sprintf("Deployment of OctaviaHealthManager for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	// Even if we trigger three deployments, the Amphora subCR is only one, no
+	// need to call this functions three times in the same reconciliation loop
+	ampObsGen, err := r.checkAmphoraGeneration(instance)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			amphoraControllerReadyCondition(octaviav1.HealthManager),
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			amphoraControllerErrorMessage(octaviav1.HealthManager),
+			err.Error()))
+		return ctrlResult, nil
+	}
+	if !ampObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			amphoraControllerReadyCondition(octaviav1.HealthManager),
+			condition.InitReason,
+			amphoraControllerErrorMessage(octaviav1.HealthManager),
+		))
+	} else {
+		instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
+		conditionStatus := octaviaHealthManager.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.HealthManager))
+		if conditionStatus != nil {
+			instance.Status.Conditions.Set(conditionStatus)
+		}
 	}
 
-	instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
-	conditionStatus = octaviaHealthManager.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.HealthManager))
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
-	} else {
-		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.HealthManager), condition.DeploymentReadyMessage)
+	if op != controllerutil.OperationResultNone && ampObsGen {
+		Log.Info(fmt.Sprintf("Deployment of OctaviaHealthManager for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	//
@@ -677,17 +710,22 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-
-	if op != controllerutil.OperationResultNone {
-		Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	if !ampObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			amphoraControllerReadyCondition(octaviav1.Housekeeping),
+			condition.InitReason,
+			amphoraControllerErrorMessage(octaviav1.Housekeeping),
+		))
+	} else {
+		instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
+		conditionStatus := octaviaHousekeeping.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Housekeeping))
+		if conditionStatus != nil {
+			instance.Status.Conditions.Set(conditionStatus)
+		}
 	}
 
-	instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
-	conditionStatus = octaviaHousekeeping.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Housekeeping))
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
-	} else {
-		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Housekeeping), condition.DeploymentReadyMessage)
+	if op != controllerutil.OperationResultNone && ampObsGen {
+		Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
@@ -701,17 +739,21 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-
-	if op != controllerutil.OperationResultNone {
-		Log.Info(fmt.Sprintf("Deployment of OctaviaWorker for %s successfully reconciled - operation: %s", instance.Name, string(op)))
-	}
-
-	instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
-	conditionStatus = octaviaWorker.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Worker))
-	if conditionStatus != nil {
-		instance.Status.Conditions.Set(conditionStatus)
+	if !ampObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			amphoraControllerReadyCondition(octaviav1.Worker),
+			condition.InitReason,
+			amphoraControllerErrorMessage(octaviav1.Worker),
+		))
 	} else {
-		instance.Status.Conditions.MarkTrue(amphoraControllerReadyCondition(octaviav1.Worker), condition.DeploymentReadyMessage)
+		instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
+		conditionStatus := octaviaWorker.Status.Conditions.Mirror(amphoraControllerReadyCondition(octaviav1.Worker))
+		if conditionStatus != nil {
+			instance.Status.Conditions.Set(conditionStatus)
+		}
+	}
+	if op != controllerutil.OperationResultNone && ampObsGen {
+		Log.Info(fmt.Sprintf("Deployment of OctaviaWorker for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// remove finalizers from unused MariaDBAccount records
@@ -741,8 +783,6 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 
 	// create Deployment - end
 
-	// Update the lastObserved generation before evaluating conditions
-	instance.Status.ObservedGeneration = instance.Generation
 	// We reached the end of the Reconcile, update the Ready condition based on
 	// the sub conditions
 	if instance.Status.Conditions.AllSubConditionIsTrue() {
@@ -1295,4 +1335,44 @@ func amphoraControllerErrorMessage(role string) string {
 		octaviav1.Worker:        octaviav1.OctaviaWorkerReadyErrorMessage,
 	}
 	return condMap[role]
+}
+
+// checkOctaviaAPIGeneration -
+func (r *OctaviaReconciler) checkOctaviaAPIGeneration(
+	instance *octaviav1.Octavia,
+) (bool, error) {
+	api := &octaviav1.OctaviaAPIList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve OctaviaAPI %w")
+		return false, err
+	}
+	for _, item := range api.Items {
+		if item.Generation != item.Status.ObservedGeneration {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+// checkAmphoraGeneration -
+func (r *OctaviaReconciler) checkAmphoraGeneration(
+	instance *octaviav1.Octavia,
+) (bool, error) {
+	amph := &octaviav1.OctaviaAmphoraControllerList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(instance.Namespace),
+	}
+	if err := r.Client.List(context.Background(), amph, listOpts...); err != nil {
+		r.Log.Error(err, "Unable to retrieve OctaviaAPI %w")
+		return false, err
+	}
+	for _, item := range amph.Items {
+		if item.Generation != item.Status.ObservedGeneration {
+			return false, nil
+		}
+	}
+	return true, nil
 }

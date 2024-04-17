@@ -175,6 +175,7 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	)
 
 	instance.Status.Conditions.Init(&cl)
+	instance.Status.ObservedGeneration = instance.Generation
 
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
 	if instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer()) || isNewInstance {
@@ -790,41 +791,43 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		return ctrlResult, nil
 	}
 
-	// verify if network attachment matches expectations
-	networkReady := false
-	networkAttachmentStatus := map[string][]string{}
-	if *instance.Spec.Replicas > 0 {
-		networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
-			ctx,
-			helper,
-			instance.Spec.NetworkAttachments,
-			serviceLabels,
-			instance.Status.ReadyCount,
-		)
-		if err != nil {
+	if depl.GetDeployment().Generation == depl.GetDeployment().Status.ObservedGeneration {
+		instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
+		// verify if network attachment matches expectations
+		networkReady := false
+		networkAttachmentStatus := map[string][]string{}
+		if *instance.Spec.Replicas > 0 {
+			networkReady, networkAttachmentStatus, err = nad.VerifyNetworkStatusFromAnnotation(
+				ctx,
+				helper,
+				instance.Spec.NetworkAttachments,
+				serviceLabels,
+				instance.Status.ReadyCount,
+			)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		} else {
+			networkReady = true
+		}
+
+		instance.Status.NetworkAttachments = networkAttachmentStatus
+		if networkReady {
+			instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
+		} else {
+			err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.NetworkAttachmentsReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.NetworkAttachmentsReadyErrorMessage,
+				err.Error()))
+
 			return ctrl.Result{}, err
 		}
-	} else {
-		networkReady = true
-	}
-
-	instance.Status.NetworkAttachments = networkAttachmentStatus
-	if networkReady {
-		instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
-	} else {
-		err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.NetworkAttachmentsReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.NetworkAttachmentsReadyErrorMessage,
-			err.Error()))
-
-		return ctrl.Result{}, err
-	}
-	instance.Status.ReadyCount = depl.GetDeployment().Status.ReadyReplicas
-	if instance.Status.ReadyCount > 0 {
-		instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+		if instance.Status.ReadyCount == *instance.Spec.Replicas {
+			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+		}
 	}
 	// create Deployment - end
 
