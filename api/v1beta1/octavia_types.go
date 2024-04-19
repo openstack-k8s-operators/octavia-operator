@@ -302,11 +302,21 @@ func init() {
 	SchemeBuilder.Register(&Octavia{}, &OctaviaList{})
 }
 
-// IsReady - returns true if service is ready to server requests
+// IsReady - returns true if services are ready to serve requests
 func (instance Octavia) IsReady() bool {
-	ready := instance.Status.OctaviaAPIReadyCount > 0
-	// TODO: add other ready counts
-	return ready
+	readyCounts := []int32{
+		instance.Status.OctaviaAPIReadyCount,
+		instance.Status.OctaviaHealthManagerReadyCount,
+		instance.Status.OctaviaHousekeepingReadyCount,
+		instance.Status.OctaviaWorkerReadyCount,
+	}
+
+	for _, readyCount := range readyCounts {
+		if readyCount < 1 {
+			return false
+		}
+	}
+	return true
 }
 
 // SetupDefaults - initializes any CRD field defaults based on environment variables (the defaulting mechanism itself is implemented via webhooks)
