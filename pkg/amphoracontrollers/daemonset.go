@@ -90,6 +90,18 @@ func DaemonSet(
 		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
 	}
 
+	// Because we don't use jobboard, we need to ensure that the octavia
+	// controllers are gracefully shutdown, so after they receive the signal,
+	// they need to complete the jobs that are being executed (creating a LB,
+	// updating a listener)
+	// 600 sec is close to the value that was used in tripleo, it's based on the
+	// max duration of a flow in a worst case scenario (updating an amphora that
+	// is not reachable).
+	// The octavia [DEFAULT].graceful_shutdown_timeout is set accordingly
+	// TODO(gthiemonge) This setting must be updated/removed when Jobboard is
+	// re-enabled
+	terminationGracePeriodSeconds := int64(600)
+
 	daemonset := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -105,7 +117,8 @@ func DaemonSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					ServiceAccountName: instance.Spec.ServiceAccount,
+					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
+					ServiceAccountName:            instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
 							Name:           serviceName,
