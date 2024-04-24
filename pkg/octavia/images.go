@@ -34,7 +34,7 @@ const (
 	AmphoraImageVertTag = "amphora-image-vert"
 )
 
-type OctaviaAmphoraImage struct {
+type AmphoraImage struct {
 	ID       string
 	URL      string
 	Checksum string
@@ -73,7 +73,7 @@ func getTags(
 func ensureAmphoraImage(
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
-	amphoraImage OctaviaAmphoraImage,
+	amphoraImage AmphoraImage,
 	imageStatus string,
 ) (bool, error) {
 	log.Info(fmt.Sprintf("Ensuring image %+v", amphoraImage.Name))
@@ -131,7 +131,7 @@ func amphoraImageListByTag(
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
 	tag string,
-) (map[string]OctaviaAmphoraImage, error) {
+) (map[string]AmphoraImage, error) {
 	listOpts := images.ListOpts{
 		Sort: "created_at:desc",
 		Tags: []string{tag},
@@ -147,7 +147,7 @@ func amphoraImageListByTag(
 		return nil, err
 	}
 
-	existingAmphoraImages := map[string]OctaviaAmphoraImage{}
+	existingAmphoraImages := map[string]AmphoraImage{}
 	for _, image := range allImages {
 		var checksum string
 		prop := image.Properties["image_checksum"]
@@ -159,7 +159,7 @@ func amphoraImageListByTag(
 		if _, ok := existingAmphoraImages[image.Name]; ok {
 			log.Info(fmt.Sprintf("Multiple '%s' images exist. The Octavia service uses only the most recent image", image.Name))
 		} else {
-			existingAmphoraImages[image.Name] = OctaviaAmphoraImage{
+			existingAmphoraImages[image.Name] = AmphoraImage{
 				ID:       image.ID,
 				Name:     image.Name,
 				Status:   image.Status,
@@ -174,7 +174,7 @@ func amphoraImageListByTag(
 func amphoraImageList(
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
-) (map[string]OctaviaAmphoraImage, error) {
+) (map[string]AmphoraImage, error) {
 	amphoraImages, err := amphoraImageListByTag(imageClient, log, AmphoraImageTag)
 	if err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func EnsureAmphoraImages(
 	instance *octaviav1.Octavia,
 	log *logr.Logger,
 	helper *helper.Helper,
-	imageList []OctaviaAmphoraImage,
+	imageList []AmphoraImage,
 ) (bool, error) {
 	osclient, err := getOpenstackClient(ctx, instance, helper)
 	if err != nil {
@@ -242,7 +242,6 @@ func EnsureAmphoraImages(
 func GetImageOwnerID(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
-	log *logr.Logger,
 	helper *helper.Helper,
 ) (string, error) {
 	osclient, err := getOpenstackClient(ctx, instance, helper)

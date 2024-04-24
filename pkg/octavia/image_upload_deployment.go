@@ -67,7 +67,7 @@ func getInitVolumeMounts() []corev1.VolumeMount {
 }
 
 // GetVolumeMounts - general VolumeMounts
-func getVolumeMounts(serviceName string) []corev1.VolumeMount {
+func getVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "amphora-image",
@@ -116,7 +116,7 @@ func ImageUploadDeployment(
 							},
 							Args:         args,
 							Image:        instance.Spec.ApacheContainerImage,
-							VolumeMounts: getVolumeMounts("octavia-image-upload"),
+							VolumeMounts: getVolumeMounts(),
 							Resources:    instance.Spec.Resources,
 							// TODO(gthiemonge) do we need probes?
 						},

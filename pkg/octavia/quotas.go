@@ -28,10 +28,7 @@ import (
 )
 
 func ensureComputeQuotas(
-	ctx context.Context,
-	instance *octaviav1.Octavia,
 	log *logr.Logger,
-	helper *helper.Helper,
 	osclient *openstack.OpenStack,
 	serviceTenantID string,
 ) error {
@@ -72,10 +69,7 @@ func ensureComputeQuotas(
 }
 
 func ensureNetworkQuotas(
-	ctx context.Context,
-	instance *octaviav1.Octavia,
 	log *logr.Logger,
-	helper *helper.Helper,
 	osclient *openstack.OpenStack,
 	serviceTenantID string,
 ) error {
@@ -129,10 +123,10 @@ func EnsureQuotas(
 		return fmt.Errorf("error while getting the project %s: %w", instance.Spec.TenantName, err)
 	}
 
-	if err := ensureComputeQuotas(ctx, instance, log, helper, osclient, serviceTenant.ID); err != nil {
+	if err := ensureComputeQuotas(log, osclient, serviceTenant.ID); err != nil {
 		return fmt.Errorf("error while setting the compute quotas: %w", err)
 	}
-	if err := ensureNetworkQuotas(ctx, instance, log, helper, osclient, serviceTenant.ID); err != nil {
+	if err := ensureNetworkQuotas(log, osclient, serviceTenant.ID); err != nil {
 		return fmt.Errorf("error while setting the network quotas: %w", err)
 	}
 

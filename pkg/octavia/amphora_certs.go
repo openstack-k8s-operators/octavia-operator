@@ -113,7 +113,7 @@ func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, *x509
 }
 
 // Create a certificate and key for the client and sign it with the CA
-func generateClientCert(caCertPEM []byte, caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKey, caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error) {
+func generateClientCert(caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKey, caPrivKey *rsa.PrivateKey, commonName string) ([]byte, error) {
 
 	certTemplate := &x509.Certificate{
 		SerialNumber:          big.NewInt(2019),
@@ -152,7 +152,7 @@ func EnsureAmphoraCerts(
 	h *helper.Helper,
 	log *logr.Logger) error {
 	var oAmpSecret *corev1.Secret
-	var serverCAPass []byte = nil
+	var serverCAPass []byte
 
 	certsSecretName := fmt.Sprintf("%s-certs-secret", instance.Name)
 	_, _, err := secret.GetSecret(ctx, h, certsSecretName, instance.Namespace)
@@ -192,7 +192,7 @@ func EnsureAmphoraCerts(
 		if err != nil {
 			return fmt.Errorf("Error while generating amphora client key: %w", err)
 		}
-		clientCert, err := generateClientCert(clientCACert, clientCATemplate, clientKey, clientCAKey, "Octavia controller")
+		clientCert, err := generateClientCert(clientCATemplate, clientKey, clientCAKey, "Octavia controller")
 		if err != nil {
 			return fmt.Errorf("Error while generating amphora client certificate: %w", err)
 		}

@@ -46,7 +46,7 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, portName string, networkID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		NetworkID: networkID,
 	}
@@ -78,7 +78,7 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 		ipAddress = LbMgmtRouterPortIPv6
 	}
 
-	p, err := findPort(client, LbMgmtRouterPortName, tenantNetwork.ID, ipAddress, log)
+	p, err := findPort(client, tenantNetwork.ID, ipAddress, log)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func ensureProvSubnet(client *gophercloud.ServiceClient, providerNetwork *networ
 
 func ensureProvNetwork(client *gophercloud.ServiceClient, serviceTenantID string, log *logr.Logger) (
 	*networks.Network, error) {
-	provNet, err := getNetwork(client, LbProvNetName, serviceTenantID)
+	_, err := getNetwork(client, LbProvNetName, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,7 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, serviceTenantID string
 		AdminStateUp: &asu,
 		TenantID:     serviceTenantID,
 	}
-	provNet, err = ensureNetworkExt(client, createOpts, log, serviceTenantID)
+	provNet, err := ensureNetworkExt(client, createOpts, log, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -422,7 +422,7 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 
 func externalFixedIPs(subnetID string) []routers.ExternalFixedIP {
 	ips := []routers.ExternalFixedIP{
-		routers.ExternalFixedIP{
+		{
 			IPAddress: LbRouterFixedIPAddress,
 			SubnetID:  subnetID,
 		},
