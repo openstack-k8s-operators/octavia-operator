@@ -168,6 +168,7 @@
     - export EDPM_COMPUTE_CEPH_ENABLED=false
     - export BMO_SETUP=false
     - export KUBECONFIG=~/.kube/config
+    - alias openstack='oc exec -ti openstackclient -- openstack'
   tags: config
 
 - name: Deploy openstack operators
