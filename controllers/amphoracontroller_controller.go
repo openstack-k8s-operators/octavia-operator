@@ -187,29 +187,6 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 		instance.Status.NetworkAttachments = map[string][]string{}
 	}
 
-	// Always patch the instance status when exiting this function so we can persist any changes.
-	defer func() {
-		// update the overall status condition if service is ready
-		if instance.IsReady() {
-			instance.Status.Conditions.MarkTrue(condition.ReadyCondition, condition.ReadyMessage)
-		} else {
-			instance.Status.Conditions.MarkUnknown(condition.ReadyCondition, condition.InitReason, condition.ReadyInitMessage)
-			instance.Status.Conditions.Set(instance.Status.Conditions.Mirror(condition.ReadyCondition))
-		}
-
-		if err := helper.SetAfter(instance); err != nil {
-			Log.Error(err, "Set after and calc patch/diff")
-		}
-
-		if changed := helper.GetChanges()["status"]; changed {
-			patch := client.MergeFrom(helper.GetBeforeObject())
-
-			if err := r.Status().Patch(ctx, instance, patch); err != nil && !k8s_errors.IsNotFound(err) {
-				Log.Error(err, "Update status")
-			}
-		}
-	}()
-
 	// Handle non-deleted clusters
 	return r.reconcileNormal(ctx, instance, helper)
 }
