@@ -648,6 +648,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
 	templateParameters["AmpFlavorId"] = templateVars.AmphoraDefaultFlavorID
 	templateParameters["NovaSshKeyPair"] = octavia.NovaKeyPairName
+	templateParameters["AmpImageOwnerId"] = spec.AmphoraImageOwnerID
 	serverCAPassphrase := caPassSecret.Data["server-ca-passphrase"]
 	if serverCAPassphrase != nil {
 		templateParameters["ServerCAKeyPassphrase"] = string(serverCAPassphrase)

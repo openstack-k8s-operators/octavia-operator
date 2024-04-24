@@ -136,6 +136,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// AmphoraCustomFlavors - User-defined flavors for Octavia
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=""
+	AmphoraImageOwnerID string `json:"amphoraImageOwnerID,omitempty"`
+
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS tls.Ca `json:"tls,omitempty"`
