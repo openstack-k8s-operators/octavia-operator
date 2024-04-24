@@ -187,6 +187,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
 		condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
 		condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaAmphoraCertsReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraCertsReadyInitMessage),
 		amphoraControllerInitCondition(octaviav1.HealthManager),
 		amphoraControllerInitCondition(octaviav1.Housekeeping),
 		amphoraControllerInitCondition(octaviav1.Worker),
@@ -504,13 +505,14 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	err = octavia.EnsureAmphoraCerts(ctx, instance, helper, &Log)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
+			octaviav1.OctaviaAmphoraCertsReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
+			octaviav1.OctaviaAmphoraCertsReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAmphoraCertsReadyCondition, octaviav1.OctaviaAmphoraCertsReadyInitMessage)
 
 	if err = octavia.EnsureQuotas(ctx, instance, &r.Log, helper); err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(

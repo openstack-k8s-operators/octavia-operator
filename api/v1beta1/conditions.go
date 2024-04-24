@@ -30,6 +30,8 @@ const (
 	OctaviaHousekeepingReadyCondition condition.Type = "OctaviaHousekeepingReady"
 
 	OctaviaWorkerReadyCondition condition.Type = "OctaviaWorkerReady"
+
+	OctaviaAmphoraCertsReadyCondition condition.Type = "OctaviaAmphoraCertsReady"
 )
 
 // Common Messages used by API objects
@@ -69,4 +71,13 @@ const (
 
 	// OctaviaAmphoraControllerReadyErrorMessage
 	OctaviaWorkerReadyErrorMessage = "OctaviaWorker error occured %s"
+
+	//
+	// OctaviaAmphoraCertsReady condition messages
+	//
+	// OctaviaAmphoraCertsReadyInitMessage
+	OctaviaAmphoraCertsReadyInitMessage = "Octavia Amphora certificates are not initialized"
+
+	// OctaviaAmphoraCertsReadyErrorMessage
+	OctaviaAmphoraCertsReadyErrorMessage = "Octavia Amphora certificates error occured %s"
 )
