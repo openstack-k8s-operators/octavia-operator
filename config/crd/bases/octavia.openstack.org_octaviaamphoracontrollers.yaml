@@ -74,6 +74,9 @@ spec:
                   - name
                   type: object
                 type: array
+              amphoraImageOwnerID:
+                default: ""
+                type: string
               containerImage:
                 description: ContainerImage - Amphora Controller Container Image URL
                 type: string

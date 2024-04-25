@@ -649,8 +649,13 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
+	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, &Log, helper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
+		ampImageOwnerID, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
@@ -700,7 +705,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 
 	// Skip the other amphora controller pods until the health managers are all up and running.
 	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
+		ampImageOwnerID, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
@@ -729,7 +734,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		instance.Spec.OctaviaWorker, octaviav1.Worker)
+		ampImageOwnerID, instance.Spec.OctaviaWorker, octaviav1.Worker)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
@@ -1261,6 +1266,7 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
 	networkInfo octavia.NetworkProvisioningSummary,
+	ampImageOwnerID string,
 	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
 	role string,
 ) (*octaviav1.OctaviaAmphoraController,
@@ -1288,6 +1294,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		daemonset.Spec.TLS = instance.Spec.OctaviaAPI.TLS.Ca
+		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

@@ -238,3 +238,22 @@ func EnsureAmphoraImages(
 
 	return true, nil
 }
+
+func GetImageOwnerID(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	log *logr.Logger,
+	helper *helper.Helper,
+) (string, error) {
+	osclient, err := getOpenstackClient(ctx, instance, helper)
+	if err != nil {
+		return "", fmt.Errorf("error while getting a service client when getting image owner: %w", err)
+	}
+
+	project, err := GetProject(osclient, instance.Spec.TenantName)
+	if err != nil {
+		return "", fmt.Errorf("error while getting the project %s: %w", instance.Spec.TenantName, err)
+	}
+
+	return project.ID, nil
+}
