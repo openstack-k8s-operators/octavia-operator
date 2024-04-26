@@ -162,12 +162,6 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 	instance.Status.Conditions.Init(&cl)
 	instance.Status.ObservedGeneration = instance.Generation
 
-	if isNewInstance {
-		if err := r.Status().Update(ctx, instance); err != nil {
-			return ctrl.Result{}, err
-		}
-	}
-
 	// If we're not deleting this and the service object doesn't have our finalizer, add it.
 	if instance.DeletionTimestamp.IsZero() && controllerutil.AddFinalizer(instance, helper.GetFinalizer()) || isNewInstance {
 		return ctrl.Result{}, nil
@@ -197,10 +191,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileDelete(ctx context.Context
 
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 
-	if err := r.Update(ctx, instance); err != nil && !k8s_errors.IsNotFound(err) {
-		return ctrl.Result{}, err
-	}
-
 	Log.Info("Reconciled Service delete successfully")
 	return ctrl.Result{}, nil
 }
@@ -223,15 +213,6 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service")
-	if !controllerutil.ContainsFinalizer(instance, helper.GetFinalizer()) {
-		// If the service object doesn't have our finalizer, add it.
-		controllerutil.AddFinalizer(instance, helper.GetFinalizer())
-		// Register the finalizer immediately to avoid orphaning resources on delete
-		err := r.Update(ctx, instance)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-	}
 
 	// Prepare NetworkAttachments first, it must be done before generating the
 	// configuration as the config uses IP addresses of the attachments.
@@ -382,7 +363,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	inputHash, err := r.createHashOfInputHashes(instance, configMapVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -690,7 +671,6 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 }
 
 func (r *OctaviaAmphoraControllerReconciler) createHashOfInputHashes(
-	ctx context.Context,
 	instance *octaviav1.OctaviaAmphoraController,
 	envVars map[string]env.Setter,
 ) (string, error) {
@@ -702,9 +682,6 @@ func (r *OctaviaAmphoraControllerReconciler) createHashOfInputHashes(
 
 	if hashMap, changed := util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		if err := r.Client.Status().Update(ctx, instance); err != nil {
-			return hash, err
-		}
 		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, nil
