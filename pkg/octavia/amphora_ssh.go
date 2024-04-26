@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -141,7 +140,7 @@ func uploadKeypair(
 		return fmt.Errorf("Could not extract keypairs: %w", err)
 	}
 
-	var keypairExists bool = false
+	var keypairExists = false
 	for _, kp := range allKeyPairs {
 		if kp.Name == NovaKeyPairName {
 			keypairExists = true
@@ -177,7 +176,6 @@ func EnsureAmpSSHConfig(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
 	h *helper.Helper,
-	log *logr.Logger,
 ) error {
 	cmap, _, err := configmap.GetConfigMap(
 		ctx, h, instance, instance.Spec.LoadBalancerSSHPubKey, 10*time.Second)

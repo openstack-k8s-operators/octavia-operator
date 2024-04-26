@@ -32,7 +32,6 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
@@ -206,16 +205,14 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileDelete(ctx context.Context
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAmphoraControllerReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
-	helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaAmphoraControllerReconciler) reconcileUpdate(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service update")
 	Log.Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAmphoraControllerReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
-	helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaAmphoraControllerReconciler) reconcileUpgrade(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service upgrade")
 	Log.Info("Reconciled Service upgrade successfully")
@@ -393,7 +390,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// Handle service update
-	ctrlResult, err := r.reconcileUpdate(ctx, instance, helper)
+	ctrlResult, err := r.reconcileUpdate(ctx)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -401,7 +398,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 
 	// Handle service upgrade
-	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
+	ctrlResult, err = r.reconcileUpgrade(ctx)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -578,7 +575,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	parentOctaviaName := octavia.GetOwningOctaviaControllerName(
 		instance)
 	serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", parentOctaviaName)
-	caPassSecret, _, err := secret.GetSecret(
+	caPassSecret, _, err := oko_secret.GetSecret(
 		ctx, helper, serverCAPassSecretName, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
@@ -681,7 +678,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		},
 	}
 
-	err = secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
+	err = oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
 	if err != nil {
 		r.Log.Error(err, "unable to process config map")
 		return err
@@ -795,7 +792,7 @@ func getPodIPs(name string, ns string, client kubernetes.Interface, log *logr.Lo
 func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(context.Background()).WithName("Controllers").WithName("Amphora")
+	l := log.FromContext(ctx).WithName("Controllers").WithName("Amphora")
 
 	for _, field := range allWatchFields {
 		crList := &octaviav1.OctaviaAmphoraControllerList{}
@@ -803,7 +800,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
 			Namespace:     src.GetNamespace(),
 		}
-		err := r.Client.List(context.TODO(), crList, listOps)
+		err := r.Client.List(ctx, crList, listOps)
 		if err != nil {
 			return []reconcile.Request{}
 		}

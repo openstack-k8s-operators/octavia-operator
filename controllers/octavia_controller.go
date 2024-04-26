@@ -35,7 +35,6 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
-	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
@@ -429,7 +428,7 @@ func (r *OctaviaReconciler) reconcileInit(
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaReconciler) reconcileUpdate(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileUpdate(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service update")
 
@@ -440,7 +439,7 @@ func (r *OctaviaReconciler) reconcileUpdate(ctx context.Context, instance *octav
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaReconciler) reconcileUpgrade(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
+func (r *OctaviaReconciler) reconcileUpgrade(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service upgrade")
 
@@ -572,7 +571,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
 	// Handle service update
-	ctrlResult, err = r.reconcileUpdate(ctx, instance, helper)
+	ctrlResult, err = r.reconcileUpdate(ctx)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -580,7 +579,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	// Handle service upgrade
-	ctrlResult, err = r.reconcileUpgrade(ctx, instance, helper)
+	ctrlResult, err = r.reconcileUpgrade(ctx)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -649,7 +648,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
-	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, &Log, helper)
+	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, helper)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -773,7 +772,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	// Amphora SSH key config for debugging
-	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper, &Log)
+	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1044,7 +1043,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 		return ctrl.Result{}, err
 	}
 
-	urlMap, err := r.getLocalImageURLs(ctx, helper, endpoint)
+	urlMap, err := r.getLocalImageURLs(endpoint)
 	if err != nil {
 		Log.Info(fmt.Sprintf("Cannot get amphora image list: %s", err))
 		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
@@ -1062,33 +1061,34 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))
 	instance.Status.Hash[octaviav1.ImageUploadHash] = hash
 
-	// Tasks are successfull, the deployment can be deleted
+	// Tasks are successful, the deployment can be deleted
 	Log.Info("Deleting amphora image upload deployment")
-	depl.Delete(ctx, helper)
+	err = depl.Delete(ctx, helper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaReconciler) getLocalImageURLs(
-	ctx context.Context,
-	helper *helper.Helper,
 	endpoint string,
-) ([]octavia.OctaviaAmphoraImage, error) {
+) ([]octavia.AmphoraImage, error) {
 	// Get the list of images and their hashes
-	listUrl := fmt.Sprintf("%s/octavia-amphora-images.sha256sum", endpoint)
+	listURL := fmt.Sprintf("%s/octavia-amphora-images.sha256sum", endpoint)
 
-	resp, err := http.Get(listUrl)
+	resp, err := http.Get(listURL)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 	scanner := bufio.NewScanner(resp.Body)
-	ret := []octavia.OctaviaAmphoraImage{}
+	ret := []octavia.AmphoraImage{}
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) == 2 {
 			name, _ := strings.CutSuffix(fields[1], ".qcow2")
-			ret = append(ret, octavia.OctaviaAmphoraImage{
+			ret = append(ret, octavia.AmphoraImage{
 				Name:     name,
 				URL:      fmt.Sprintf("%s/%s", endpoint, fields[1]),
 				Checksum: fields[0],
@@ -1180,7 +1180,7 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 			Labels:        cmLabels,
 		},
 	}
-	err := secret.EnsureSecrets(ctx, h, instance, cms, envVars)
+	err := oko_secret.EnsureSecrets(ctx, h, instance, cms, envVars)
 	if err != nil {
 		return err
 	}
