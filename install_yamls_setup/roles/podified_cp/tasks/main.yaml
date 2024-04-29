@@ -16,23 +16,56 @@
 - name: Install required packages
   ansible.builtin.package:
     name:
-      - ansible-core
+      - ansible
       - gcc
       - git-core
       - make
       - podman
       - python3
       - python3-pip
-      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
     state: latest
   become: yes
+  tags: install
+
+- name: Install ansible
+  ansible.builtin.package:
+    name:
+      - ansible
+    state: latest
+  become: yes
+  when:
+    - (ansible_distribution == 'CentOS' or
+       ansible_distribution == 'Rocky' or
+       ansible_distribution == 'RedHat')
+    - ansible_distribution_major_version | int == 8
+  tags: install
+
+- name: Install ansible-core
+  ansible.builtin.package:
+    name:
+      - ansible-core
+    state: latest
+  become: yes
+  when:
+    - (ansible_distribution == 'CentOS' or
+       ansible_distribution == 'Rocky' or
+       ansible_distribution == 'RedHat')
+    - ansible_distribution_major_version | int >= 9
+  tags: install
+
+- name: Install kubefwd_amd64
+  ansible.builtin.dnf:
+    name:
+      - https://github.com/txn2/kubefwd/releases/download/1.22.5/kubefwd_amd64.rpm
+    disable_gpg_check: True
+  become: yes
+  when: ansible_os_family == 'RedHat'
   tags: install
 
 - name: Install some extra packages
   ansible.builtin.package:
     name:
       - bash-completion
-      - delve
       - tmux
       - vim
     state: latest
@@ -93,25 +126,15 @@
     state: link
   tags: crc
 
-- name: Create devsetup using make
-  shell:
-    cmd: |
-      set +ex
-      eval $(crc oc-env)
-      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      make crc_storage
-      make input
-    chdir: "~/install_yamls"
-  tags: crc
-
 - name: Run make crc_attach_default_interface
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make attach_default_interface_cleanup
       make crc_attach_default_interface
+      EDPM_TOTAL_NODES=1 EDPM_COMPUTE_VCPUS=16 EDPM_COMPUTE_RAM=100 EDPM_COMPUTE_DISK_SIZE=100 make edpm_compute
       exit 0
     chdir: "~/install_yamls/devsetup"
   tags: crc
@@ -121,7 +144,7 @@
 - name: Add docker.io credentials to pull-secret in OSP cluster
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc get secret/pull-secret -n openshift-config \
         --template='{{ '{{' }} index .data ".dockerconfigjson" | base64decode{{ '}}' }}' \
@@ -133,24 +156,44 @@
         --from-file=.dockerconfigjson=pull-secret.json
   tags: pull-secret
 
+- name: Add exports to .bashrc
+  lineinfile:
+    path: ~/.bashrc
+    line: "{{ item }}"
+  with_items:
+    - export GOPATH=$HOME/go
+    - export PATH=$PATH:~/bin:$GOPATH/bin:~/.crc/bin/oc
+    - export OS_CLOUD=default
+    - export OS_PASSWORD=12345678
+    - export EDPM_COMPUTE_CEPH_ENABLED=false
+    - export BMO_SETUP=false
+    - export KUBECONFIG=~/.kube/config
+    - alias openstack='oc exec -ti openstackclient -- openstack'
+  tags: config
+
 - name: Deploy openstack operators
   shell:
     cmd: |
-      set +ex
+      set -exo pipefail
       eval $(crc oc-env)
       oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
-      make openstack 2>&1 | tee make_openstack.log
-      sleep 10; make openstack_wait; sleep 10
-      make openstack_deploy 2>&1 | tee make_openstack_deploy.log
-      sleep 10; make openstack_wait_deploy; sleep 10
+      make crc_storage
+      make input
+      make openstack_wait 2>&1 | tee make_openstack.log
+      sleep 20
+      TIMEOUT=800s make openstack_wait_deploy 2>&1 | \
+          tee make_openstack_deploy.log
+      sleep 20
+      TIMEOUT=800s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
 
+      oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type json \
+                -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
       oc get csv -n openstack-operators octavia-operator.v0.0.1 -o json | \
         jq -r 'del(.metadata.generation, .metadata.resourceVersion, .metadata.uid)'  > operator_csv.json
       sleep 10
       oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type=json \
         -p="[{'op': 'remove', 'path': '/spec/webhookdefinitions'}]"
 
-      oc project openstack
       oc patch openstackcontrolplane openstack-galera-network-isolation --type=merge --patch '
           spec:
             octavia:
@@ -164,17 +207,8 @@
     chdir: "~/install_yamls"
   tags: crc
 
-- name: Add exports to .bashrc
-  lineinfile:
-    path: ~/.bashrc
-    line: "{{ item }}"
-  with_items:
-    - export PATH=$PATH:~/.crc/bin/oc
-    - export OS_CLOUD=default
-    - export OS_PASSWORD=12345678
-    - export EDPM_COMPUTE_CEPH_ENABLED=false
-    - export BMO_SETUP=false
-    - export KUBECONFIG=~/.kube/config
+- name: Install delve debugger
+  command: go install github.com/go-delve/delve/cmd/dlv@latest
   tags: config
 
 - name: Copy ~/.tmux.conf
