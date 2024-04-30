@@ -199,7 +199,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	crs := &octaviav1.OctaviaAPIList{}
 
 	// index passwordSecretField
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, passwordSecretField, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, passwordSecretField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
 		cr := rawObj.(*octaviav1.OctaviaAPI)
 		if cr.Spec.Secret == "" {
@@ -211,7 +211,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	}
 
 	// index caBundleSecretNameField
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, caBundleSecretNameField, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, caBundleSecretNameField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
 		cr := rawObj.(*octaviav1.OctaviaAPI)
 		if cr.Spec.TLS.CaBundleSecretName == "" {
@@ -223,7 +223,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	}
 
 	// index tlsAPIInternalField
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, tlsAPIInternalField, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, tlsAPIInternalField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
 		cr := rawObj.(*octaviav1.OctaviaAPI)
 		if cr.Spec.TLS.API.Internal.SecretName == nil {
@@ -235,7 +235,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	}
 
 	// index tlsAPIPublicField
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, tlsAPIPublicField, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, tlsAPIPublicField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
 		cr := rawObj.(*octaviav1.OctaviaAPI)
 		if cr.Spec.TLS.API.Public.SecretName == nil {
@@ -247,7 +247,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 	}
 
 	// index tlsOvnField
-	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAPI{}, tlsOvnField, func(rawObj client.Object) []string {
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, tlsOvnField, func(rawObj client.Object) []string {
 		// Extract the secret name from the spec, if one is provided
 		cr := rawObj.(*octaviav1.OctaviaAPI)
 		if cr.Spec.TLS.Ovn.SecretName == nil {
@@ -267,7 +267,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient(), r.GetLogger(ctx)))).
+		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient()))).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
@@ -859,7 +859,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
 
-	db, err := mariadbv1.GetDatabaseByName(ctx, h, octavia.DatabaseName)
+	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, h, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err
 	}

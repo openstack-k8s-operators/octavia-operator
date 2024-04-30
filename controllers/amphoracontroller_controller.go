@@ -476,7 +476,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 ) error {
 	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
-	db, err := mariadbv1.GetDatabaseByName(ctx, helper, octavia.DatabaseName)
+	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err
 	}
