@@ -30,6 +30,14 @@ const (
 	OctaviaHousekeepingReadyCondition condition.Type = "OctaviaHousekeepingReady"
 
 	OctaviaWorkerReadyCondition condition.Type = "OctaviaWorkerReady"
+
+	OctaviaAmphoraCertsReadyCondition condition.Type = "OctaviaAmphoraCertsReady"
+
+	OctaviaQuotasReadyCondition condition.Type = "OctaviaQuotasReady"
+
+	OctaviaAmphoraSSHReadyCondition condition.Type = "OctaviaAmphoraSSHReady"
+
+	OctaviaAmphoraImagesReadyCondition condition.Type = "OctaviaAmphoraImagesReady"
 )
 
 // Common Messages used by API objects
@@ -69,4 +77,52 @@ const (
 
 	// OctaviaAmphoraControllerReadyErrorMessage
 	OctaviaWorkerReadyErrorMessage = "OctaviaWorker error occured %s"
+
+	//
+	// OctaviaAmphoraCertsReady condition messages
+	//
+	// OctaviaAmphoraCertsReadyInitMessage
+	OctaviaAmphoraCertsReadyInitMessage = "Octavia Amphora certificates are not initialized"
+
+	// OctaviaAmphoraCertsReadyErrorMessage
+	OctaviaAmphoraCertsReadyErrorMessage = "Octavia Amphora certificates error occured %s"
+
+	// OctaviaAmphoraCertsReadyCompleteMessage
+	OctaviaAmphoraCertsReadyCompleteMessage = "Octavia Amphora certificates setup completed"
+
+	//
+	// OctaviaQuotasReady condition messages
+	//
+	// OctaviaQuotasReadyInitMessage
+	OctaviaQuotasReadyInitMessage = "Octavia quotas are not initialized"
+
+	// OctaviaAmphoraCertsReadyErrorMessage
+	OctaviaQuotasReadyErrorMessage = "Octavia quotas setup error occured %s"
+
+	// OctaviaAmphoraSSHReadyCompleteMessage
+	OctaviaQuotasReadyCompleteMessage = "Octavia quotas setup completed"
+
+	//
+	// OctaviaAmphoraSSHReady condition messages
+	//
+	// OctaviaAmphoraSSHReadyInitMessage
+	OctaviaAmphoraSSHReadyInitMessage = "Octavia Amphora SSH setup is not initialized"
+
+	// OctaviaAmphoraSSHReadyErrorMessage
+	OctaviaAmphoraSSHReadyErrorMessage = "Octavia Amphora SSH setup error occured %s"
+
+	// OctaviaAmphoraSSHReadyCompleteMessage
+	OctaviaAmphoraSSHReadyCompleteMessage = "Octavia Amphora SSH setup completed"
+
+	//
+	// OctaviaAmphoraImagesReady condition messages
+	//
+	// OctaviaAmphoraImagesReadyInitMessage
+	OctaviaAmphoraImagesReadyInitMessage = "Octavia Amphora Images setup is not initialized"
+
+	// OctaviaAmphoraImagesReadyErrorMessage
+	OctaviaAmphoraImagesReadyErrorMessage = "Octavia Amphora Images setup error occured %s"
+
+	// OctaviaAmphoraImagesReadyCompleteMessage
+	OctaviaAmphoraImagesReadyCompleteMessage = "Octavia Amphora Images setup completed"
 )

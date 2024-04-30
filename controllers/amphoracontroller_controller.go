@@ -461,8 +461,9 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	if instance.Status.Conditions.AllSubConditionIsTrue() {
 		instance.Status.Conditions.MarkTrue(
 			condition.ReadyCondition, condition.ReadyMessage)
+	} else {
+		Log.Info("Not all conditions are ready for Amphora controller")
 	}
-	Log.Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
 }
 

@@ -187,6 +187,10 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
 		condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
 		condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaAmphoraCertsReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraCertsReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaQuotasReadyCondition, condition.InitReason, octaviav1.OctaviaQuotasReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaAmphoraSSHReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraSSHReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaAmphoraImagesReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraImagesReadyInitMessage),
 		amphoraControllerInitCondition(octaviav1.HealthManager),
 		amphoraControllerInitCondition(octaviav1.Housekeeping),
 		amphoraControllerInitCondition(octaviav1.Worker),
@@ -500,29 +504,34 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			condition.InputReadyWaitingMessage))
 		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
+	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	err = octavia.EnsureAmphoraCerts(ctx, instance, helper, &Log)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
+			octaviav1.OctaviaAmphoraCertsReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
+			octaviav1.OctaviaAmphoraCertsReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaAmphoraCertsReadyCondition,
+		octaviav1.OctaviaAmphoraCertsReadyCompleteMessage)
 
 	if err = octavia.EnsureQuotas(ctx, instance, &r.Log, helper); err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
+			octaviav1.OctaviaQuotasReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
+			octaviav1.OctaviaQuotasReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-
-	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaQuotasReadyCondition,
+		octaviav1.OctaviaQuotasReadyCompleteMessage)
 
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
@@ -774,16 +783,34 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// Amphora SSH key config for debugging
 	err = octavia.EnsureAmpSSHConfig(ctx, instance, helper)
 	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraSSHReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraSSHReadyErrorMessage,
+			err.Error()))
 		return ctrl.Result{}, err
 	}
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaAmphoraSSHReadyCondition,
+		octaviav1.OctaviaAmphoraSSHReadyCompleteMessage)
 
 	ctrlResult, err = r.reconcileAmphoraImages(ctx, instance, helper)
 	if (ctrlResult != ctrl.Result{}) {
 		return ctrlResult, nil
 	}
 	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
+			err.Error()))
 		return ctrl.Result{}, err
 	}
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaAmphoraImagesReadyCondition,
+		octaviav1.OctaviaAmphoraImagesReadyCompleteMessage)
 
 	// create Deployment - end
 
