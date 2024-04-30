@@ -516,7 +516,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaAmphoraCertsReadyCondition, octaviav1.OctaviaAmphoraCertsReadyInitMessage)
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaAmphoraCertsReadyCondition,
+		octaviav1.OctaviaAmphoraCertsReadyCompleteMessage)
 
 	if err = octavia.EnsureQuotas(ctx, instance, &r.Log, helper); err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
@@ -527,7 +529,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaQuotasReadyCondition, octaviav1.OctaviaQuotasReadyInitMessage)
+	instance.Status.Conditions.MarkTrue(
+		octaviav1.OctaviaQuotasReadyCondition,
+		octaviav1.OctaviaQuotasReadyCompleteMessage)
 
 	//
 	// TODO check when/if Init, Update, or Upgrade should/could be skipped
@@ -789,7 +793,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	instance.Status.Conditions.MarkTrue(
 		octaviav1.OctaviaAmphoraSSHReadyCondition,
-		octaviav1.OctaviaAmphoraSSHReadyInitMessage)
+		octaviav1.OctaviaAmphoraSSHReadyCompleteMessage)
 
 	ctrlResult, err = r.reconcileAmphoraImages(ctx, instance, helper)
 	if (ctrlResult != ctrl.Result{}) {
@@ -806,7 +810,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	instance.Status.Conditions.MarkTrue(
 		octaviav1.OctaviaAmphoraImagesReadyCondition,
-		octaviav1.OctaviaAmphoraImagesReadyInitMessage)
+		octaviav1.OctaviaAmphoraImagesReadyCompleteMessage)
 
 	// create Deployment - end
 

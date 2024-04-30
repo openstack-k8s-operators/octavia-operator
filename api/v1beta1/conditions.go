@@ -87,6 +87,9 @@ const (
 	// OctaviaAmphoraCertsReadyErrorMessage
 	OctaviaAmphoraCertsReadyErrorMessage = "Octavia Amphora certificates error occured %s"
 
+	// OctaviaAmphoraCertsReadyCompleteMessage
+	OctaviaAmphoraCertsReadyCompleteMessage = "Octavia Amphora certificates setup completed"
+
 	//
 	// OctaviaQuotasReady condition messages
 	//
@@ -95,6 +98,9 @@ const (
 
 	// OctaviaAmphoraCertsReadyErrorMessage
 	OctaviaQuotasReadyErrorMessage = "Octavia quotas setup error occured %s"
+
+	// OctaviaAmphoraSSHReadyCompleteMessage
+	OctaviaQuotasReadyCompleteMessage = "Octavia quotas setup completed"
 
 	//
 	// OctaviaAmphoraSSHReady condition messages
@@ -105,6 +111,9 @@ const (
 	// OctaviaAmphoraSSHReadyErrorMessage
 	OctaviaAmphoraSSHReadyErrorMessage = "Octavia Amphora SSH setup error occured %s"
 
+	// OctaviaAmphoraSSHReadyCompleteMessage
+	OctaviaAmphoraSSHReadyCompleteMessage = "Octavia Amphora SSH setup completed"
+
 	//
 	// OctaviaAmphoraImagesReady condition messages
 	//
@@ -113,4 +122,7 @@ const (
 
 	// OctaviaAmphoraImagesReadyErrorMessage
 	OctaviaAmphoraImagesReadyErrorMessage = "Octavia Amphora Images setup error occured %s"
+
+	// OctaviaAmphoraImagesReadyCompleteMessage
+	OctaviaAmphoraImagesReadyCompleteMessage = "Octavia Amphora Images setup completed"
 )
