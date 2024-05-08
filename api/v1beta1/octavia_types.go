@@ -217,6 +217,10 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:default=4
 	// IP Version of the managed subnets
 	SubnetIPVersion int `json:"subnetIpVersion,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// Availability zones for the octavia management network resources
+	AvailabilityZones []string `json:"availabilityZones,omitempty"`
 }
 
 // OctaviaAmphoraFlavor Settings for custom Amphora flavors
