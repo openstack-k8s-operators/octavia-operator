@@ -17,7 +17,13 @@ limitations under the License.
 package v1beta1
 
 import (
+	"fmt"
+
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -95,16 +101,92 @@ var _ webhook.Validator = &Octavia{}
 func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 	octavialog.Info("validate create", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object creation.
+	var allErrs field.ErrorList
+	basePath := field.NewPath("spec")
+	if err := r.Spec.ValidateCreate(basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
+			r.Name, allErrs)
+	}
+
 	return nil, nil
+}
+
+// ValidateCreate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an octavia spec.
+func (r *OctaviaSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+
+	return allErrs
+}
+
+func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+
+	return allErrs
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	octavialog.Info("validate update", "name", r.Name)
 
-	// TODO(user): fill in your validation logic upon object update.
+	oldOctavia, ok := old.(*Octavia)
+	if !ok || oldOctavia == nil {
+		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
+	}
+
+	var allErrs field.ErrorList
+	basePath := field.NewPath("spec")
+
+	if err := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath); err != nil {
+		allErrs = append(allErrs, err...)
+	}
+
+	if len(allErrs) != 0 {
+		return nil, apierrors.NewInvalid(
+			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
+			r.Name, allErrs)
+	}
+
 	return nil, nil
+}
+
+// ValidateUpdate - Exported function wrapping non-exported validate functions,
+// this function can be called externally to validate an barbican spec.
+func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+
+	return allErrs
+}
+
+func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// validate the service override key is valid
+	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+
+	return allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
