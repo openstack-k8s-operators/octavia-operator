@@ -312,7 +312,7 @@ func ensureProvSubnet(client *gophercloud.ServiceClient, providerNetwork *networ
 	return ensureSubnet(client, 4, createOpts, log)
 }
 
-func ensureProvNetwork(client *gophercloud.ServiceClient, serviceTenantID string, log *logr.Logger) (
+func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.OctaviaLbMgmtNetworks, serviceTenantID string, log *logr.Logger) (
 	*networks.Network, error) {
 	_, err := getNetwork(client, LbProvNetName, serviceTenantID)
 	if err != nil {
@@ -321,10 +321,11 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, serviceTenantID string
 
 	asu := true
 	createOpts := networks.CreateOpts{
-		Name:         LbProvNetName,
-		Description:  LbProvNetDescription,
-		AdminStateUp: &asu,
-		TenantID:     serviceTenantID,
+		Name:                  LbProvNetName,
+		Description:           LbProvNetDescription,
+		AdminStateUp:          &asu,
+		TenantID:              serviceTenantID,
+		AvailabilityZoneHints: netDetails.AvailabilityZones,
 	}
 	provNet, err := ensureNetworkExt(client, createOpts, log, serviceTenantID)
 	if err != nil {
@@ -407,10 +408,11 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 
 	asu := true
 	createOpts := networks.CreateOpts{
-		Name:         LbMgmtNetName,
-		Description:  LbMgmtNetDescription,
-		AdminStateUp: &asu,
-		TenantID:     serviceTenantID,
+		Name:                  LbMgmtNetName,
+		Description:           LbMgmtNetDescription,
+		AdminStateUp:          &asu,
+		TenantID:              serviceTenantID,
+		AvailabilityZoneHints: networkDetails.AvailabilityZones,
 	}
 	mgmtNetwork, err = ensureNetwork(client, createOpts, log, serviceTenantID)
 	if err != nil {
@@ -804,7 +806,7 @@ func EnsureAmphoraManagementNetwork(
 		log.Error(err, "Unable to complete configuration of octavia provider network security groups, continuing...")
 	}
 
-	providerNetwork, err := ensureProvNetwork(client, adminTenant.ID, log)
+	providerNetwork, err := ensureProvNetwork(client, netDetails, adminTenant.ID, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -835,9 +837,10 @@ func EnsureAmphoraManagementNetwork(
 		}
 		adminStateUp := true
 		createOpts := routers.CreateOpts{
-			Name:         LbRouterName,
-			AdminStateUp: &adminStateUp,
-			GatewayInfo:  &gatewayInfo,
+			Name:                  LbRouterName,
+			AdminStateUp:          &adminStateUp,
+			GatewayInfo:           &gatewayInfo,
+			AvailabilityZoneHints: netDetails.AvailabilityZones,
 		}
 		router, err = routers.Create(client, createOpts).Extract()
 		if err != nil {

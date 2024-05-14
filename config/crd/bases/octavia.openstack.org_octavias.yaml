@@ -107,6 +107,12 @@ spec:
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
                 properties:
+                  availabilityZones:
+                    description: Availability zones for the octavia management network
+                      resources
+                    items:
+                      type: string
+                    type: array
                   manageLbMgmtNetworks:
                     default: true
                     type: boolean
