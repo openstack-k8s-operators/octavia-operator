@@ -198,6 +198,26 @@ spec:
           name: config-data
         - mountPath: /run/octavia
           name: octavia-run
+        - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          name: combined-ca-bundle
+          readOnly: true
+          subPath: tls-ca-bundle.pem
+        - mountPath: /var/lib/config-data/tls/certs/internal.crt
+          name: internal-tls-certs
+          readOnly: true
+          subPath: tls.crt
+        - mountPath: /var/lib/config-data/tls/private/internal.key
+          name: internal-tls-certs
+          readOnly: true
+          subPath: tls.key
+        - mountPath: /var/lib/config-data/tls/certs/public.crt
+          name: public-tls-certs
+          readOnly: true
+          subPath: tls.crt
+        - mountPath: /var/lib/config-data/tls/private/public.key
+          name: public-tls-certs
+          readOnly: true
+          subPath: tls.key
       initContainers:
       - args:
         - -c

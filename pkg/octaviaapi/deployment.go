@@ -82,11 +82,14 @@ func Deployment(
 	// create Volume and VolumeMounts
 	volumes := getVolumes(instance.Name)
 	volumeMounts := getVolumeMounts("octavia-api")
+	volumeMountsDriverAgent := getVolumeMounts("octavia-driver-agent")
 
 	// add CA cert if defined
 	if instance.Spec.TLS.CaBundleSecretName != "" {
 		volumes = append(volumes, instance.Spec.TLS.CreateVolume())
 		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
+		volumeMountsDriverAgent = append(volumeMountsDriverAgent, instance.Spec.TLS.CreateVolumeMounts(nil)...)
+
 	}
 
 	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {
@@ -105,6 +108,7 @@ func Deployment(
 			}
 			volumes = append(volumes, svc.CreateVolume(endpt.String()))
 			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
+			volumeMountsDriverAgent = append(volumeMountsDriverAgent, svc.CreateVolumeMounts(endpt.String())...)
 		}
 	}
 
@@ -115,6 +119,7 @@ func Deployment(
 		}
 		volumes = append(volumes, svc.CreateVolume("ovndb"))
 		volumeMounts = append(volumeMounts, svc.CreateVolumeMounts("ovndb")...)
+		volumeMountsDriverAgent = append(volumeMountsDriverAgent, svc.CreateVolumeMounts("ovndb")...)
 	}
 
 	envVars := map[string]env.Setter{}
@@ -166,7 +171,7 @@ func Deployment(
 							Name:           fmt.Sprintf("%s-provider-agent", serviceName),
 							Image:          instance.Spec.ContainerImage,
 							Env:            env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
-							VolumeMounts:   getVolumeMounts("octavia-driver-agent"),
+							VolumeMounts:   volumeMountsDriverAgent,
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
