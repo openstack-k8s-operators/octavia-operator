@@ -11,12 +11,11 @@
     state: latest
   become: yes
   when: ansible_os_family == 'RedHat'
-  tags: install
+  tags: host-setup
 
 - name: Install required packages
   ansible.builtin.package:
     name:
-      - ansible
       - gcc
       - git-core
       - make
@@ -25,7 +24,7 @@
       - python3-pip
     state: latest
   become: yes
-  tags: install
+  tags: host-setup
 
 - name: Install ansible
   ansible.builtin.package:
@@ -38,7 +37,7 @@
        ansible_distribution == 'Rocky' or
        ansible_distribution == 'RedHat')
     - ansible_distribution_major_version | int == 8
-  tags: install
+  tags: host-setup
 
 - name: Install ansible-core
   ansible.builtin.package:
@@ -51,7 +50,7 @@
        ansible_distribution == 'Rocky' or
        ansible_distribution == 'RedHat')
     - ansible_distribution_major_version | int >= 9
-  tags: install
+  tags: host-setup
 
 - name: Install kubefwd_amd64
   ansible.builtin.dnf:
@@ -60,7 +59,7 @@
     disable_gpg_check: True
   become: yes
   when: ansible_os_family == 'RedHat'
-  tags: install
+  tags: host-setup
 
 - name: Install some extra packages
   ansible.builtin.package:
@@ -70,14 +69,14 @@
       - vim
     state: latest
   become: yes
-  tags: install
+  tags: host-setup
 
 - name: Pip install pre-commit as user
   ansible.builtin.pip:
     name:
       - pre-commit
     extra_args: --user
-  tags: install
+  tags: host-setup
 
 - name: Clone operators using Git
   ansible.builtin.git: "{{ item }}"
@@ -88,56 +87,94 @@
   template:
     src: pull-secret.txt.j2
     dest: "~/pull-secret.txt"
-  tags: [crc, pre-config]
+  tags: host-setup
 
 - name: Ensure ~/.config/openstack directory exists
   ansible.builtin.file:
     path: ~/.config/openstack
     state: directory
     mode: '0755'
-  tags: [crc, pre-config]
+  tags: host-setup
 
 - name: Set up ~/.config/openstack/clouds.yaml
   copy:
     src: clouds.yaml
     dest: ~/.config/openstack/clouds.yaml
-  tags: [crc, pre-config]
+  tags: host-setup
 
-- name: Create devsetup using make (may take 30 minutes or more)
+- name: Add exports to .bashrc
+  lineinfile:
+    path: ~/.bashrc
+    line: "{{ item }}"
+  with_items:
+    - export GOPATH=$HOME/go
+    - export PATH=$PATH:~/bin:$GOPATH/bin:~/.crc/bin/oc
+    - export OS_CLOUD=default
+    - export OS_PASSWORD=12345678
+    - export EDPM_COMPUTE_CEPH_ENABLED=false
+    - export BMO_SETUP=false
+    - export KUBECONFIG=~/.kube/config
+    - alias openstack='oc exec -ti openstackclient -- openstack'
+  tags: host-setup
+
+- name: Cleanup previous CRC setup
+  make:
+    target: crc_cleanup
+    chdir: "~/install_yamls/devsetup"
+  tags: [devsetup, cleanup]
+  ignore_errors: True
+
+- name: Clean up ~/bin directory
+  file:
+    path: "~/bin/{{ item }}"
+    state: absent
+  with_items: [ crc, kubectl, kubectl-kuttl, kustomize, operator-sdk ]
+  tags: [cleanup]
+
+- name: Clean up ~/.crc directory
+  file:
+    path: "~/.crc"
+    state: absent
+  tags: [cleanup]
+
+- name: Create crc using make (may take 30 minutes or more)
   make:
     target: crc
     params:
       CPUS: "{{ make_crc_cpus }}"
       MEMORY: "{{ make_crc_memory }}"
       DISK: "{{ make_crc_disk }}"
+      CRC_VERSION: 2.33.0
     chdir: "~/install_yamls/devsetup"
-  tags: crc
+  tags: devsetup
 
 - name: Run make download_tools
   make:
     target: download_tools
     chdir: "~/install_yamls/devsetup"
-  tags: crc
+  tags: devsetup
 
 - name: Create symbolic link for kubectl
   file:
     src: ~/.crc/bin/oc/oc
     dest: ~/.crc/bin/oc/kubectl
     state: link
-  tags: crc
+  tags: host-setup
 
 - name: Run make crc_attach_default_interface
   shell:
     cmd: |
       set -exo pipefail
-      eval $(crc oc-env)
-      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      sleep 30
+      eval $(crc oc-env); oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make attach_default_interface_cleanup
+      sleep 10
       make crc_attach_default_interface
+      sleep 30
       EDPM_TOTAL_NODES=1 EDPM_COMPUTE_VCPUS=16 EDPM_COMPUTE_RAM=100 EDPM_COMPUTE_DISK_SIZE=100 make edpm_compute
       exit 0
     chdir: "~/install_yamls/devsetup"
-  tags: crc
+  tags: devsetup
 
 # Without this there could be image pull limit errors when deploying rabbitmq
 # Based on https://docs.openshift.com/container-platform/4.13/openshift_images/managing_images/using-image-pull-secrets.html#images-update-global-pull-secret_using-image-pull-secrets
@@ -154,37 +191,20 @@
         --to=pull-secret.json
       oc set data secret/pull-secret -n openshift-config \
         --from-file=.dockerconfigjson=pull-secret.json
-  tags: pull-secret
-
-- name: Add exports to .bashrc
-  lineinfile:
-    path: ~/.bashrc
-    line: "{{ item }}"
-  with_items:
-    - export GOPATH=$HOME/go
-    - export PATH=$PATH:~/bin:$GOPATH/bin:~/.crc/bin/oc
-    - export OS_CLOUD=default
-    - export OS_PASSWORD=12345678
-    - export EDPM_COMPUTE_CEPH_ENABLED=false
-    - export BMO_SETUP=false
-    - export KUBECONFIG=~/.kube/config
-    - alias openstack='oc exec -ti openstackclient -- openstack'
-  tags: config
+  tags: devsetup
 
 - name: Deploy openstack operators
   shell:
     cmd: |
       set -exo pipefail
-      eval $(crc oc-env)
-      oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      eval $(crc oc-env); oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
       make crc_storage
       make input
       make openstack_wait 2>&1 | tee make_openstack.log
-      sleep 20
-      TIMEOUT=800s make openstack_wait_deploy 2>&1 | \
-          tee make_openstack_deploy.log
-      sleep 20
-      TIMEOUT=800s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy
+      sleep 60
+      TIMEOUT=800s make openstack_wait_deploy 2>&1 | tee make_openstack_deploy.log
+      sleep 60
+      TIMEOUT=800s DATAPLANE_TOTAL_NODES=1 make edpm_wait_deploy 2>&1 | tee make_edpm_deploy.log
 
       oc patch csv -n openstack-operators octavia-operator.v0.0.1 --type json \
                 -p="[{"op": "replace", "path": "/spec/install/spec/deployments/0/spec/replicas", "value": "0"}]"
@@ -205,11 +225,41 @@
       exit 0
     #creates: "/etc/bash_completion.d/oc_completion"
     chdir: "~/install_yamls"
-  tags: crc
+  tags: install-yamls
+
+- name: Apply workarounds
+  shell:
+    cmd: |
+      set -exo pipefail
+      eval $(crc oc-env); oc login -u kubeadmin -p 12345678 https://api.crc.testing:6443
+      oc patch openstackcontrolplanes.core.openstack.org openstack-galera-network-isolation --type merge --patch \
+        '{"spec":{"octavia":{"template":{"apacheContainerImage":"registry.redhat.io/rhel8/httpd-24:latest"}}}}'
+      oc patch openstackcontrolplane openstack-galera-network-isolation --type=merge --patch \
+        '{"spec":{"octavia":{"template":{"amphoraImageContainerImage":"registry-proxy.engineering.redhat.com/rh-osbs/rhosp-dev-preview-octavia-amphora-image:18.0.0"}}}}'
+      # Fix networkAttachments for the amphora controller pods
+      oc patch openstackcontrolplanes.core.openstack.org openstack-galera-network-isolation \
+          --type=merge --patch '{"spec":{"ovn":{"template":{"ovnController":{"nicMappings":{"octavia":"octavia"}}}}}}'
+      oc patch openstackcontrolplanes.core.openstack.org openstack-galera-network-isolation \
+        --type=merge --patch \
+        '{"spec":{"octavia":{"template":{"octaviaHealthManager":{"networkAttachments":["octavia"]},"octaviaHousekeeping":{"networkAttachments":["octavia"]},"octaviaWorker":{"networkAttachments":["octavia"]}}}}}'
+  tags: workarounds
+
+- name: make edpm_deploy_instance
+  make:
+    target: edpm_deploy_instance
+    chdir: "~/install_yamls/devsetup"
+  tags: install-yamls
+
+- name: Copy PodSet CR with containerImage fields set
+  copy:
+    src: octavia_v1beta1_octavia.yaml
+    dest: ~/octavia_v1beta1_octavia.yaml
+    force: no
+  tags: post
 
 - name: Install delve debugger
   command: go install github.com/go-delve/delve/cmd/dlv@latest
-  tags: config
+  tags: vscode
 
 - name: Copy ~/.tmux.conf
   copy:
@@ -217,7 +267,7 @@
     dest: ~/.tmux.conf
     force: no
   ignore_errors: true
-  tags: config
+  tags: vscode
 
 - name: Copy ~/.vscode jsons
   copy:
@@ -227,14 +277,14 @@
   with_items:
     - launch.json
     - tasks.json
-  tags: config
+  tags: vscode
 
 - name: Copy VSCode workspace config
   copy:
     src: stack.code-workspace
     dest: ~/
     force: no
-  tags: config
+  tags: vscode
 
 - name: Increase max_user_watches for VSCode
   become: yes
@@ -242,14 +292,7 @@
     path: /etc/sysctl.conf
     line: fs.inotify.max_user_watches=524288
   notify: "Apply sysctl"
-  tags: config
-
-- name: Copy PodSet CR with containerImage fields set
-  copy:
-    src: octavia_v1beta1_octavia.yaml
-    dest: ~/octavia_v1beta1_octavia.yaml
-    force: no
-  tags: config
+  tags: vscode
 
 # Now run the operator as a Go program locally (outside the Kubernetes cluster):
 #
