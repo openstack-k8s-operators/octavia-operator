@@ -26,7 +26,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/go-logr/logr"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
@@ -149,8 +148,7 @@ func generateClientCert(caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKe
 func EnsureAmphoraCerts(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
-	h *helper.Helper,
-	log *logr.Logger) error {
+	h *helper.Helper) error {
 	var oAmpSecret *corev1.Secret
 	var serverCAPass []byte
 
@@ -165,10 +163,9 @@ func EnsureAmphoraCerts(
 		cAPassSecret, _, err := secret.GetSecret(
 			ctx, h, serverCAPassSecretName, instance.Namespace)
 		if err != nil {
-			log.Info("Could not read server CA passphrase. No encryption will be applied to the generated key.")
-		} else {
-			serverCAPass = cAPassSecret.Data["server-ca-passphrase"]
+			return fmt.Errorf("Error retrieving secret %s needed to encrypt the generated key - %w", serverCAPassSecretName, err)
 		}
+		serverCAPass = cAPassSecret.Data["server-ca-passphrase"]
 
 		serverCAKey, serverCAKeyPEM, err := generateKey(serverCAPass)
 		if err != nil {
