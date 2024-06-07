@@ -160,7 +160,7 @@ type OctaviaSpecBase struct {
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
+	// +kubebuilder:default={manageLbMgmtNetworks: true}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 
 	// +kubebuilder:validation:Optional
@@ -217,11 +217,6 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=4
-	// IP Version of the managed subnets
-	SubnetIPVersion int `json:"subnetIpVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Availability zones for the octavia management network resources

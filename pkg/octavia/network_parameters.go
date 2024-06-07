@@ -10,11 +10,14 @@ import (
 
 // NetworkParameters - Parameters for the Octavia networks, based on the config of the NAD
 type NetworkParameters struct {
-	CIDR            netip.Prefix
-	AllocationStart netip.Addr
-	AllocationEnd   netip.Addr
-	Gateway         netip.Addr
-	RouterIPAddress netip.Addr
+	ProviderCIDR            netip.Prefix
+	ProviderAllocationStart netip.Addr
+	ProviderAllocationEnd   netip.Addr
+	ProviderGateway         netip.Addr
+	TenantCIDR              netip.Prefix
+	TenantAllocationStart   netip.Addr
+	TenantAllocationEnd     netip.Addr
+	TenantGateway           netip.Addr
 }
 
 // NADConfig - IPAM parameters of the NAD
@@ -31,7 +34,8 @@ type NADIpam struct {
 }
 
 type NADRoute struct {
-	Gateway netip.Addr `json:"gw"`
+	Gateway     netip.Addr   `json:"gw"`
+	Destination netip.Prefix `json:"dst"`
 }
 
 func getConfigFromNAD(
@@ -47,6 +51,38 @@ func getConfigFromNAD(
 	return nadConfig, nil
 }
 
+func getRangeAndGatewayFromCIDR(
+	cidr netip.Prefix,
+) (start netip.Addr, end netip.Addr, gateway netip.Addr) {
+	addr := cidr.Addr()
+	if addr.Is6() {
+		addrBytes := addr.As16()
+		for i := 8; i < 15; i++ {
+			addrBytes[i] = 0
+		}
+		addrBytes[15] = 3
+		gateway = netip.AddrFrom16(addrBytes)
+		addrBytes[15] = 5
+		start = netip.AddrFrom16(addrBytes)
+		for i := 8; i < 15; i++ {
+			addrBytes[i] = 0xff
+		}
+		addrBytes[15] = 0xfe
+		end = netip.AddrFrom16(addrBytes)
+	} else {
+		addrBytes := addr.As4()
+		addrBytes[2] = 0
+		addrBytes[3] = 3
+		gateway = netip.AddrFrom4(addrBytes)
+		addrBytes[3] = 5
+		start = netip.AddrFrom4(addrBytes)
+		addrBytes[2] = 0xff
+		addrBytes[3] = 0xfe
+		end = netip.AddrFrom4(addrBytes)
+	}
+	return
+}
+
 func GetNetworkParametersFromNAD(
 	nad *networkv1.NetworkAttachmentDefinition,
 ) (*NetworkParameters, error) {
@@ -57,24 +93,41 @@ func GetNetworkParametersFromNAD(
 		return nil, fmt.Errorf("cannot read network parameters: %w", err)
 	}
 
-	networkParameters.CIDR = nadConfig.IPAM.CIDR
+	// Provider subnet parameters
+	networkParameters.ProviderCIDR = nadConfig.IPAM.CIDR
 
-	networkParameters.AllocationStart = nadConfig.IPAM.RangeEnd.Next()
-	end := networkParameters.AllocationStart
+	networkParameters.ProviderAllocationStart = nadConfig.IPAM.RangeEnd.Next()
+	end := networkParameters.ProviderAllocationStart
 	for i := 0; i < LbProvSubnetPoolSize; i++ {
-		if !networkParameters.CIDR.Contains(end) {
-			return nil, fmt.Errorf("cannot allocate %d IP addresses in %s", LbProvSubnetPoolSize, networkParameters.CIDR)
+		if !networkParameters.ProviderCIDR.Contains(end) {
+			return nil, fmt.Errorf("cannot allocate %d IP addresses in %s", LbProvSubnetPoolSize, networkParameters.ProviderCIDR)
 		}
 		end = end.Next()
 	}
-	networkParameters.AllocationEnd = end
-	// TODO(gthiemonge) Remove routes from NAD, manage them in the operator
+	networkParameters.ProviderAllocationEnd = end
 	if len(nadConfig.IPAM.Routes) > 0 {
-		networkParameters.RouterIPAddress = nadConfig.IPAM.Routes[0].Gateway
+		networkParameters.ProviderGateway = nadConfig.IPAM.Routes[0].Gateway
 	} else {
 		return nil, fmt.Errorf("cannot find gateway information in network attachment")
 	}
-	// Gateway is currently unset
+
+	// Tenant subnet parameters
+	networkParameters.TenantCIDR = nadConfig.IPAM.Routes[0].Destination
+	var bitlen int
+	if networkParameters.TenantCIDR.Addr().Is6() {
+		bitlen = 64
+	} else {
+		bitlen = 16
+	}
+
+	if networkParameters.TenantCIDR.Bits() != bitlen {
+		return nil, fmt.Errorf("the tenant CIDR is /%d, it should be /%d", networkParameters.TenantCIDR.Bits(), bitlen)
+	}
+
+	start, end, gateway := getRangeAndGatewayFromCIDR(networkParameters.TenantCIDR)
+	networkParameters.TenantAllocationStart = start
+	networkParameters.TenantAllocationEnd = end
+	networkParameters.TenantGateway = gateway
 
 	return networkParameters, err
 }

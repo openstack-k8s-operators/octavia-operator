@@ -103,7 +103,6 @@ spec:
               lbMgmtNetwork:
                 default:
                   manageLbMgmtNetworks: true
-                  subnetIpVersion: 4
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
                 properties:
@@ -116,10 +115,6 @@ spec:
                   manageLbMgmtNetworks:
                     default: true
                     type: boolean
-                  subnetIpVersion:
-                    default: 4
-                    description: IP Version of the managed subnets
-                    type: integer
                 type: object
               nodeSelector:
                 additionalProperties:

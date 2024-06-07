@@ -72,12 +72,8 @@ func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress str
 }
 
 func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet,
-	securityGroups *[]string, log *logr.Logger) (*ports.Port, error) {
-	ipAddress := LbMgmtRouterPortIPv4
-	if tenantSubnet.IPVersion == 6 {
-		ipAddress = LbMgmtRouterPortIPv6
-	}
-
+	securityGroups *[]string, networkParameters *NetworkParameters, log *logr.Logger) (*ports.Port, error) {
+	ipAddress := networkParameters.TenantGateway.String()
 	p, err := findPort(client, tenantNetwork.ID, ipAddress, log)
 	if err != nil {
 		return nil, err
@@ -297,23 +293,18 @@ func ensureProvSubnet(
 	networkParameters *NetworkParameters,
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
-	var gatewayIP string
-	if networkParameters.Gateway.IsValid() {
-		gatewayIP = networkParameters.Gateway.String()
-	} else {
-		gatewayIP = ""
-	}
+	gatewayIP := ""
 	createOpts := subnets.CreateOpts{
 		Name:        LbProvSubnetName,
 		Description: LbProvSubnetDescription,
 		NetworkID:   providerNetwork.ID,
 		TenantID:    providerNetwork.TenantID,
-		CIDR:        networkParameters.CIDR.String(),
+		CIDR:        networkParameters.ProviderCIDR.String(),
 		IPVersion:   gophercloud.IPVersion(4),
 		AllocationPools: []subnets.AllocationPool{
 			{
-				Start: networkParameters.AllocationStart.String(),
-				End:   networkParameters.AllocationEnd.String(),
+				Start: networkParameters.ProviderAllocationStart.String(),
+				End:   networkParameters.ProviderAllocationEnd.String(),
 			},
 		},
 		GatewayIP: &gatewayIP,
@@ -346,12 +337,16 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 
 func ensureLbMgmtSubnet(
 	client *gophercloud.ServiceClient,
-	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
 	tenantNetwork *networks.Network,
 	networkParameters *NetworkParameters,
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
-	ipVersion := networkDetails.SubnetIPVersion
+	var ipVersion int
+	if networkParameters.TenantCIDR.Addr().Is6() {
+		ipVersion = 6
+	} else {
+		ipVersion = 4
+	}
 
 	var createOpts subnets.CreateOpts
 	if ipVersion == 6 {
@@ -361,14 +356,14 @@ func ensureLbMgmtSubnet(
 			Description:     LbMgmtSubnetDescription,
 			NetworkID:       tenantNetwork.ID,
 			TenantID:        tenantNetwork.TenantID,
-			CIDR:            LbMgmtSubnetIPv6CIDR,
+			CIDR:            networkParameters.TenantCIDR.String(),
 			IPVersion:       gophercloud.IPVersion(ipVersion),
 			IPv6AddressMode: LbMgmtSubnetIPv6AddressMode,
 			IPv6RAMode:      LbMgmtSubnetIPv6RAMode,
 			AllocationPools: []subnets.AllocationPool{
 				{
-					Start: LbMgmtSubnetIPv6AllocationPoolStart,
-					End:   LbMgmtSubnetIPv6AllocationPoolEnd,
+					Start: networkParameters.TenantAllocationStart.String(),
+					End:   networkParameters.TenantAllocationEnd.String(),
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -381,18 +376,18 @@ func ensureLbMgmtSubnet(
 			Description: LbMgmtSubnetDescription,
 			NetworkID:   tenantNetwork.ID,
 			TenantID:    tenantNetwork.TenantID,
-			CIDR:        LbMgmtSubnetCIDR,
+			CIDR:        networkParameters.TenantCIDR.String(),
 			IPVersion:   gophercloud.IPVersion(ipVersion),
 			AllocationPools: []subnets.AllocationPool{
 				{
-					Start: LbMgmtSubnetAllocationPoolStart,
-					End:   LbMgmtSubnetAllocationPoolEnd,
+					Start: networkParameters.TenantAllocationStart.String(),
+					End:   networkParameters.TenantAllocationEnd.String(),
 				},
 			},
 			HostRoutes: []subnets.HostRoute{
 				{
-					DestinationCIDR: networkParameters.CIDR.String(),
-					NextHop:         LbMgmtRouterPortIPv4,
+					DestinationCIDR: networkParameters.ProviderCIDR.String(),
+					NextHop:         networkParameters.TenantGateway.String(),
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -435,7 +430,7 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 func externalFixedIPs(subnetID string, networkParameters *NetworkParameters) []routers.ExternalFixedIP {
 	ips := []routers.ExternalFixedIP{
 		{
-			IPAddress: networkParameters.RouterIPAddress.String(),
+			IPAddress: networkParameters.ProviderGateway.String(),
 			SubnetID:  subnetID,
 		},
 	}
@@ -784,7 +779,7 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantSubnet, err := ensureLbMgmtSubnet(client, netDetails, tenantNetwork, networkParameters, log)
+	tenantSubnet, err := ensureLbMgmtSubnet(client, tenantNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -800,7 +795,7 @@ func EnsureAmphoraManagementNetwork(
 
 	securityGroups := []string{lbMgmtSecurityGroupID, lbHealthSecurityGroupID}
 
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, &securityGroups, log)
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, &securityGroups, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
