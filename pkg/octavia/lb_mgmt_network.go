@@ -33,12 +33,14 @@ import (
 )
 
 type NetworkProvisioningSummary struct {
-	TenantNetworkID    string
-	TenantSubnetID     string
-	TenantRouterPortID string
-	ProviderNetworkID  string
-	RouterID           string
-	SecurityGroupID    string
+	TenantNetworkID         string
+	TenantSubnetID          string
+	TenantRouterPortID      string
+	ProviderNetworkID       string
+	RouterID                string
+	SecurityGroupID         string
+	ManagementSubnetCIDR    string
+	ManagementSubnetGateway string
 }
 
 //
@@ -870,11 +872,13 @@ func EnsureAmphoraManagementNetwork(
 	}
 
 	return NetworkProvisioningSummary{
-		TenantNetworkID:    tenantNetwork.ID,
-		TenantSubnetID:     tenantSubnet.ID,
-		TenantRouterPortID: tenantRouterPort.ID,
-		ProviderNetworkID:  providerNetwork.ID,
-		RouterID:           router.ID,
-		SecurityGroupID:    lbMgmtSecurityGroupID,
+		TenantNetworkID:         tenantNetwork.ID,
+		TenantSubnetID:          tenantSubnet.ID,
+		TenantRouterPortID:      tenantRouterPort.ID,
+		ProviderNetworkID:       providerNetwork.ID,
+		RouterID:                router.ID,
+		SecurityGroupID:         lbMgmtSecurityGroupID,
+		ManagementSubnetCIDR:    networkParameters.TenantCIDR.String(),
+		ManagementSubnetGateway: networkParameters.ProviderGateway.String(),
 	}, nil
 }

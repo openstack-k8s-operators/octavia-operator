@@ -15,6 +15,10 @@
 # under the License.
 set -ex
 
-/usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
+/usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
 
-exec /usr/bin/octavia-health-manager --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf
+if [ "$1" = "octavia-health-manager" ]; then
+    /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
+fi
+
+exec /usr/bin/$1 --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf

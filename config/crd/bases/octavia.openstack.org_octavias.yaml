@@ -580,6 +580,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword
@@ -775,6 +781,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword
@@ -975,6 +987,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword

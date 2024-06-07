@@ -143,6 +143,14 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS tls.Ca `json:"tls,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaProviderSubnetGateway -
+	OctaviaProviderSubnetGateway string `json:"octaviaProviderSubnetGateway"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaProviderSubnetCIDR -
+	OctaviaProviderSubnetCIDR string `json:"octaviaProviderSubnetCIDR"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller
