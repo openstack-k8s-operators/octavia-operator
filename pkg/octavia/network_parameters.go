@@ -17,7 +17,6 @@ type NetworkParameters struct {
 	TenantCIDR              netip.Prefix
 	TenantAllocationStart   netip.Addr
 	TenantAllocationEnd     netip.Addr
-	TenantGateway           netip.Addr
 }
 
 // NADConfig - IPAM parameters of the NAD
@@ -51,17 +50,15 @@ func getConfigFromNAD(
 	return nadConfig, nil
 }
 
-func getRangeAndGatewayFromCIDR(
+func getRangeFromCIDR(
 	cidr netip.Prefix,
-) (start netip.Addr, end netip.Addr, gateway netip.Addr) {
+) (start netip.Addr, end netip.Addr) {
 	addr := cidr.Addr()
 	if addr.Is6() {
 		addrBytes := addr.As16()
 		for i := 8; i < 15; i++ {
 			addrBytes[i] = 0
 		}
-		addrBytes[15] = 3
-		gateway = netip.AddrFrom16(addrBytes)
 		addrBytes[15] = 5
 		start = netip.AddrFrom16(addrBytes)
 		for i := 8; i < 15; i++ {
@@ -72,8 +69,6 @@ func getRangeAndGatewayFromCIDR(
 	} else {
 		addrBytes := addr.As4()
 		addrBytes[2] = 0
-		addrBytes[3] = 3
-		gateway = netip.AddrFrom4(addrBytes)
 		addrBytes[3] = 5
 		start = netip.AddrFrom4(addrBytes)
 		addrBytes[2] = 0xff
@@ -124,10 +119,9 @@ func GetNetworkParametersFromNAD(
 		return nil, fmt.Errorf("the tenant CIDR is /%d, it should be /%d", networkParameters.TenantCIDR.Bits(), bitlen)
 	}
 
-	start, end, gateway := getRangeAndGatewayFromCIDR(networkParameters.TenantCIDR)
+	start, end := getRangeFromCIDR(networkParameters.TenantCIDR)
 	networkParameters.TenantAllocationStart = start
 	networkParameters.TenantAllocationEnd = end
-	networkParameters.TenantGateway = gateway
 
 	return networkParameters, err
 }

@@ -35,7 +35,6 @@ import (
 type NetworkProvisioningSummary struct {
 	TenantNetworkID         string
 	TenantSubnetID          string
-	TenantRouterPortID      string
 	ProviderNetworkID       string
 	RouterID                string
 	SecurityGroupID         string
@@ -48,7 +47,7 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, networkID string, name string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		NetworkID: networkID,
 	}
@@ -65,7 +64,7 @@ func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress str
 	}
 	if len(allPorts) > 0 {
 		for _, port := range allPorts {
-			if len(port.FixedIPs) > 0 && port.FixedIPs[0].IPAddress == ipAddress {
+			if port.Name == name {
 				return &port, nil
 			}
 		}
@@ -73,10 +72,8 @@ func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress str
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet,
-	securityGroups *[]string, networkParameters *NetworkParameters, log *logr.Logger) (*ports.Port, error) {
-	ipAddress := networkParameters.TenantGateway.String()
-	p, err := findPort(client, tenantNetwork.ID, ipAddress, log)
+func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, error) {
+	p, err := findPort(client, tenantNetwork.ID, LbMgmtRouterPortName, log)
 	if err != nil {
 		return nil, err
 	}
@@ -89,15 +86,9 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 	log.Info("Unable to locate port, creating new one")
 	asu := true
 	createOpts := ports.CreateOpts{
-		Name:         LbMgmtRouterPortName,
-		AdminStateUp: &asu,
-		NetworkID:    tenantNetwork.ID,
-		FixedIPs: []ports.IP{
-			{
-				SubnetID:  tenantSubnet.ID,
-				IPAddress: ipAddress,
-			},
-		},
+		Name:           LbMgmtRouterPortName,
+		AdminStateUp:   &asu,
+		NetworkID:      tenantNetwork.ID,
 		SecurityGroups: securityGroups,
 	}
 	p, err = ports.Create(client, createOpts).Extract()
@@ -296,13 +287,19 @@ func ensureProvSubnet(
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
 	gatewayIP := ""
+	var ipVersion int
+	if networkParameters.ProviderCIDR.Addr().Is6() {
+		ipVersion = 6
+	} else {
+		ipVersion = 4
+	}
 	createOpts := subnets.CreateOpts{
 		Name:        LbProvSubnetName,
 		Description: LbProvSubnetDescription,
 		NetworkID:   providerNetwork.ID,
 		TenantID:    providerNetwork.TenantID,
 		CIDR:        networkParameters.ProviderCIDR.String(),
-		IPVersion:   gophercloud.IPVersion(4),
+		IPVersion:   gophercloud.IPVersion(ipVersion),
 		AllocationPools: []subnets.AllocationPool{
 			{
 				Start: networkParameters.ProviderAllocationStart.String(),
@@ -311,7 +308,7 @@ func ensureProvSubnet(
 		},
 		GatewayIP: &gatewayIP,
 	}
-	return ensureSubnet(client, 4, createOpts, log)
+	return ensureSubnet(client, ipVersion, createOpts, log)
 }
 
 func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.OctaviaLbMgmtNetworks, serviceTenantID string, log *logr.Logger) (
@@ -335,6 +332,31 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 	}
 
 	return provNet, nil
+}
+
+func ensureLbMgmtSubnetRoutes(
+	client *gophercloud.ServiceClient,
+	tenantSubnet *subnets.Subnet,
+	networkParameters *NetworkParameters,
+	tenantRouterPort *ports.Port,
+) error {
+	if len(tenantSubnet.HostRoutes) == 0 {
+		hostRoutes := []subnets.HostRoute{
+			{
+				DestinationCIDR: networkParameters.ProviderCIDR.String(),
+				NextHop:         tenantRouterPort.FixedIPs[0].IPAddress,
+			},
+		}
+		updateOpts := subnets.UpdateOpts{
+			HostRoutes: &hostRoutes,
+		}
+		_, err := subnets.Update(client, tenantSubnet.ID, updateOpts).Extract()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func ensureLbMgmtSubnet(
@@ -369,7 +391,6 @@ func ensureLbMgmtSubnet(
 				},
 			},
 			GatewayIP: &gatewayIP,
-			// TODO(beagles): ipv6 host routes
 		}
 	} else {
 		gatewayIP := LbMgmtSubnetGatewayIP
@@ -384,12 +405,6 @@ func ensureLbMgmtSubnet(
 				{
 					Start: networkParameters.TenantAllocationStart.String(),
 					End:   networkParameters.TenantAllocationEnd.String(),
-				},
-			},
-			HostRoutes: []subnets.HostRoute{
-				{
-					DestinationCIDR: networkParameters.ProviderCIDR.String(),
-					NextHop:         networkParameters.TenantGateway.String(),
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -797,7 +812,7 @@ func EnsureAmphoraManagementNetwork(
 
 	securityGroups := []string{lbMgmtSecurityGroupID, lbHealthSecurityGroupID}
 
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, &securityGroups, networkParameters, log)
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, &securityGroups, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -856,8 +871,7 @@ func EnsureAmphoraManagementNetwork(
 			log.Error(err, "Unable to create router object")
 			return NetworkProvisioningSummary{}, err
 		}
-	}
-	if tenantRouterPort.DeviceID == "" {
+
 		interfaceOpts := routers.AddInterfaceOpts{
 			PortID: tenantRouterPort.ID,
 		}
@@ -865,16 +879,17 @@ func EnsureAmphoraManagementNetwork(
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
 		}
-	} else if tenantRouterPort.DeviceID != router.ID {
-		return NetworkProvisioningSummary{},
-			fmt.Errorf("Port %s has unexpected device ID %s and cannot be added to router %s", tenantRouterPort.ID,
-				tenantRouterPort.DeviceID, router.ID)
+	}
+	// Set route on subnet
+
+	err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
 	}
 
 	return NetworkProvisioningSummary{
 		TenantNetworkID:         tenantNetwork.ID,
 		TenantSubnetID:          tenantSubnet.ID,
-		TenantRouterPortID:      tenantRouterPort.ID,
 		ProviderNetworkID:       providerNetwork.ID,
 		RouterID:                router.ID,
 		SecurityGroupID:         lbMgmtSecurityGroupID,
