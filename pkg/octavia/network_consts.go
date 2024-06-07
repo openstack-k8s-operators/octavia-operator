@@ -83,19 +83,10 @@ const (
 	// LbProvSubnetDescription -
 	LbProvSubnetDescription = "LBaaS Management Provider Subnet"
 
+	// LbProvSubnetPoolSize -
+	LbProvSubnetPoolSize = 25
+
 	// IPv4 consts
-
-	// LbProvSubnetCIDR -
-	LbProvSubnetCIDR = "172.23.0.0/24"
-
-	// LbProvSubnetAllocationPoolStart -
-	LbProvSubnetAllocationPoolStart = "172.23.0.100"
-
-	// LbProvSubnetAllocationPoolEnd -
-	LbProvSubnetAllocationPoolEnd = "172.23.0.125"
-
-	// LbProvSubnetGatewayIP -
-	LbProvSubnetGatewayIP = ""
 
 	// TODO(beagles): support IPv6 for the provider network.
 	// LbRouterName -
@@ -103,9 +94,6 @@ const (
 
 	// LbProvPhysicalNet -
 	LbProvPhysicalNet = "octavia"
-
-	// LbRouterFixedIPAddress
-	LbRouterFixedIPAddress = "172.23.0.150"
 
 	// LbMgmtRouterPortName
 	LbMgmtRouterPortName = "lb-mgmt-router-port"

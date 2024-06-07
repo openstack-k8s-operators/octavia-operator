@@ -892,6 +892,11 @@ spec:
                 - secret
                 - serviceAccount
                 type: object
+              octaviaNetworkAttachment:
+                default: octavia
+                description: OctaviaNetworkAttachment is a NetworkAttachment resource
+                  name for the Octavia Management Network
+                type: string
               octaviaWorker:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
@@ -1197,6 +1202,7 @@ spec:
             - apacheContainerImage
             - databaseInstance
             - octaviaAPI
+            - octaviaNetworkAttachment
             - rabbitMqClusterName
             - secret
             type: object

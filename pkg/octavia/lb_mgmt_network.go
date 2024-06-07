@@ -291,20 +291,29 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 	return foundNetwork, nil
 }
 
-func ensureProvSubnet(client *gophercloud.ServiceClient, providerNetwork *networks.Network, log *logr.Logger) (
-	*subnets.Subnet, error) {
-	gatewayIP := LbProvSubnetGatewayIP
+func ensureProvSubnet(
+	client *gophercloud.ServiceClient,
+	providerNetwork *networks.Network,
+	networkParameters *NetworkParameters,
+	log *logr.Logger,
+) (*subnets.Subnet, error) {
+	var gatewayIP string
+	if networkParameters.Gateway.IsValid() {
+		gatewayIP = networkParameters.Gateway.String()
+	} else {
+		gatewayIP = ""
+	}
 	createOpts := subnets.CreateOpts{
 		Name:        LbProvSubnetName,
 		Description: LbProvSubnetDescription,
 		NetworkID:   providerNetwork.ID,
 		TenantID:    providerNetwork.TenantID,
-		CIDR:        LbProvSubnetCIDR,
+		CIDR:        networkParameters.CIDR.String(),
 		IPVersion:   gophercloud.IPVersion(4),
 		AllocationPools: []subnets.AllocationPool{
 			{
-				Start: LbProvSubnetAllocationPoolStart,
-				End:   LbProvSubnetAllocationPoolEnd,
+				Start: networkParameters.AllocationStart.String(),
+				End:   networkParameters.AllocationEnd.String(),
 			},
 		},
 		GatewayIP: &gatewayIP,
@@ -339,6 +348,7 @@ func ensureLbMgmtSubnet(
 	client *gophercloud.ServiceClient,
 	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
 	tenantNetwork *networks.Network,
+	networkParameters *NetworkParameters,
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
 	ipVersion := networkDetails.SubnetIPVersion
@@ -381,7 +391,7 @@ func ensureLbMgmtSubnet(
 			},
 			HostRoutes: []subnets.HostRoute{
 				{
-					DestinationCIDR: LbProvSubnetCIDR,
+					DestinationCIDR: networkParameters.CIDR.String(),
 					NextHop:         LbMgmtRouterPortIPv4,
 				},
 			},
@@ -422,10 +432,10 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 	return mgmtNetwork, nil
 }
 
-func externalFixedIPs(subnetID string) []routers.ExternalFixedIP {
+func externalFixedIPs(subnetID string, networkParameters *NetworkParameters) []routers.ExternalFixedIP {
 	ips := []routers.ExternalFixedIP{
 		{
-			IPAddress: LbRouterFixedIPAddress,
+			IPAddress: networkParameters.RouterIPAddress.String(),
 			SubnetID:  subnetID,
 		},
 	}
@@ -452,6 +462,7 @@ func compareExternalFixedIPs(a []routers.ExternalFixedIP, b []routers.ExternalFi
 func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	gatewayNetwork *networks.Network,
 	gatewaySubnet *subnets.Subnet,
+	networkParameters *NetworkParameters,
 	log *logr.Logger) (*routers.Router, error) {
 
 	if !router.AdminStateUp {
@@ -464,7 +475,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	needsUpdate := false
 	updateInfo := routers.UpdateOpts{}
 	enableSNAT := false
-	fixedIPs := externalFixedIPs(gatewaySubnet.ID)
+	fixedIPs := externalFixedIPs(gatewaySubnet.ID, networkParameters)
 
 	//
 	// TODO(beagles) we don't care about the other fields right now because we
@@ -752,6 +763,7 @@ func EnsureAmphoraManagementNetwork(
 	ns string,
 	tenantName string,
 	netDetails *octaviav1.OctaviaLbMgmtNetworks,
+	networkParameters *NetworkParameters,
 	log *logr.Logger,
 	helper *helper.Helper,
 ) (NetworkProvisioningSummary, error) {
@@ -772,7 +784,7 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantSubnet, err := ensureLbMgmtSubnet(client, netDetails, tenantNetwork, log)
+	tenantSubnet, err := ensureLbMgmtSubnet(client, netDetails, tenantNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -811,7 +823,7 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 
-	providerSubnet, err := ensureProvSubnet(client, providerNetwork, log)
+	providerSubnet, err := ensureProvSubnet(client, providerNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -822,7 +834,7 @@ func EnsureAmphoraManagementNetwork(
 	}
 	if router != nil {
 		log.Info("Router object found, reconciling")
-		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, log)
+		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, networkParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -833,7 +845,7 @@ func EnsureAmphoraManagementNetwork(
 		gatewayInfo := routers.GatewayInfo{
 			NetworkID:        providerNetwork.ID,
 			EnableSNAT:       &enableSNAT,
-			ExternalFixedIPs: externalFixedIPs(providerSubnet.ID),
+			ExternalFixedIPs: externalFixedIPs(providerSubnet.ID, networkParameters),
 		}
 		adminStateUp := true
 		createOpts := routers.CreateOpts{

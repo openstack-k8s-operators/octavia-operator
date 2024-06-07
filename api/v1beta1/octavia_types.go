@@ -192,6 +192,11 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:validation:Required
 	// Apache Container Image URL
 	ApacheContainerImage string `json:"apacheContainerImage"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=octavia
+	// OctaviaNetworkAttachment is a NetworkAttachment resource name for the Octavia Management Network
+	OctaviaNetworkAttachment string `json:"octaviaNetworkAttachment"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
