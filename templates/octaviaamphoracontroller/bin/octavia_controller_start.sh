@@ -21,4 +21,7 @@ if [ "$1" = "octavia-health-manager" ]; then
     /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
 fi
 
+# Ignore possible errors
+/usr/local/bin/container-scripts/octavia_status.py || true
+
 exec /usr/bin/$1 --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf
