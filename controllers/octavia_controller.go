@@ -642,6 +642,16 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// Amphora reconciliation
 	// ------------------------------------------------------------------------------------------------------------
 
+	nad, err := nad.GetNADWithName(ctx, helper, instance.Spec.OctaviaNetworkAttachment, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	networkParameters, err := octavia.GetNetworkParametersFromNAD(nad)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
 	// multiple details.
 	networkInfo, err := octavia.EnsureAmphoraManagementNetwork(
@@ -649,6 +659,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Namespace,
 		instance.Spec.TenantName,
 		&instance.Spec.LbMgmtNetworks,
+		networkParameters,
 		&Log,
 		helper,
 	)
@@ -1322,6 +1333,8 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		daemonset.Spec.TLS = instance.Spec.OctaviaAPI.TLS.Ca
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
+		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
+		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

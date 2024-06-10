@@ -160,7 +160,7 @@ type OctaviaSpecBase struct {
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={manageLbMgmtNetworks: true, subnetIpVersion: 4}
+	// +kubebuilder:default={manageLbMgmtNetworks: true}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 
 	// +kubebuilder:validation:Optional
@@ -192,6 +192,11 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:validation:Required
 	// Apache Container Image URL
 	ApacheContainerImage string `json:"apacheContainerImage"`
+
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=octavia
+	// OctaviaNetworkAttachment is a NetworkAttachment resource name for the Octavia Management Network
+	OctaviaNetworkAttachment string `json:"octaviaNetworkAttachment"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
@@ -212,11 +217,6 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=true
 	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks,omitempty"`
-
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=4
-	// IP Version of the managed subnets
-	SubnetIPVersion int `json:"subnetIpVersion,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Availability zones for the octavia management network resources

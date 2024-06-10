@@ -103,7 +103,6 @@ spec:
               lbMgmtNetwork:
                 default:
                   manageLbMgmtNetworks: true
-                  subnetIpVersion: 4
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
                 properties:
@@ -116,10 +115,6 @@ spec:
                   manageLbMgmtNetworks:
                     default: true
                     type: boolean
-                  subnetIpVersion:
-                    default: 4
-                    description: IP Version of the managed subnets
-                    type: integer
                 type: object
               nodeSelector:
                 additionalProperties:
@@ -585,6 +580,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword
@@ -780,6 +781,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword
@@ -892,6 +899,11 @@ spec:
                 - secret
                 - serviceAccount
                 type: object
+              octaviaNetworkAttachment:
+                default: octavia
+                description: OctaviaNetworkAttachment is a NetworkAttachment resource
+                  name for the Octavia Management Network
+                type: string
               octaviaWorker:
                 description: OctaviaHousekeeping - Spec definition for the Octavia
                   Housekeeping agent for the Octavia deployment
@@ -975,6 +987,12 @@ spec:
                     description: NodeSelector to target subset of worker nodes running
                       this service
                     type: object
+                  octaviaProviderSubnetCIDR:
+                    description: OctaviaProviderSubnetCIDR -
+                    type: string
+                  octaviaProviderSubnetGateway:
+                    description: OctaviaProviderSubnetGateway -
+                    type: string
                   passwordSelectors:
                     default:
                       service: OctaviaPassword
@@ -1197,6 +1215,7 @@ spec:
             - apacheContainerImage
             - databaseInstance
             - octaviaAPI
+            - octaviaNetworkAttachment
             - rabbitMqClusterName
             - secret
             type: object

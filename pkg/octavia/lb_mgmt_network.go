@@ -33,12 +33,13 @@ import (
 )
 
 type NetworkProvisioningSummary struct {
-	TenantNetworkID    string
-	TenantSubnetID     string
-	TenantRouterPortID string
-	ProviderNetworkID  string
-	RouterID           string
-	SecurityGroupID    string
+	TenantNetworkID         string
+	TenantSubnetID          string
+	ProviderNetworkID       string
+	RouterID                string
+	SecurityGroupID         string
+	ManagementSubnetCIDR    string
+	ManagementSubnetGateway string
 }
 
 //
@@ -46,7 +47,7 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress string, log *logr.Logger) (*ports.Port, error) {
+func findPort(client *gophercloud.ServiceClient, networkID string, name string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		NetworkID: networkID,
 	}
@@ -63,7 +64,7 @@ func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress str
 	}
 	if len(allPorts) > 0 {
 		for _, port := range allPorts {
-			if len(port.FixedIPs) > 0 && port.FixedIPs[0].IPAddress == ipAddress {
+			if port.Name == name {
 				return &port, nil
 			}
 		}
@@ -71,14 +72,8 @@ func findPort(client *gophercloud.ServiceClient, networkID string, ipAddress str
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, tenantSubnet *subnets.Subnet,
-	securityGroups *[]string, log *logr.Logger) (*ports.Port, error) {
-	ipAddress := LbMgmtRouterPortIPv4
-	if tenantSubnet.IPVersion == 6 {
-		ipAddress = LbMgmtRouterPortIPv6
-	}
-
-	p, err := findPort(client, tenantNetwork.ID, ipAddress, log)
+func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, error) {
+	p, err := findPort(client, tenantNetwork.ID, LbMgmtRouterPortName, log)
 	if err != nil {
 		return nil, err
 	}
@@ -91,15 +86,9 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 	log.Info("Unable to locate port, creating new one")
 	asu := true
 	createOpts := ports.CreateOpts{
-		Name:         LbMgmtRouterPortName,
-		AdminStateUp: &asu,
-		NetworkID:    tenantNetwork.ID,
-		FixedIPs: []ports.IP{
-			{
-				SubnetID:  tenantSubnet.ID,
-				IPAddress: ipAddress,
-			},
-		},
+		Name:           LbMgmtRouterPortName,
+		AdminStateUp:   &asu,
+		NetworkID:      tenantNetwork.ID,
 		SecurityGroups: securityGroups,
 	}
 	p, err = ports.Create(client, createOpts).Extract()
@@ -291,25 +280,35 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 	return foundNetwork, nil
 }
 
-func ensureProvSubnet(client *gophercloud.ServiceClient, providerNetwork *networks.Network, log *logr.Logger) (
-	*subnets.Subnet, error) {
-	gatewayIP := LbProvSubnetGatewayIP
+func ensureProvSubnet(
+	client *gophercloud.ServiceClient,
+	providerNetwork *networks.Network,
+	networkParameters *NetworkParameters,
+	log *logr.Logger,
+) (*subnets.Subnet, error) {
+	gatewayIP := ""
+	var ipVersion int
+	if networkParameters.ProviderCIDR.Addr().Is6() {
+		ipVersion = 6
+	} else {
+		ipVersion = 4
+	}
 	createOpts := subnets.CreateOpts{
 		Name:        LbProvSubnetName,
 		Description: LbProvSubnetDescription,
 		NetworkID:   providerNetwork.ID,
 		TenantID:    providerNetwork.TenantID,
-		CIDR:        LbProvSubnetCIDR,
-		IPVersion:   gophercloud.IPVersion(4),
+		CIDR:        networkParameters.ProviderCIDR.String(),
+		IPVersion:   gophercloud.IPVersion(ipVersion),
 		AllocationPools: []subnets.AllocationPool{
 			{
-				Start: LbProvSubnetAllocationPoolStart,
-				End:   LbProvSubnetAllocationPoolEnd,
+				Start: networkParameters.ProviderAllocationStart.String(),
+				End:   networkParameters.ProviderAllocationEnd.String(),
 			},
 		},
 		GatewayIP: &gatewayIP,
 	}
-	return ensureSubnet(client, 4, createOpts, log)
+	return ensureSubnet(client, ipVersion, createOpts, log)
 }
 
 func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.OctaviaLbMgmtNetworks, serviceTenantID string, log *logr.Logger) (
@@ -335,13 +334,43 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 	return provNet, nil
 }
 
+func ensureLbMgmtSubnetRoutes(
+	client *gophercloud.ServiceClient,
+	tenantSubnet *subnets.Subnet,
+	networkParameters *NetworkParameters,
+	tenantRouterPort *ports.Port,
+) error {
+	if len(tenantSubnet.HostRoutes) == 0 {
+		hostRoutes := []subnets.HostRoute{
+			{
+				DestinationCIDR: networkParameters.ProviderCIDR.String(),
+				NextHop:         tenantRouterPort.FixedIPs[0].IPAddress,
+			},
+		}
+		updateOpts := subnets.UpdateOpts{
+			HostRoutes: &hostRoutes,
+		}
+		_, err := subnets.Update(client, tenantSubnet.ID, updateOpts).Extract()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func ensureLbMgmtSubnet(
 	client *gophercloud.ServiceClient,
-	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
 	tenantNetwork *networks.Network,
+	networkParameters *NetworkParameters,
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
-	ipVersion := networkDetails.SubnetIPVersion
+	var ipVersion int
+	if networkParameters.TenantCIDR.Addr().Is6() {
+		ipVersion = 6
+	} else {
+		ipVersion = 4
+	}
 
 	var createOpts subnets.CreateOpts
 	if ipVersion == 6 {
@@ -351,18 +380,17 @@ func ensureLbMgmtSubnet(
 			Description:     LbMgmtSubnetDescription,
 			NetworkID:       tenantNetwork.ID,
 			TenantID:        tenantNetwork.TenantID,
-			CIDR:            LbMgmtSubnetIPv6CIDR,
+			CIDR:            networkParameters.TenantCIDR.String(),
 			IPVersion:       gophercloud.IPVersion(ipVersion),
 			IPv6AddressMode: LbMgmtSubnetIPv6AddressMode,
 			IPv6RAMode:      LbMgmtSubnetIPv6RAMode,
 			AllocationPools: []subnets.AllocationPool{
 				{
-					Start: LbMgmtSubnetIPv6AllocationPoolStart,
-					End:   LbMgmtSubnetIPv6AllocationPoolEnd,
+					Start: networkParameters.TenantAllocationStart.String(),
+					End:   networkParameters.TenantAllocationEnd.String(),
 				},
 			},
 			GatewayIP: &gatewayIP,
-			// TODO(beagles): ipv6 host routes
 		}
 	} else {
 		gatewayIP := LbMgmtSubnetGatewayIP
@@ -371,18 +399,12 @@ func ensureLbMgmtSubnet(
 			Description: LbMgmtSubnetDescription,
 			NetworkID:   tenantNetwork.ID,
 			TenantID:    tenantNetwork.TenantID,
-			CIDR:        LbMgmtSubnetCIDR,
+			CIDR:        networkParameters.TenantCIDR.String(),
 			IPVersion:   gophercloud.IPVersion(ipVersion),
 			AllocationPools: []subnets.AllocationPool{
 				{
-					Start: LbMgmtSubnetAllocationPoolStart,
-					End:   LbMgmtSubnetAllocationPoolEnd,
-				},
-			},
-			HostRoutes: []subnets.HostRoute{
-				{
-					DestinationCIDR: LbProvSubnetCIDR,
-					NextHop:         LbMgmtRouterPortIPv4,
+					Start: networkParameters.TenantAllocationStart.String(),
+					End:   networkParameters.TenantAllocationEnd.String(),
 				},
 			},
 			GatewayIP: &gatewayIP,
@@ -422,10 +444,10 @@ func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octa
 	return mgmtNetwork, nil
 }
 
-func externalFixedIPs(subnetID string) []routers.ExternalFixedIP {
+func externalFixedIPs(subnetID string, networkParameters *NetworkParameters) []routers.ExternalFixedIP {
 	ips := []routers.ExternalFixedIP{
 		{
-			IPAddress: LbRouterFixedIPAddress,
+			IPAddress: networkParameters.ProviderGateway.String(),
 			SubnetID:  subnetID,
 		},
 	}
@@ -452,6 +474,7 @@ func compareExternalFixedIPs(a []routers.ExternalFixedIP, b []routers.ExternalFi
 func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	gatewayNetwork *networks.Network,
 	gatewaySubnet *subnets.Subnet,
+	networkParameters *NetworkParameters,
 	log *logr.Logger) (*routers.Router, error) {
 
 	if !router.AdminStateUp {
@@ -464,7 +487,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	needsUpdate := false
 	updateInfo := routers.UpdateOpts{}
 	enableSNAT := false
-	fixedIPs := externalFixedIPs(gatewaySubnet.ID)
+	fixedIPs := externalFixedIPs(gatewaySubnet.ID, networkParameters)
 
 	//
 	// TODO(beagles) we don't care about the other fields right now because we
@@ -752,6 +775,7 @@ func EnsureAmphoraManagementNetwork(
 	ns string,
 	tenantName string,
 	netDetails *octaviav1.OctaviaLbMgmtNetworks,
+	networkParameters *NetworkParameters,
 	log *logr.Logger,
 	helper *helper.Helper,
 ) (NetworkProvisioningSummary, error) {
@@ -772,7 +796,7 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantSubnet, err := ensureLbMgmtSubnet(client, netDetails, tenantNetwork, log)
+	tenantSubnet, err := ensureLbMgmtSubnet(client, tenantNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -788,7 +812,7 @@ func EnsureAmphoraManagementNetwork(
 
 	securityGroups := []string{lbMgmtSecurityGroupID, lbHealthSecurityGroupID}
 
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, tenantSubnet, &securityGroups, log)
+	tenantRouterPort, err := ensurePort(client, tenantNetwork, &securityGroups, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -811,7 +835,7 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 
-	providerSubnet, err := ensureProvSubnet(client, providerNetwork, log)
+	providerSubnet, err := ensureProvSubnet(client, providerNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -822,7 +846,7 @@ func EnsureAmphoraManagementNetwork(
 	}
 	if router != nil {
 		log.Info("Router object found, reconciling")
-		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, log)
+		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, networkParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -833,7 +857,7 @@ func EnsureAmphoraManagementNetwork(
 		gatewayInfo := routers.GatewayInfo{
 			NetworkID:        providerNetwork.ID,
 			EnableSNAT:       &enableSNAT,
-			ExternalFixedIPs: externalFixedIPs(providerSubnet.ID),
+			ExternalFixedIPs: externalFixedIPs(providerSubnet.ID, networkParameters),
 		}
 		adminStateUp := true
 		createOpts := routers.CreateOpts{
@@ -847,8 +871,7 @@ func EnsureAmphoraManagementNetwork(
 			log.Error(err, "Unable to create router object")
 			return NetworkProvisioningSummary{}, err
 		}
-	}
-	if tenantRouterPort.DeviceID == "" {
+
 		interfaceOpts := routers.AddInterfaceOpts{
 			PortID: tenantRouterPort.ID,
 		}
@@ -856,18 +879,21 @@ func EnsureAmphoraManagementNetwork(
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
 		}
-	} else if tenantRouterPort.DeviceID != router.ID {
-		return NetworkProvisioningSummary{},
-			fmt.Errorf("Port %s has unexpected device ID %s and cannot be added to router %s", tenantRouterPort.ID,
-				tenantRouterPort.DeviceID, router.ID)
+	}
+	// Set route on subnet
+
+	err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
+	if err != nil {
+		log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
 	}
 
 	return NetworkProvisioningSummary{
-		TenantNetworkID:    tenantNetwork.ID,
-		TenantSubnetID:     tenantSubnet.ID,
-		TenantRouterPortID: tenantRouterPort.ID,
-		ProviderNetworkID:  providerNetwork.ID,
-		RouterID:           router.ID,
-		SecurityGroupID:    lbMgmtSecurityGroupID,
+		TenantNetworkID:         tenantNetwork.ID,
+		TenantSubnetID:          tenantSubnet.ID,
+		ProviderNetworkID:       providerNetwork.ID,
+		RouterID:                router.ID,
+		SecurityGroupID:         lbMgmtSecurityGroupID,
+		ManagementSubnetCIDR:    networkParameters.TenantCIDR.String(),
+		ManagementSubnetGateway: networkParameters.ProviderGateway.String(),
 	}, nil
 }

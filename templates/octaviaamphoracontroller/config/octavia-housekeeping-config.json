@@ -1,5 +1,5 @@
 {
-    "command": "/usr/bin/octavia-housekeeping --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf",
+    "command": "/usr/local/bin/container-scripts/octavia_controller_start.sh octavia-housekeeping",
     "config_files": [
         {
             "source": "/var/lib/config-data/merged/octavia.conf",

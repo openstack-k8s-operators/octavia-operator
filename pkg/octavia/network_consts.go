@@ -35,30 +35,8 @@ const (
 
 	// IPv4 consts
 
-	// LbMgmtSubnetCIDR -
-	LbMgmtSubnetCIDR = "172.24.0.0/16"
-
-	// LbMgmtSubnetAllocationPoolStart -
-	LbMgmtSubnetAllocationPoolStart = "172.24.0.5"
-
-	// LbMgmtSubnetAllocationPoolEnd -
-	LbMgmtSubnetAllocationPoolEnd = "172.24.255.254"
-
 	// LbMgmtSubnetGatewayIP -
 	LbMgmtSubnetGatewayIP = ""
-
-	// IPv6 consts
-	// using Unique local address (fc00::/7)
-	// with Global ID 6c:6261:6173 ("lbaas")
-
-	// LbMgmtSubnetIPv6CIDR -
-	LbMgmtSubnetIPv6CIDR = "fd6c:6261:6173:0001::/64"
-
-	// LbMgmtSubnetIPv6AllocationPoolStart -
-	LbMgmtSubnetIPv6AllocationPoolStart = "fd6c:6261:6173:0001::5"
-
-	// LbMgmtSubnetIPv6AllocationPoolEnd -
-	LbMgmtSubnetIPv6AllocationPoolEnd = "fd6c:6261:6173:0001:ffff:ffff:ffff:ffff"
 
 	// LbMgmtSubnetIPv6AddressMode -
 	LbMgmtSubnetIPv6AddressMode = "slaac"
@@ -83,19 +61,10 @@ const (
 	// LbProvSubnetDescription -
 	LbProvSubnetDescription = "LBaaS Management Provider Subnet"
 
+	// LbProvSubnetPoolSize -
+	LbProvSubnetPoolSize = 25
+
 	// IPv4 consts
-
-	// LbProvSubnetCIDR -
-	LbProvSubnetCIDR = "172.23.0.0/24"
-
-	// LbProvSubnetAllocationPoolStart -
-	LbProvSubnetAllocationPoolStart = "172.23.0.100"
-
-	// LbProvSubnetAllocationPoolEnd -
-	LbProvSubnetAllocationPoolEnd = "172.23.0.125"
-
-	// LbProvSubnetGatewayIP -
-	LbProvSubnetGatewayIP = ""
 
 	// TODO(beagles): support IPv6 for the provider network.
 	// LbRouterName -
@@ -104,17 +73,8 @@ const (
 	// LbProvPhysicalNet -
 	LbProvPhysicalNet = "octavia"
 
-	// LbRouterFixedIPAddress
-	LbRouterFixedIPAddress = "172.23.0.150"
-
 	// LbMgmtRouterPortName
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
-
-	// LbMgmtRouterPortIPv4
-	LbMgmtRouterPortIPv4 = "172.24.0.3"
-
-	// LbMgmtRouterPortIPv6
-	LbMgmtRouterPortIPv6 = "fd6c:6261:6173:0001::3"
 
 	// Network attachment details
 	// LbNetworkAttachmentName
