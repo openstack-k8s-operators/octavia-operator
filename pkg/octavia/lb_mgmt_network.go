@@ -847,12 +847,12 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 	if router != nil {
-		log.Info("Router object found, reconciling")
+		log.V(1).Info("Router object found, reconciling")
 		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, networkParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
-		log.Info(fmt.Sprintf("Reconciled router %s (%s)", router.Name, router.ID))
+		log.V(1).Info(fmt.Sprintf("Reconciled router %s (%s)", router.Name, router.ID))
 	} else {
 		log.Info("Creating octavia provider router")
 		enableSNAT := false
