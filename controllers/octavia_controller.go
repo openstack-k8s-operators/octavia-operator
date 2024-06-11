@@ -186,7 +186,6 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(octaviav1.OctaviaAPIReadyCondition, condition.InitReason, octaviav1.OctaviaAPIReadyInitMessage),
 		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
 		condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
-		condition.UnknownCondition(condition.DeploymentReadyCondition, condition.InitReason, condition.DeploymentReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraCertsReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraCertsReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaQuotasReadyCondition, condition.InitReason, octaviav1.OctaviaQuotasReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraSSHReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraSSHReadyInitMessage),
@@ -504,6 +503,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			condition.InputReadyWaitingMessage))
 		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
+	instance.Status.Conditions.MarkTrue(
+		condition.RabbitMqTransportURLReadyCondition,
+		condition.RabbitMqTransportURLReadyMessage)
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	err = octavia.EnsureAmphoraCerts(ctx, instance, helper, &Log)
@@ -823,6 +825,8 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		octaviav1.OctaviaAmphoraImagesReadyCondition,
 		octaviav1.OctaviaAmphoraImagesReadyCompleteMessage)
 
+	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
+
 	// create Deployment - end
 
 	// We reached the end of the Reconcile, update the Ready condition based on
@@ -965,6 +969,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 ) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 
+	var ctrlResult ctrl.Result
 	if instance.Spec.AmphoraImageContainerImage == "" {
 		if instance.Status.Hash[octaviav1.ImageUploadHash] != "" {
 			Log.Info("Reseting image upload hash")
@@ -984,36 +989,6 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 
 	serviceLabels := map[string]string{
 		common.AppSelector: octavia.ServiceName + "-image",
-	}
-
-	Log.Info("Initializing amphora image upload deployment")
-	depl := deployment.NewDeployment(
-		octavia.ImageUploadDeployment(instance, serviceLabels),
-		time.Duration(5)*time.Second,
-	)
-	ctrlResult, err := depl.CreateOrPatch(ctx, helper)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DeploymentReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.DeploymentReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, err
-	} else if (ctrlResult != ctrl.Result{}) {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.DeploymentReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
-			condition.DeploymentReadyRunningMessage))
-		return ctrlResult, nil
-	}
-
-	readyCount := depl.GetDeployment().Status.ReadyReplicas
-	if readyCount == 0 {
-		// Not ready, wait for the next loop
-		Log.Info("Image Upload Pod not ready")
-		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, nil
 	}
 
 	exportLabels := util.MergeStringMaps(
@@ -1075,6 +1050,35 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 			condition.SeverityInfo,
 			condition.ExposeServiceReadyRunningMessage))
 		return ctrlResult, nil
+	}
+	Log.Info("Initializing amphora image upload deployment")
+	depl := deployment.NewDeployment(
+		octavia.ImageUploadDeployment(instance, serviceLabels),
+		time.Duration(5)*time.Second,
+	)
+	ctrlResult, err = depl.CreateOrPatch(ctx, helper)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, err
+	} else if (ctrlResult != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
+			err.Error()))
+		return ctrlResult, nil
+	}
+	readyCount := depl.GetDeployment().Status.ReadyReplicas
+	if readyCount == 0 {
+		// Not ready, wait for the next loop
+		Log.Info("Image Upload Pod not ready")
+		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, nil
 	}
 	endpoint, err := svc.GetAPIEndpoint(nil, nil, "")
 	if err != nil {
