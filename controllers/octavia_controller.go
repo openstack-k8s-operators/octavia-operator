@@ -508,7 +508,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		condition.RabbitMqTransportURLReadyMessage)
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
-	err = octavia.EnsureAmphoraCerts(ctx, instance, helper, &Log)
+	err = octavia.EnsureAmphoraCerts(ctx, instance, helper)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			octaviav1.OctaviaAmphoraCertsReadyCondition,
