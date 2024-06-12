@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 import sys
 import os
+import ipaddress
 from pyroute2 import IPRoute
 
 try:
@@ -30,12 +31,15 @@ if not len(octavia_interface):
     sys.exit(1)
 
 ipfile = open(filename, "r")
-ipaddress = ipfile.read()
+ipaddr = ipfile.read()
 ipfile.close()
-if ipaddress:
+if ipaddr:
     current_addresses = ip.get_addr(label=interface_name)
     # TODO(beagles): check IPv6, IIUC the  library will do some translation of
     # mask but it might not be what we want.
-    if ipaddress not in current_addresses:
-        ip.addr('add', index = octavia_interface[0], address=ipaddress, mask=32)
+    if ipaddr not in current_addresses:
+        mask_value = 32
+        if ipaddress.ip_address(ipaddr).version == 6:
+            mask_value = 128
+        ip.addr('add', index = octavia_interface[0], address=ipaddr, mask=mask_value)
 ip.close()
