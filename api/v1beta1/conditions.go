@@ -38,6 +38,8 @@ const (
 	OctaviaAmphoraSSHReadyCondition condition.Type = "OctaviaAmphoraSSHReady"
 
 	OctaviaAmphoraImagesReadyCondition condition.Type = "OctaviaAmphoraImagesReady"
+
+	OctaviaRsyslogReadyCondition condition.Type = "OctaviaRsyslogReady"
 )
 
 // Common Messages used by API objects

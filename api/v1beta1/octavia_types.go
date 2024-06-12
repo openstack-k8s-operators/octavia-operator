@@ -63,6 +63,10 @@ type OctaviaSpec struct {
 	// +kubebuilder:validation:Optional
 	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
 	OctaviaWorker OctaviaAmphoraControllerSpec `json:"octaviaWorker"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaRsyslog - Spec definition for the Octavia Rsyslog agent for the Octavia deployment
+	OctaviaRsyslog OctaviaRsyslogSpec `json:"octaviaRsyslog"`
 }
 
 // OctaviaSpecCore - this version has no containerImages and is used by OpenStackControlplane
@@ -86,6 +90,10 @@ type OctaviaSpecCore struct {
 	// +kubebuilder:validation:Optional
 	// OctaviaHousekeeping - Spec definition for the Octavia Housekeeping agent for the Octavia deployment
 	OctaviaWorker OctaviaAmphoraControllerSpecCore `json:"octaviaWorker"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaRsyslog - Spec definition for the Octavia Rsyslog agent for the Octavia deployment
+	OctaviaRsyslog OctaviaRsyslogSpecCore `json:"octaviaRsyslog"`
 }
 
 // OctaviaSpecBase -
@@ -270,6 +278,9 @@ type OctaviaStatus struct {
 
 	// ReadyCount of octavia HealthManager instances
 	OctaviaHealthManagerReadyCount int32 `json:"healthmanagerreadyCount,omitempty"`
+
+	// ReadyCount of octavia Rsyslog instances
+	OctaviaRsyslogReadyCount int32 `json:"rsyslogreadyCount,omitempty"`
 
 	// ObservedGeneration - the most recent generation observed for this
 	// service. If the observed generation is less than the spec generation,

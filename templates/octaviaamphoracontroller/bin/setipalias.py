@@ -7,8 +7,9 @@ from pyroute2 import IPRoute
 
 try:
     interface_name = sys.argv[1]
+    node_type = sys.argv[2]
 except IndexError:
-    print(f"usage: {sys.argv[0]} <interface_name>")
+    print(f"usage: {sys.argv[0]} <interface_name> [hm|rsyslog]")
     sys.exit(1)
 
 # The file containing our IP alias has the worker node name for
@@ -18,7 +19,7 @@ if not node_name_env:
     print("NODE_NAME not set")
     sys.exit(1)
 
-nodefile = "hm_%s" % node_name_env
+nodefile = f"{node_type}_{node_name_env}"
 filename = os.path.join('/var/lib/hmports', nodefile)
 if not os.path.exists(filename):
     print(f"Required alias address file {filename} does not exist")

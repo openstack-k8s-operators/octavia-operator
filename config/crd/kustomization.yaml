@@ -5,6 +5,7 @@ resources:
 - bases/octavia.openstack.org_octaviaamphoracontrollers.yaml
 - bases/octavia.openstack.org_octaviaapis.yaml
 - bases/octavia.openstack.org_octavias.yaml
+- bases/octavia.openstack.org_octaviarsyslogs.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patchesStrategicMerge:

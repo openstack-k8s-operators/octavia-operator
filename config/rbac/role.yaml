@@ -242,6 +242,32 @@ rules:
 - apiGroups:
   - octavia.openstack.org
   resources:
+  - octaviarsyslogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
   - octavias
   verbs:
   - create

@@ -833,6 +833,33 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, nil
 	}
 
+	octaviaRsyslog, op, err := r.octaviaRsyslogDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaRsyslog)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			amphoraControllerReadyCondition(octaviav1.Worker),
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			amphoraControllerErrorMessage(octaviav1.Worker),
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+	if !ampObsGen {
+		instance.Status.Conditions.Set(condition.UnknownCondition(
+			amphoraControllerReadyCondition(octaviav1.Worker),
+			condition.InitReason,
+			amphoraControllerErrorMessage(octaviav1.Worker),
+		))
+	} else {
+		instance.Status.OctaviaRsyslogReadyCount = octaviaRsyslog.Status.ReadyCount
+		conditionStatus := octaviaRsyslog.Status.Conditions.Mirror(octaviav1.OctaviaRsyslogReadyCondition)
+		if conditionStatus != nil {
+			instance.Status.Conditions.Set(conditionStatus)
+		}
+	}
+	if op != controllerutil.OperationResultNone && ampObsGen {
+		Log.Info(fmt.Sprintf("Deployment of OctaviaRsyslog for %s successfully reconciled - operation: %s", instance.Name, string(op)))
+	}
+
 	// Skip the other amphora controller pods until the health managers are all up and running.
 	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
 		ampImageOwnerID, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
@@ -1511,6 +1538,36 @@ func amphoraControllerErrorMessage(role string) string {
 		octaviav1.Worker:        octaviav1.OctaviaWorkerReadyErrorMessage,
 	}
 	return condMap[role]
+}
+
+func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
+	instance *octaviav1.Octavia,
+	controllerSpec octaviav1.OctaviaRsyslogSpec,
+) (*octaviav1.OctaviaRsyslog,
+	controllerutil.OperationResult, error) {
+
+	daemonset := &octaviav1.OctaviaRsyslog{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-rsyslog", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
+		daemonset.Spec = controllerSpec
+		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
+		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
+		if len(daemonset.Spec.NodeSelector) == 0 {
+			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
+		}
+		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	return daemonset, op, err
 }
 
 // checkOctaviaAPIGeneration -

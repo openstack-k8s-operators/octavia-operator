@@ -586,13 +586,20 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		return err
 	}
 	var ipAddresses []string
+	var rsyslogIPAddresses []string
 	for key, val := range hmMap.Data {
 		if strings.HasPrefix(key, "hm_") {
 			ipAddresses = append(ipAddresses, fmt.Sprintf("%s:5555", val))
 		}
+		if strings.HasPrefix(key, "rsyslog_") {
+			// TODO(gthiemonge) Make port configurable
+			rsyslogIPAddresses = append(rsyslogIPAddresses, fmt.Sprintf("%s:514", val))
+		}
 	}
 	ipAddressString := strings.Join(ipAddresses, ",")
 	templateParameters["ControllerIPList"] = ipAddressString
+	templateParameters["AdminLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
+	templateParameters["TenantLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
 
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser
