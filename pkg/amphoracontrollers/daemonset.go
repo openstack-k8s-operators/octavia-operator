@@ -42,12 +42,12 @@ func DaemonSet(
 
 	// The API pod has an extra volume so the API and the provider agent can
 	// communicate with each other.
-	volumes := octavia.GetVolumes(instance.Name)
+	volumes := GetVolumes(instance.Name)
 	parentOctaviaName := octavia.GetOwningOctaviaControllerName(instance)
 	certsSecretName := fmt.Sprintf("%s-certs-secret", parentOctaviaName)
 	volumes = append(volumes, GetCertVolume(certsSecretName)...)
 
-	volumeMounts := octavia.GetVolumeMounts(serviceName)
+	volumeMounts := GetVolumeMounts(serviceName)
 	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
 
 	livenessProbe := &corev1.Probe{
@@ -83,6 +83,7 @@ func DaemonSet(
 
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
+	envVars["NODE_NAME"] = env.DownwardAPI("spec.nodeName")
 
 	envVars["MGMT_CIDR"] = env.SetValue(instance.Spec.OctaviaProviderSubnetCIDR)
 	envVars["MGMT_GATEWAY"] = env.SetValue(instance.Spec.OctaviaProviderSubnetGateway)

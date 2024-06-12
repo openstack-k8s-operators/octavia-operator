@@ -43,6 +43,7 @@ import (
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -672,6 +673,109 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 
 	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, helper)
 	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	nodeConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      octavia.HmConfigMap,
+			Namespace: instance.GetNamespace(),
+			Labels:    labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{}),
+		},
+		Data: make(map[string]string),
+	}
+
+	// Look for existing config map and if exists, read existing data and match
+	// against nodes.
+	foundMap := &corev1.ConfigMap{}
+	err = helper.GetClient().Get(ctx, types.NamespacedName{Name: octavia.HmConfigMap, Namespace: instance.GetNamespace()},
+		foundMap)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			Log.Info(fmt.Sprintf("Port map %s doesn't exist, creating.", octavia.HmConfigMap))
+		} else {
+			return ctrl.Result{}, err
+		}
+	} else {
+		Log.Info("Retrieved existing map, updating..")
+		nodeConfigMap.Data = foundMap.Data
+	}
+
+	//
+	// Predictable IPs.
+	//
+	// NOTE(beagles): refactoring this might be nice. This could also  be
+	// optimized but the data sets are small (nodes an IP ranges are less than
+	// 100) so optimization might be a waste.
+	//
+	predictableIPParams, err := octavia.GetPredictableIPAM(networkParameters)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	// Get a list of the nodes in the cluster
+
+	// TODO(beagles):
+	// * confirm whether or not this lists only the nodes we want (i.e. ones
+	// that will host the daemonset)
+	// * do we want to provide a mechanism to temporarily disabling this list
+	// for maintenance windows where nodes might be "coming and going"
+
+	nodes, _ := helper.GetKClient().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	updatedMap := make(map[string]string)
+	allocatedIPs := make(map[string]bool)
+	var predictableIPsRequired []string
+
+	// First scan existing allocations so we can keep existing allocations.
+	// Keeping track of what's required and what already exists. If a node is
+	// removed from the cluster, it's IPs will not be added to the allocated
+	// list and are effectively recycled.
+	for _, node := range nodes.Items {
+		Log.Info(fmt.Sprintf("cluster node name %s", node.Name))
+		portName := fmt.Sprintf("hm_%s", node.Name)
+		if ipValue, ok := nodeConfigMap.Data[portName]; ok {
+			updatedMap[portName] = ipValue
+			allocatedIPs[ipValue] = true
+			Log.Info(fmt.Sprintf("%s has IP mapping %s: %s", node.Name, portName, ipValue))
+		} else {
+			predictableIPsRequired = append(predictableIPsRequired, portName)
+		}
+		portName = fmt.Sprintf("rsyslog_%s", node.Name)
+		if ipValue, ok := nodeConfigMap.Data[portName]; ok {
+			updatedMap[portName] = ipValue
+			allocatedIPs[ipValue] = true
+			Log.Info(fmt.Sprintf("%s has IP mapping %s: %s", node.Name, portName, ipValue))
+		} else {
+			predictableIPsRequired = append(predictableIPsRequired, portName)
+		}
+	}
+	// Get new IPs using the range from predictableIPParmas minus the
+	// allocatedIPs captured above.
+	Log.Info(fmt.Sprintf("Allocating %d predictable IPs", len(predictableIPsRequired)))
+	for _, portName := range predictableIPsRequired {
+		hmPort, err := octavia.GetNextIP(predictableIPParams, allocatedIPs)
+		if err != nil {
+			// An error here is really unexpected- it means either we have
+			// messed up the allocatedIPs list or the range we are assuming is
+			// too small for the number of health managers and rsyslog
+			// containers.
+			return ctrl.Result{}, err
+		}
+		updatedMap[portName] = hmPort
+	}
+
+	mapLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
+	_, err = controllerutil.CreateOrPatch(ctx, helper.GetClient(), nodeConfigMap, func() error {
+		nodeConfigMap.Labels = util.MergeStringMaps(nodeConfigMap.Labels, mapLabels)
+		nodeConfigMap.Data = updatedMap
+		err := controllerutil.SetControllerReference(instance, nodeConfigMap, helper.GetScheme())
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err != nil {
+		Log.Info("Unable to create config map for health manager ports...")
 		return ctrl.Result{}, err
 	}
 

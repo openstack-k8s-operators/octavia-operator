@@ -17,6 +17,8 @@ package amphoracontrollers
 
 import (
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
 const (
@@ -27,6 +29,35 @@ var (
 	// Files get mounted as root:root, but process is running as octavia
 	configMode int32 = 0644
 )
+
+func GetVolumes(name string) []corev1.Volume {
+	var config0640AccessMode int32 = 0640
+	return append(
+		octavia.GetVolumes(name),
+		corev1.Volume{
+			Name: "hm-ports",
+			VolumeSource: corev1.VolumeSource{
+				ConfigMap: &corev1.ConfigMapVolumeSource{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: octavia.HmConfigMap,
+					},
+					DefaultMode: &config0640AccessMode,
+				},
+			},
+		},
+	)
+}
+
+func GetVolumeMounts(serviceName string) []corev1.VolumeMount {
+	return append(
+		octavia.GetVolumeMounts(serviceName),
+		corev1.VolumeMount{
+			Name:      "hm-ports",
+			MountPath: "/var/lib/hmports",
+			ReadOnly:  true,
+		},
+	)
+}
 
 // GetCertVolume - service volumes
 func GetCertVolume(certSecretName string) []corev1.Volume {

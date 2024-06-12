@@ -49,4 +49,7 @@ const (
 
 	// AdminTenantName
 	AdminTenant = "admin"
+
+	// HmConfigMap ...
+	HmConfigMap = "octavia-hmport-map"
 )

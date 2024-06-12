@@ -64,6 +64,9 @@ const (
 	// LbProvSubnetPoolSize -
 	LbProvSubnetPoolSize = 25
 
+	// LbProvPredictablePoolSize  -
+	LbProvPredictablePoolSize = 25
+
 	// IPv4 consts
 
 	// TODO(beagles): support IPv6 for the provider network.

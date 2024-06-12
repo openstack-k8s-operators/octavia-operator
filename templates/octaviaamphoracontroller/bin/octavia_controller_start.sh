@@ -18,6 +18,7 @@ set -ex
 /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
 
 if [ "$1" = "octavia-health-manager" ]; then
+    /usr/local/bin/container-scripts/setipalias.py octavia
     /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
 fi
 
