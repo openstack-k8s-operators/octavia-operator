@@ -19,7 +19,7 @@ import socket
 
 from pyroute2 import IPRoute
 
-import octavia.amphorae.backends.utils.ip_advertisement as ip_adv
+import ip_advertisement as ip_adv
 
 try:
     interface_name = sys.argv[1]
