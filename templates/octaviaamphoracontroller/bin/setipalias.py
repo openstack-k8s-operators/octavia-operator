@@ -2,6 +2,7 @@
 import sys
 import os
 import ipaddress
+import netifaces
 from pyroute2 import IPRoute
 
 try:
@@ -34,9 +35,10 @@ ipfile = open(filename, "r")
 ipaddr = ipfile.read()
 ipfile.close()
 if ipaddr:
-    current_addresses = ip.get_addr(label=interface_name)
-    # TODO(beagles): check IPv6, IIUC the  library will do some translation of
-    # mask but it might not be what we want.
+    # Get our current addresses so we can avoid trying to set the
+    # same address again.
+    ifaceinfo = netifaces.ifaddresses(interface_name)[netifaces.AF_INET]
+    current_addresses = [x['addr'] for x in ifaceinfo]
     if ipaddr not in current_addresses:
         mask_value = 32
         if ipaddress.ip_address(ipaddr).version == 6:
