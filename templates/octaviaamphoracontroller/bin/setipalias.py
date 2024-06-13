@@ -37,11 +37,13 @@ ipfile.close()
 if ipaddr:
     # Get our current addresses so we can avoid trying to set the
     # same address again.
-    ifaceinfo = netifaces.ifaddresses(interface_name)[netifaces.AF_INET]
+    version = ipaddress.ip_address(ipaddr).version
+    ifaceinfo = netifaces.ifaddresses(interface_name)[
+        netifaces.AF_INET if version == 4 else netifaces.AF_INET6]
     current_addresses = [x['addr'] for x in ifaceinfo]
     if ipaddr not in current_addresses:
         mask_value = 32
-        if ipaddress.ip_address(ipaddr).version == 6:
+        if version == 6:
             mask_value = 128
         ip.addr('add', index = octavia_interface[0], address=ipaddr, mask=mask_value)
 ip.close()
