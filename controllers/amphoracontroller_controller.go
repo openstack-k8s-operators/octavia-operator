@@ -87,6 +87,7 @@ func (r *OctaviaAmphoraControllerReconciler) GetLogger(ctx context.Context) logr
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update
 // service account permissions that are needed to grant permission to the above
 // +kubebuilder:rbac:groups="",resources=pods,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
 
 // Reconcile implementation of the reconcile loop for amphora
 // controllers like the octavia housekeeper, worker and health manager
