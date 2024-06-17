@@ -120,6 +120,9 @@ const (
 	// OctaviaAmphoraImagesReadyInitMessage
 	OctaviaAmphoraImagesReadyInitMessage = "Octavia Amphora Images setup is not initialized"
 
+	// OctaviaAmphoraImagesReadyRunningMessage
+	OctaviaAmphoraImagesReadyRunningMessage = "Octavia Amphora Images setup in progress"
+
 	// OctaviaAmphoraImagesReadyErrorMessage
 	OctaviaAmphoraImagesReadyErrorMessage = "Octavia Amphora Images setup error occured %s"
 

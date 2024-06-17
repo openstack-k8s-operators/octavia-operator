@@ -1176,10 +1176,9 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	} else if (ctrlResult != ctrl.Result{}) {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			octaviav1.OctaviaAmphoraImagesReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
-			err.Error()))
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			octaviav1.OctaviaAmphoraImagesReadyRunningMessage))
 		return ctrlResult, nil
 	}
 	readyCount := depl.GetDeployment().Status.ReadyReplicas
@@ -1190,13 +1189,25 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	}
 	endpoint, err := svc.GetAPIEndpoint(nil, nil, "")
 	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
+			err.Error()))
 		return ctrl.Result{}, err
 	}
 
 	urlMap, err := r.getLocalImageURLs(endpoint)
 	if err != nil {
 		Log.Info(fmt.Sprintf("Cannot get amphora image list: %s", err))
-		return ctrl.Result{Requeue: true, RequeueAfter: 1 * time.Second}, err
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaAmphoraImagesReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
 	}
 
 	ok, err := octavia.EnsureAmphoraImages(ctx, instance, &r.Log, helper, urlMap)
@@ -1206,6 +1217,11 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	if !ok {
 		// Images are not ready
 		Log.Info("Waiting for amphora images to be ready")
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaAmphoraImagesReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			octaviav1.OctaviaAmphoraImagesReadyRunningMessage))
 		return ctrl.Result{Requeue: true, RequeueAfter: 5 * time.Second}, nil
 	}
 	Log.Info(fmt.Sprintf("Setting image upload hash - %s", hash))
