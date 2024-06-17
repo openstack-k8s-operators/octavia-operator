@@ -362,9 +362,11 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(instance, configMapVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(instance, configMapVars)
 	if err != nil {
 		return ctrl.Result{}, err
+	} else if hashChanged {
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
@@ -650,18 +652,18 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 func (r *OctaviaAmphoraControllerReconciler) createHashOfInputHashes(
 	instance *octaviav1.OctaviaAmphoraController,
 	envVars map[string]env.Setter,
-) (string, error) {
+) (string, bool, error) {
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
 	hash, err := util.ObjectHash(mergedMapVars)
 	if err != nil {
-		return hash, err
+		return hash, false, err
 	}
-
+	var changed bool
 	if hashMap, changed := util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
 		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
-	return hash, nil
+	return hash, changed, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
