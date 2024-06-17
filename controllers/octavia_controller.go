@@ -103,6 +103,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // service account permissions that are needed to grant permission to the above
 // +kubebuilder:rbac:groups="security.openshift.io",resourceNames=anyuid;privileged,resources=securitycontextconstraints,verbs=use
 // +kubebuilder:rbac:groups="",resources=pods,verbs=create;delete;get;list;patch;update;watch
+// +kubebuilder:rbac:groups="",resources=nodes,verbs=get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -720,7 +721,10 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// * do we want to provide a mechanism to temporarily disabling this list
 	// for maintenance windows where nodes might be "coming and going"
 
-	nodes, _ := helper.GetKClient().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	nodes, err := helper.GetKClient().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 	updatedMap := make(map[string]string)
 	allocatedIPs := make(map[string]bool)
 	var predictableIPsRequired []string
