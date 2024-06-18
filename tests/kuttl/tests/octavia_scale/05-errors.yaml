@@ -10,7 +10,7 @@ apiVersion: octavia.openstack.org/v1beta1
 kind: Octavia
 metadata:
   finalizers:
-  - Octavia
+  - openstack.org/octavia
   name: octavia
 ---
 apiVersion: apps/v1
