@@ -244,6 +244,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&mariadbv1.MariaDBDatabase{}).
 		Owns(&mariadbv1.MariaDBAccount{}).
 		Owns(&octaviav1.OctaviaAPI{}).
+		Owns(&octaviav1.OctaviaAmphoraController{}).
 		Owns(&batchv1.Job{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
