@@ -361,7 +361,7 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 	serviceLabels map[string]string,
 ) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service init")
+	Log.V(1).Info("Reconciling Service init")
 	//
 	// expose the service (create service and return the created endpoint URLs)
 	//
@@ -526,36 +526,36 @@ func (r *OctaviaAPIReconciler) reconcileInit(
 		instance.Status.Conditions.Set(c)
 	}
 
-	Log.Info("Reconciled Service init successfully")
+	Log.V(1).Info("Reconciled Service init successfully")
 	return ctrlResult, nil
 }
 
 func (r *OctaviaAPIReconciler) reconcileUpdate(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service update")
+	Log.V(1).Info("Reconciling Service update")
 
 	// TODO: should have minor update tasks if required
 	// - delete dbsync hash from status to rerun it?
 
-	Log.Info("Reconciled Service update successfully")
+	Log.V(1).Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAPIReconciler) reconcileUpgrade(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service upgrade")
+	Log.V(1).Info("Reconciling Service upgrade")
 
 	// TODO: should have major version upgrade tasks
 	// -delete dbsync hash from status to rerun it?
 
-	Log.Info("Reconciled Service upgrade successfully")
+	Log.V(1).Info("Reconciled Service upgrade successfully")
 	return ctrl.Result{}, nil
 }
 
 // TODO(tweining): implement
 func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaAPI, helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service")
+	Log.V(1).Info("Reconciling Service")
 
 	// ConfigMap
 	configMapVars := make(map[string]env.Setter)
@@ -836,7 +836,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		instance.Status.Conditions.MarkTrue(
 			condition.ReadyCondition, condition.ReadyMessage)
 	}
-	Log.Info("Reconciled Service successfully")
+	Log.V(1).Info("Reconciled Service successfully")
 	return ctrl.Result{}, nil
 }
 
@@ -849,7 +849,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	envVars *map[string]env.Setter,
 ) error {
 	Log := r.GetLogger(ctx)
-	Log.Info("Generating service config map")
+	Log.V(1).Info("Generating service config map")
 	//
 	// create Configmap/Secret required for octavia input
 	// - %-scripts configmap holding scripts to e.g. bootstrap the service
@@ -1004,7 +1004,7 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		Log.Error(err, "unable to process config map")
 		return err
 	}
-	Log.Info("Service config map generated")
+	Log.V(1).Info("Service config map generated")
 
 	return nil
 }

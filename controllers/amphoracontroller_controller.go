@@ -186,32 +186,32 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 func (r *OctaviaAmphoraControllerReconciler) reconcileDelete(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service delete")
+	Log.V(1).Info("Reconciling Service delete")
 
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
 
-	Log.Info("Reconciled Service delete successfully")
+	Log.V(1).Info("Reconciled Service delete successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileUpdate(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service update")
-	Log.Info("Reconciled Service update successfully")
+	Log.V(1).Info("Reconciling Service update")
+	Log.V(1).Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileUpgrade(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service upgrade")
-	Log.Info("Reconciled Service upgrade successfully")
+	Log.V(1).Info("Reconciling Service upgrade")
+	Log.V(1).Info("Reconciled Service upgrade successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service")
+	Log.V(1).Info("Reconciling Service")
 
 	// Prepare NetworkAttachments first, it must be done before generating the
 	// configuration as the config uses IP addresses of the attachments.
@@ -305,7 +305,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	if err != nil {
 		return ctrl.Result{}, err
 	}
-	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
+	r.Log.V(1).Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
 	templateVars := OctaviaTemplateVars{
 		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
@@ -458,10 +458,11 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// We reached the end of the Reconcile, update the Ready condition based on
 	// the sub conditions
 	if instance.Status.Conditions.AllSubConditionIsTrue() {
+		Log.Info("Amphora controller is now ready.")
 		instance.Status.Conditions.MarkTrue(
 			condition.ReadyCondition, condition.ReadyMessage)
 	} else {
-		Log.Info("Not all conditions are ready for Amphora controller")
+		Log.V(1).Info("Not all conditions are ready for Amphora controller yet")
 	}
 	return ctrl.Result{}, nil
 }
@@ -474,7 +475,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateVars OctaviaTemplateVars,
 	ospSecret *corev1.Secret,
 ) error {
-	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
+	r.Log.V(1).Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
@@ -642,8 +643,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		return err
 	}
 
-	r.Log.Info("Service config map generated")
-
+	r.Log.V(1).Info("Service config map generated")
 	return nil
 }
 
