@@ -8,9 +8,6 @@ operators_git_repos:
     dest: ~/octavia-operator
     version: main
   # Optional repositories:
-  - repo: https://github.com/openstack-k8s-operators/neutron-operator.git
-    dest: ~/neutron-operator
-    depth: 10
   - repo: https://github.com/openstack-k8s-operators/lib-common.git
     dest: ~/lib-common
 make_crc_cpus: 20
