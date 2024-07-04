@@ -296,7 +296,7 @@
 
 # Now run the operator as a Go program locally (outside the Kubernetes cluster):
 #
-# First run kubefwd in the background so communication between local operator
+# First run kubefwd so communication between local operator
 # and cluster is possible:
 # sudo -E kubefwd services -n openstack
 #
