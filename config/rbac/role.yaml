@@ -32,6 +32,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -163,6 +164,7 @@ rules:
   resources:
   - mariadbaccounts/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - mariadb.openstack.org
@@ -181,6 +183,7 @@ rules:
   resources:
   - mariadbdatabases/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - octavia.openstack.org
@@ -199,6 +202,7 @@ rules:
   resources:
   - octaviaamphoracontrollers/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - octavia.openstack.org
@@ -225,6 +229,7 @@ rules:
   resources:
   - octaviaapis/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - octavia.openstack.org
@@ -251,6 +256,7 @@ rules:
   resources:
   - octavias/finalizers
   verbs:
+  - patch
   - update
 - apiGroups:
   - octavia.openstack.org
@@ -288,6 +294,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
@@ -298,6 +305,7 @@ rules:
   - create
   - get
   - list
+  - patch
   - update
   - watch
 - apiGroups:
