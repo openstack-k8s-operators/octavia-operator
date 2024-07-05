@@ -49,6 +49,24 @@ spec:
             description: OctaviaRsyslogSpec defines common state for all Octavia Amphora
               Controllers
             properties:
+              adminLogTargets:
+                description: AdminLogTargets is a list of OctaviaRsyslogTarget, the
+                  admin logs are forwarded to those targets. Use only when forwarding
+                  to an external Rsyslog server.
+                items:
+                  properties:
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    protocol:
+                      type: string
+                  required:
+                  - host
+                  - port
+                  - protocol
+                  type: object
+                type: array
               containerImage:
                 default: quay.io/podified-antelope-centos9/openstack-rsyslog:current-podified
                 description: ContainerImage - Amphora Controller Container Image URL
@@ -133,6 +151,24 @@ spec:
                 description: 'ServiceUser - service user name (TODO: beagles, do we
                   need this at all)'
                 type: string
+              tenantLogTargets:
+                description: TenantLogTargets is a list of OctaviaRsyslogTarget, the
+                  tenant logs are forwarded to those targets. Use only when forwarding
+                  to an external Rsyslog server.
+                items:
+                  properties:
+                    host:
+                      type: string
+                    port:
+                      type: integer
+                    protocol:
+                      type: string
+                  required:
+                  - host
+                  - port
+                  - protocol
+                  type: object
+                type: array
             required:
             - serviceAccount
             type: object

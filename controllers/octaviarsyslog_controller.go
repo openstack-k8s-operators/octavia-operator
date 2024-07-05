@@ -374,7 +374,8 @@ func (r *OctaviaRsyslogReconciler) generateServiceConfigMaps(
 	}
 
 	templateParameters := map[string]interface{}{}
-	templateParameters["LogTargets"] = []string{}
+	templateParameters["AdminLogTargets"] = instance.Spec.AdminLogTargets
+	templateParameters["TenantLogTargets"] = instance.Spec.TenantLogTargets
 
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser

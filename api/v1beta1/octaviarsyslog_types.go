@@ -62,6 +62,16 @@ type OctaviaRsyslogSpecCore struct {
 	// +kubebuilder:default={"octavia"}
 	// NetworkAttachments is a list of NetworkAttachment resource names to expose the services to the given network
 	NetworkAttachments []string `json:"networkAttachments,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// AdminLogTargets is a list of OctaviaRsyslogTarget, the admin logs are forwarded to those targets.
+	// Use only when forwarding to an external Rsyslog server.
+	AdminLogTargets []OctaviaRsyslogTarget `json:"adminLogTargets,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// TenantLogTargets is a list of OctaviaRsyslogTarget, the tenant logs are forwarded to those targets.
+	// Use only when forwarding to an external Rsyslog server.
+	TenantLogTargets []OctaviaRsyslogTarget `json:"tenantLogTargets,omitempty"`
 }
 
 // OctaviaRsyslogStatus defines the observed state of the Octavia Amphora Controller
@@ -110,6 +120,12 @@ type OctaviaRsyslogList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []OctaviaRsyslog `json:"items"`
+}
+
+type OctaviaRsyslogTarget struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Protocol string `json:"protocol"`
 }
 
 func init() {
