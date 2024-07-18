@@ -15,9 +15,6 @@
 # under the License.
 set -ex
 
-#/usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
-
-# Ignore possible errors
-#/usr/local/bin/container-scripts/octavia_status.py || true
+cp /var/lib/config-data/merged/09-octavia-listener.conf /etc/rsyslog.d/
 
 exec /usr/sbin/rsyslogd -n

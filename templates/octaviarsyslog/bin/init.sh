@@ -27,5 +27,7 @@ done
 /usr/local/bin/container-scripts/setipalias.py octavia rsyslog
 /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
 
+/usr/local/bin/container-scripts/octavia_rsyslog_config.py octavia
+
 # Ignore possible errors
 /usr/local/bin/container-scripts/octavia_status.py || true
