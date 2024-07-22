@@ -1,15 +1,24 @@
 #!/usr/bin/python3
+
 import sys
 import os
 import ipaddress
 import netifaces
 from pyroute2 import IPRoute
 
+node_type = "rsyslog"
+
+rsyslog_config = """
+module(load="imudp")
+input(type="imudp" address="{address}" port="514")
+module(load="imtcp")
+input(type="imtcp" address="{address}" port="514")
+"""
+
 try:
     interface_name = sys.argv[1]
-    node_type = sys.argv[2]
 except IndexError:
-    print(f"usage: {sys.argv[0]} <interface_name> [hm|rsyslog]")
+    print(f"usage: {sys.argv[0]} <interface_name>")
     sys.exit(1)
 
 # The file containing our IP alias has the worker node name for
@@ -36,15 +45,7 @@ ipfile = open(filename, "r")
 ipaddr = ipfile.read()
 ipfile.close()
 if ipaddr:
-    # Get our current addresses so we can avoid trying to set the
-    # same address again.
-    version = ipaddress.ip_address(ipaddr).version
-    ifaceinfo = netifaces.ifaddresses(interface_name)[
-        netifaces.AF_INET if version == 4 else netifaces.AF_INET6]
-    current_addresses = [x['addr'] for x in ifaceinfo]
-    if ipaddr not in current_addresses:
-        mask_value = 32
-        if version == 6:
-            mask_value = 128
-        ip.addr('add', index = octavia_interface[0], address=ipaddr, mask=mask_value)
+    dest_file = "/var/lib/config-data/merged/09-octavia-listener.conf"
+    with open(dest_file, "w") as fp:
+        fp.write(rsyslog_config.format(address=ipaddr))
 ip.close()

@@ -1,0 +1,11 @@
+{
+    "command": "/usr/local/bin/container-scripts/octavia_rsyslog_start.sh",
+    "config_files": [
+        {
+            "source": "/var/lib/config-data/merged/10-octavia.conf",
+            "dest": "/etc/rsyslog.d/10-octavia.conf",
+            "owner": "root",
+            "perm": "0644"
+        }
+    ]
+}

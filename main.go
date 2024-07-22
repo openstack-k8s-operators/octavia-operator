@@ -124,6 +124,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	if err = (&controllers.OctaviaRsyslogReconciler{
+		Client:  mgr.GetClient(),
+		Scheme:  mgr.GetScheme(),
+		Kclient: kclient,
+		Log:     ctrl.Log.WithName("controllers").WithName("OctaviaRsyslog"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "OctaviaRsyslog")
+		os.Exit(1)
+	}
+
 	if err = (&controllers.OctaviaAmphoraControllerReconciler{
 		Client:  mgr.GetClient(),
 		Scheme:  mgr.GetScheme(),

@@ -1,6 +1,6 @@
-#!/bin/bash
+#!/bin//bash
 #
-# Copyright 2024 Red Hat Inc.
+# Copyright 2020 Red Hat Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may
 # not use this file except in compliance with the License. You may obtain
@@ -15,14 +15,19 @@
 # under the License.
 set -ex
 
-/usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+# expect that the common.sh is in the same dir as the calling script
+SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
+. ${SCRIPTPATH}/common.sh --source-only
 
-if [ "$1" = "octavia-health-manager" ]; then
-    /usr/local/bin/container-scripts/setipalias.py octavia hm
-    /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
-fi
+# Merge all templates from config CM
+for dir in /var/lib/config-data/default; do
+    merge_config_dir ${dir}
+done
+
+/usr/local/bin/container-scripts/setipalias.py octavia rsyslog
+/usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
+
+/usr/local/bin/container-scripts/octavia_rsyslog_config.py octavia
 
 # Ignore possible errors
 /usr/local/bin/container-scripts/octavia_status.py || true
-
-exec /usr/bin/$1 --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf --config-dir /etc/octavia/octavia.conf.d/
