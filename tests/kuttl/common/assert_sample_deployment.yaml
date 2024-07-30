@@ -92,7 +92,7 @@ spec:
                   values:
                   - octavia-api
               topologyKey: kubernetes.io/hostname
-            weight: 1
+            weight: 100
       containers:
       - args:
         - -c
