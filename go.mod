@@ -4,21 +4,21 @@ go 1.20
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/gophercloud/gophercloud v1.13.0
+	github.com/gophercloud/gophercloud v1.14.0
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.4.1-0.20240716081244-6191389eafd5
-	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20240717072956-287a91f98874
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.4.1-0.20240715111029-358ba8041494
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20240715111029-358ba8041494
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20240718134341-5921994e4577
+	github.com/openstack-k8s-operators/infra-operator/apis v0.4.1-0.20240729052254-84df6dfc07a9
+	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20240729093119-474d32f45d19
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.4.1-0.20240730142703-7fd3da600c9d
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20240730142703-7fd3da600c9d
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20240730141130-cb64983240ea
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20240710183926-15f69cfd799a
+	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20240729110448-64cc15bbcfe3
 	go.uber.org/zap v1.27.0
-	k8s.io/api v0.28.11
-	k8s.io/apimachinery v0.28.11
-	k8s.io/client-go v0.28.11
+	k8s.io/api v0.28.12
+	k8s.io/apimachinery v0.28.12
+	k8s.io/client-go v0.28.12
 	sigs.k8s.io/controller-runtime v0.16.6
 )
 
@@ -76,8 +76,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.28.11 // indirect
-	k8s.io/component-base v0.28.11 // indirect
+	k8s.io/apiextensions-apiserver v0.28.12 // indirect
+	k8s.io/component-base v0.28.12 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
