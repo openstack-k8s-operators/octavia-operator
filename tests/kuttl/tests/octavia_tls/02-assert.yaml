@@ -135,8 +135,6 @@ spec:
           name: config-data-merged
           readOnly: true
           subPath: octavia-api-config.json
-        - mountPath: /etc/my.cnf
-          name: config-data
         - mountPath: /run/octavia
           name: octavia-run
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
@@ -194,8 +192,6 @@ spec:
           name: config-data-merged
           readOnly: true
           subPath: octavia-driver-agent-config.json
-        - mountPath: /etc/my.cnf
-          name: config-data
         - mountPath: /run/octavia
           name: octavia-run
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
