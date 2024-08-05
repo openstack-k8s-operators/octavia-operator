@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -596,6 +597,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			rsyslogIPAddresses = append(rsyslogIPAddresses, fmt.Sprintf("%s:514", val))
 		}
 	}
+	sort.Strings(ipAddresses)
+	sort.Strings(rsyslogIPAddresses)
 	ipAddressString := strings.Join(ipAddresses, ",")
 	templateParameters["ControllerIPList"] = ipAddressString
 	templateParameters["AdminLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
