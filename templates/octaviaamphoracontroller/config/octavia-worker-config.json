@@ -12,6 +12,12 @@
             "dest": "/etc/octavia/octavia.conf.d/custom.conf",
             "owner": "octavia",
             "perm": "0600"
+        },
+        {
+            "source": "/var/lib/config-data/merged/my.cnf",
+            "dest": "/etc/my.cnf",
+            "owner": "octavia",
+            "perm": "0644"
         }
     ]
 }

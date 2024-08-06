@@ -28,6 +28,12 @@
             "perm": "0400",
             "optional": true,
             "merge": true
+        },
+        {
+            "source": "/var/lib/config-data/merged/my.cnf",
+            "dest": "/etc/my.cnf",
+            "owner": "octavia",
+            "perm": "0644"
         }
     ],
     "permissions": [
