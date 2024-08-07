@@ -47,7 +47,7 @@ var octavialog = logf.Log.WithName("octavia-resource")
 // SetupOctaviaDefaults - initialize Octavia spec defaults for use with either internal or external webhooks
 func SetupOctaviaDefaults(defaults OctaviaDefaults) {
 	octaviaDefaults = defaults
-	octavialog.Info("Octavia defaults initialized", "defaults", defaults)
+	octavialog.V(1).Info("Octavia defaults initialized", "defaults", defaults)
 }
 
 // SetupWebhookWithManager sets up the webhook with the Manager
@@ -63,7 +63,7 @@ var _ webhook.Defaulter = &Octavia{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Octavia) Default() {
-	octavialog.Info("default", "name", r.Name)
+	octavialog.V(1).Info("default", "name", r.Name)
 
 	r.Spec.Default()
 }
@@ -99,7 +99,7 @@ var _ webhook.Validator = &Octavia{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
-	octavialog.Info("validate create", "name", r.Name)
+	octavialog.V(1).Info("validate create", "name", r.Name)
 
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
@@ -142,7 +142,7 @@ func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
-	octavialog.Info("validate update", "name", r.Name)
+	octavialog.V(1).Info("validate update", "name", r.Name)
 
 	oldOctavia, ok := old.(*Octavia)
 	if !ok || oldOctavia == nil {

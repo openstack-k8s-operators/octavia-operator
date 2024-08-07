@@ -432,35 +432,35 @@ func (r *OctaviaReconciler) reconcileInit(
 
 	// run octavia db sync - end
 
-	Log.Info("Reconciled Service init successfully")
+	Log.V(1).Info("Reconciled Service init successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaReconciler) reconcileUpdate(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service update")
+	Log.V(1).Info("Reconciling Service update")
 
 	// TODO: should have minor update tasks if required
 	// - delete dbsync hash from status to rerun it?
 
-	Log.Info("Reconciled Service update successfully")
+	Log.V(1).Info("Reconciled Service update successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaReconciler) reconcileUpgrade(ctx context.Context) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service upgrade")
+	Log.V(1).Info("Reconciling Service upgrade")
 
 	// TODO: should have major version upgrade tasks
 	// -delete dbsync hash from status to rerun it?
 
-	Log.Info("Reconciled Service upgrade successfully")
+	Log.V(1).Info("Reconciled Service upgrade successfully")
 	return ctrl.Result{}, nil
 }
 
 func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octaviav1.Octavia, helper *helper.Helper) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
-	Log.Info("Reconciling Service")
+	Log.V(1).Info("Reconciling Service")
 
 	// Service account, role, binding
 	rbacRules := []rbacv1.PolicyRule{
