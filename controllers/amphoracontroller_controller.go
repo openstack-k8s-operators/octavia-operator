@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
@@ -31,6 +30,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/net"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
@@ -600,8 +600,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			rsyslogIPAddresses = append(rsyslogIPAddresses, fmt.Sprintf("%s:514", val))
 		}
 	}
-	sort.Strings(ipAddresses)
-	sort.Strings(rsyslogIPAddresses)
+	net.SortIPs(ipAddresses)
+	net.SortIPs(rsyslogIPAddresses)
 	ipAddressString := strings.Join(ipAddresses, ",")
 	templateParameters["ControllerIPList"] = ipAddressString
 	templateParameters["AdminLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
