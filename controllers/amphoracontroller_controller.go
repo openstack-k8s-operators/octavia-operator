@@ -600,8 +600,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			rsyslogIPAddresses = append(rsyslogIPAddresses, fmt.Sprintf("%s:514", val))
 		}
 	}
-	net.SortIPs(ipAddresses)
-	net.SortIPs(rsyslogIPAddresses)
+	ipAddresses = net.SortIPs(ipAddresses)
+	rsyslogIPAddresses = net.SortIPs(rsyslogIPAddresses)
 	ipAddressString := strings.Join(ipAddresses, ",")
 	templateParameters["ControllerIPList"] = ipAddressString
 	templateParameters["AdminLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
