@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -591,6 +592,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 			ipAddresses = append(ipAddresses, fmt.Sprintf("%s:5555", val))
 		}
 	}
+	sort.Strings(ipAddresses)
 	ipAddressString := strings.Join(ipAddresses, ",")
 	templateParameters["ControllerIPList"] = ipAddressString
 
