@@ -593,6 +593,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string
@@ -794,6 +799,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string
@@ -1129,6 +1139,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string

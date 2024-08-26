@@ -36,13 +36,14 @@ import (
 // NetworkProvisioningSummary -
 // Type for conveying the results of the EnsureAmphoraManagementNetwork call.
 type NetworkProvisioningSummary struct {
-	TenantNetworkID         string
-	TenantSubnetID          string
-	ProviderNetworkID       string
-	RouterID                string
-	SecurityGroupID         string
-	ManagementSubnetCIDR    string
-	ManagementSubnetGateway string
+	TenantNetworkID            string
+	TenantSubnetID             string
+	ProviderNetworkID          string
+	RouterID                   string
+	SecurityGroupID            string
+	ManagementSubnetCIDR       string
+	ManagementSubnetGateway    string
+	ManagementSubnetExtraCIDRs []string
 }
 
 //
@@ -923,6 +924,7 @@ func EnsureAmphoraManagementNetwork(
 		log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
 	}
 
+	managementSubnetAZCIDRs := []string{}
 	for az, cidr := range netDetails.AvailabilityZoneCIDRs {
 		// Create Management network and subnet for AZ
 		network, err := ensureLbMgmtNetwork(client, &az, netDetails, serviceTenant.ID, log)
@@ -968,16 +970,19 @@ func EnsureAmphoraManagementNetwork(
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", subnet.ID))
 		}
+
+		managementSubnetAZCIDRs = append(managementSubnetAZCIDRs, subnetCIDR.String())
 	}
 
 	return NetworkProvisioningSummary{
-		TenantNetworkID:         tenantNetwork.ID,
-		TenantSubnetID:          tenantSubnet.ID,
-		ProviderNetworkID:       providerNetwork.ID,
-		RouterID:                router.ID,
-		SecurityGroupID:         lbMgmtSecurityGroupID,
-		ManagementSubnetCIDR:    networkParameters.TenantCIDR.String(),
-		ManagementSubnetGateway: networkParameters.ProviderGateway.String(),
+		TenantNetworkID:            tenantNetwork.ID,
+		TenantSubnetID:             tenantSubnet.ID,
+		ProviderNetworkID:          providerNetwork.ID,
+		RouterID:                   router.ID,
+		SecurityGroupID:            lbMgmtSecurityGroupID,
+		ManagementSubnetCIDR:       networkParameters.TenantCIDR.String(),
+		ManagementSubnetGateway:    networkParameters.ProviderGateway.String(),
+		ManagementSubnetExtraCIDRs: managementSubnetAZCIDRs,
 	}, nil
 }
 
