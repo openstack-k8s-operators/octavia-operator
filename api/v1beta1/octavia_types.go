@@ -236,6 +236,10 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
 	// Availability zones for the octavia management network resources
 	AvailabilityZones []string `json:"availabilityZones,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// AvailabilityZoneCIDRs are the CIDRs of each management network associated with an Availability Zone (ex: {"az":"172.34.0.0/24", ...})
+	AvailabilityZoneCIDRs map[string]string `json:"availabilityZoneCIDRs,omitempty"`
 }
 
 // OctaviaAmphoraFlavor Settings for custom Amphora flavors

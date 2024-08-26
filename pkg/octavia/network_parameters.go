@@ -50,8 +50,8 @@ func getConfigFromNAD(
 	return nadConfig, nil
 }
 
-// getRangeFromCIDR - compute a IP address range from a CIDR
-func getRangeFromCIDR(
+// GetRangeFromCIDR - compute a IP address range from a CIDR
+func GetRangeFromCIDR(
 	cidr netip.Prefix,
 ) (start netip.Addr, end netip.Addr) {
 	// For IPv6, a /64 is expected, if the CIDR is aaaa:bbbb:cccc:dddd::/64,
@@ -140,7 +140,7 @@ func GetNetworkParametersFromNAD(
 	}
 
 	// Compute an allocation range based on the CIDR
-	start, end := getRangeFromCIDR(networkParameters.TenantCIDR)
+	start, end := GetRangeFromCIDR(networkParameters.TenantCIDR)
 	networkParameters.TenantAllocationStart = start
 	networkParameters.TenantAllocationEnd = end
 
