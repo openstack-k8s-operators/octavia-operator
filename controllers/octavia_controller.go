@@ -1490,6 +1490,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
+		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

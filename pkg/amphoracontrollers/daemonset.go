@@ -88,6 +88,10 @@ func DaemonSet(
 	envVars["MGMT_CIDR"] = env.SetValue(instance.Spec.OctaviaProviderSubnetCIDR)
 	envVars["MGMT_GATEWAY"] = env.SetValue(instance.Spec.OctaviaProviderSubnetGateway)
 
+	for idx, subnetCIDR := range instance.Spec.OctaviaProviderSubnetExtraCIDRs {
+		envVars[fmt.Sprintf("MGMT_CIDR%d", idx)] = env.SetValue(subnetCIDR)
+	}
+
 	// Add the CA bundle
 	if instance.Spec.TLS.CaBundleSecretName != "" {
 		volumes = append(volumes, instance.Spec.TLS.CreateVolume())
