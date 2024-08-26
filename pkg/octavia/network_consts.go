@@ -24,14 +24,26 @@ const (
 	// LbMgmtNetName -
 	LbMgmtNetName = "lb-mgmt-net"
 
+	// LbMgmtNetNameAZ -
+	LbMgmtNetNameAZ = "lb-mgmt-%s-net"
+
 	// LbMgmtNetDescription -
 	LbMgmtNetDescription = "LBaaS Management Network"
+
+	// LbMgmtNetDescriptionAZ -
+	LbMgmtNetDescriptionAZ = "LBaaS Management Network for %s"
 
 	// LbMgmtSubnetName -
 	LbMgmtSubnetName = "lb-mgmt-subnet"
 
+	// LbMgmtSubnetNameAZ -
+	LbMgmtSubnetNameAZ = "lb-mgmt-%s-subnet"
+
 	// LbMgmtSubnetDescription -
 	LbMgmtSubnetDescription = "LBaaS Management Subnet"
+
+	// LbMgmtSubnetDescriptionAZ -
+	LbMgmtSubnetDescriptionAZ = "LBaaS Management Subnet for %s"
 
 	// IPv4 consts
 
@@ -78,6 +90,9 @@ const (
 
 	// LbMgmtRouterPortName
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
+
+	// LbMgmtRouterPortNameAZ
+	LbMgmtRouterPortNameAZ = "lb-mgmt-%s-router-port"
 
 	// Network attachment details
 	// LbNetworkAttachmentName

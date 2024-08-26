@@ -17,6 +17,7 @@ package octavia
 import (
 	"context"
 	"fmt"
+	"net/netip"
 
 	"github.com/go-logr/logr"
 	"github.com/gophercloud/gophercloud"
@@ -74,21 +75,28 @@ func findPort(client *gophercloud.ServiceClient, networkID string, name string, 
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, error) {
-	p, err := findPort(client, tenantNetwork.ID, LbMgmtRouterPortName, log)
+func ensurePort(client *gophercloud.ServiceClient, availabilityZone *string, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, bool, error) {
+	var portName string
+	if availabilityZone == nil {
+		portName = LbMgmtRouterPortName
+	} else {
+		portName = fmt.Sprintf(LbMgmtRouterPortNameAZ, *availabilityZone)
+	}
+
+	p, err := findPort(client, tenantNetwork.ID, portName, log)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if p != nil {
 		//
 		// TODO(beagles): reconcile port properties? Is there anything to do? Security groups possibly.
 		//
-		return p, nil
+		return p, false, nil
 	}
 	log.Info("Unable to locate port, creating new one")
 	asu := true
 	createOpts := ports.CreateOpts{
-		Name:           LbMgmtRouterPortName,
+		Name:           portName,
 		AdminStateUp:   &asu,
 		NetworkID:      tenantNetwork.ID,
 		SecurityGroups: securityGroups,
@@ -96,9 +104,9 @@ func ensurePort(client *gophercloud.ServiceClient, tenantNetwork *networks.Netwo
 	p, err = ports.Create(client, createOpts).Extract()
 	if err != nil {
 		log.Error(err, "Error creating port")
-		return nil, err
+		return nil, false, err
 	}
-	return p, nil
+	return p, true, nil
 }
 
 func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts subnets.CreateOpts, log *logr.Logger) (*subnets.Subnet, error) {
@@ -342,7 +350,8 @@ func ensureLbMgmtSubnetRoutes(
 	networkParameters *NetworkParameters,
 	tenantRouterPort *ports.Port,
 ) error {
-	if len(tenantSubnet.HostRoutes) == 0 {
+	if len(tenantSubnet.HostRoutes) == 0 ||
+		tenantSubnet.HostRoutes[0].NextHop != tenantRouterPort.FixedIPs[0].IPAddress {
 		hostRoutes := []subnets.HostRoute{
 			{
 				DestinationCIDR: networkParameters.ProviderCIDR.String(),
@@ -363,11 +372,23 @@ func ensureLbMgmtSubnetRoutes(
 
 func ensureLbMgmtSubnet(
 	client *gophercloud.ServiceClient,
+	availabilityZone *string,
 	tenantNetwork *networks.Network,
 	networkParameters *NetworkParameters,
 	log *logr.Logger,
 ) (*subnets.Subnet, error) {
 	var ipVersion int
+
+	var subnetName string
+	var description string
+	if availabilityZone == nil {
+		subnetName = LbMgmtSubnetName
+		description = LbMgmtSubnetDescription
+	} else {
+		subnetName = fmt.Sprintf(LbMgmtSubnetNameAZ, *availabilityZone)
+		description = fmt.Sprintf(LbMgmtSubnetDescriptionAZ, *availabilityZone)
+	}
+
 	if networkParameters.TenantCIDR.Addr().Is6() {
 		ipVersion = 6
 	} else {
@@ -378,8 +399,8 @@ func ensureLbMgmtSubnet(
 	if ipVersion == 6 {
 		gatewayIP := LbMgmtSubnetIPv6GatewayIP
 		createOpts = subnets.CreateOpts{
-			Name:            LbMgmtSubnetName,
-			Description:     LbMgmtSubnetDescription,
+			Name:            subnetName,
+			Description:     description,
 			NetworkID:       tenantNetwork.ID,
 			TenantID:        tenantNetwork.TenantID,
 			CIDR:            networkParameters.TenantCIDR.String(),
@@ -397,8 +418,8 @@ func ensureLbMgmtSubnet(
 	} else {
 		gatewayIP := LbMgmtSubnetGatewayIP
 		createOpts = subnets.CreateOpts{
-			Name:        LbMgmtSubnetName,
-			Description: LbMgmtSubnetDescription,
+			Name:        subnetName,
+			Description: description,
 			NetworkID:   tenantNetwork.ID,
 			TenantID:    tenantNetwork.TenantID,
 			CIDR:        networkParameters.TenantCIDR.String(),
@@ -415,28 +436,41 @@ func ensureLbMgmtSubnet(
 	return ensureSubnet(client, ipVersion, createOpts, log)
 }
 
-func getLbMgmtNetwork(client *gophercloud.ServiceClient, serviceTenantID string) (*networks.Network, error) {
-	return getNetwork(client, LbMgmtNetName, serviceTenantID)
-}
-
-func ensureLbMgmtNetwork(client *gophercloud.ServiceClient, networkDetails *octaviav1.OctaviaLbMgmtNetworks,
-	serviceTenantID string, log *logr.Logger) (*networks.Network, error) {
-	mgmtNetwork, err := getLbMgmtNetwork(client, serviceTenantID)
+func ensureLbMgmtNetwork(
+	client *gophercloud.ServiceClient,
+	availabilityZone *string,
+	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
+	serviceTenantID string,
+	log *logr.Logger,
+) (*networks.Network, error) {
+	var networkName string
+	var description string
+	var azHints []string
+	if availabilityZone == nil {
+		networkName = LbMgmtNetName
+		description = LbMgmtNetDescription
+		azHints = networkDetails.AvailabilityZones
+	} else {
+		networkName = fmt.Sprintf(LbMgmtNetNameAZ, *availabilityZone)
+		description = fmt.Sprintf(LbMgmtNetDescriptionAZ, *availabilityZone)
+		azHints = []string{*availabilityZone}
+	}
+	mgmtNetwork, err := getNetwork(client, networkName, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	if networkDetails == nil && mgmtNetwork == nil {
-		return nil, fmt.Errorf("Cannot find network \"%s\"", LbMgmtNetName)
+		return nil, fmt.Errorf("Cannot find network \"%s\"", networkName)
 	}
 
 	asu := true
 	createOpts := networks.CreateOpts{
-		Name:                  LbMgmtNetName,
-		Description:           LbMgmtNetDescription,
+		Name:                  networkName,
+		Description:           description,
 		AdminStateUp:          &asu,
 		TenantID:              serviceTenantID,
-		AvailabilityZoneHints: networkDetails.AvailabilityZones,
+		AvailabilityZoneHints: azHints,
 	}
 	mgmtNetwork, err = ensureNetwork(client, createOpts, log, serviceTenantID)
 	if err != nil {
@@ -794,11 +828,11 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 
-	tenantNetwork, err := ensureLbMgmtNetwork(client, netDetails, serviceTenant.ID, log)
+	tenantNetwork, err := ensureLbMgmtNetwork(client, nil, netDetails, serviceTenant.ID, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	tenantSubnet, err := ensureLbMgmtSubnet(client, tenantNetwork, networkParameters, log)
+	tenantSubnet, err := ensureLbMgmtSubnet(client, nil, tenantNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -814,7 +848,7 @@ func EnsureAmphoraManagementNetwork(
 
 	securityGroups := []string{lbMgmtSecurityGroupID, lbHealthSecurityGroupID}
 
-	tenantRouterPort, err := ensurePort(client, tenantNetwork, &securityGroups, log)
+	tenantRouterPort, _, err := ensurePort(client, nil, tenantNetwork, &securityGroups, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
@@ -887,6 +921,53 @@ func EnsureAmphoraManagementNetwork(
 	err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
+	}
+
+	for az, cidr := range netDetails.AvailabilityZoneCIDRs {
+		// Create Management network and subnet for AZ
+		network, err := ensureLbMgmtNetwork(client, &az, netDetails, serviceTenant.ID, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+
+		subnetCIDR, err := netip.ParsePrefix(cidr)
+		if err != nil {
+			return NetworkProvisioningSummary{}, fmt.Errorf("cannot parse CIDR %s for AZ %s: %w", cidr, az, err)
+		}
+		start, end := GetRangeFromCIDR(subnetCIDR)
+		networkAZParameters := NetworkParameters{
+			TenantCIDR:            subnetCIDR,
+			TenantAllocationStart: start,
+			TenantAllocationEnd:   end,
+		}
+		subnet, err := ensureLbMgmtSubnet(client, &az, network, &networkAZParameters, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+
+		// Create a port for the router, will be the gateway from the subnet to the control plane
+		routerPort, created, err := ensurePort(client, &az, network, &securityGroups, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+
+		if created {
+			// Plug port into the existing router
+			interfaceOpts := routers.AddInterfaceOpts{
+				PortID: routerPort.ID,
+			}
+
+			_, err = routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+			if err != nil {
+				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", routerPort.ID, router.ID))
+			}
+		}
+
+		// Set route to the control plane
+		err = ensureLbMgmtSubnetRoutes(client, subnet, networkParameters, routerPort)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", subnet.ID))
+		}
 	}
 
 	return NetworkProvisioningSummary{

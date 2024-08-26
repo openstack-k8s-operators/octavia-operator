@@ -109,6 +109,13 @@ spec:
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
                 properties:
+                  availabilityZoneCIDRs:
+                    additionalProperties:
+                      type: string
+                    description: 'AvailabilityZoneCIDRs are the CIDRs of each management
+                      network associated with an Availability Zone (ex: {"az":"172.34.0.0/24",
+                      ...})'
+                    type: object
                   availabilityZones:
                     description: Availability zones for the octavia management network
                       resources
