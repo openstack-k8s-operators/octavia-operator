@@ -260,73 +260,14 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		common.AppSelector: instance.ObjectMeta.Name,
 	}
 
-	// Handle config map
-	configMapVars := make(map[string]env.Setter)
-
-	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
-
-	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+	// Handle secrets
+	secretsVars := make(map[string]env.Setter)
 
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
-
-	templateVars := OctaviaTemplateVars{
-		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
-		AmphoraDefaultFlavorID: defaultFlavorID,
-		LbSecurityGroupID:      instance.Spec.LbSecurityGroupID,
-	}
-
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, templateVars, ospSecret)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ServiceConfigReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.ServiceConfigReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
 
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
@@ -356,17 +297,34 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		}
 
 		if hash != "" {
-			configMapVars[tls.CABundleKey] = env.SetValue(hash)
+			secretsVars[tls.CABundleKey] = env.SetValue(hash)
 		}
 	}
 	// all cert input checks out so report InputReady
 	instance.Status.Conditions.MarkTrue(condition.TLSInputReadyCondition, condition.InputReadyMessage)
 
+	templateVars := OctaviaTemplateVars{
+		LbMgmtNetworkID:        instance.Spec.LbMgmtNetworkID,
+		AmphoraDefaultFlavorID: defaultFlavorID,
+		LbSecurityGroupID:      instance.Spec.LbSecurityGroupID,
+	}
+
+	err = r.generateServiceSecrets(ctx, instance, helper, &secretsVars, templateVars)
+	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.ServiceConfigReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.ServiceConfigReadyErrorMessage,
+			err.Error()))
+		return ctrl.Result{}, err
+	}
+
 	//
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(instance, configMapVars)
+	inputHash, err := r.createHashOfInputHashes(instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -470,16 +428,58 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
+func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	ctx context.Context,
 	instance *octaviav1.OctaviaAmphoraController,
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
 	templateVars OctaviaTemplateVars,
-	ospSecret *corev1.Secret,
 ) error {
-	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
+	r.Log.Info(fmt.Sprintf("generating service secret for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
+
+	ospSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			r.Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return err
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+	servicePassword := string(ospSecret.Data[instance.Spec.PasswordSelectors.Service])
+
+	transportURLSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			r.Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return err
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+	transportURL := string(transportURLSecret.Data["transport_url"])
+
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err
@@ -608,7 +608,9 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 	templateParameters["TenantLogTargetList"] = strings.Join(rsyslogIPAddresses, ",")
 
 	spec := instance.Spec
+	templateParameters["TransportURL"] = transportURL
 	templateParameters["ServiceUser"] = spec.ServiceUser
+	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["ServiceRoleName"] = spec.Role
@@ -624,12 +626,10 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 		// Can't do string(nil)
 		templateParameters["ServerCAKeyPassphrase"] = ""
 	}
-	// TODO(gthiemonge) store keys/passwords/passphrases in a specific config file stored in a secret
 	templateParameters["HeartbeatKey"] = string(ospSecret.Data["OctaviaHeartbeatKey"])
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
-		// ScriptsConfigMap
 		{
 			Name:               fmt.Sprintf("%s-scripts", instance.Name),
 			Namespace:          instance.Namespace,
@@ -651,11 +651,11 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceConfigMaps(
 
 	err = oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
 	if err != nil {
-		r.Log.Error(err, "unable to process config map")
+		r.Log.Error(err, "unable to process secrets")
 		return err
 	}
 
-	r.Log.Info("Service config map generated")
+	r.Log.Info("Service secrets generated")
 
 	return nil
 }

@@ -197,13 +197,8 @@ func Deployment(
 	}
 
 	initContainerDetails := octavia.APIDetails{
-		ContainerImage:       instance.Spec.ContainerImage,
-		DatabaseHost:         instance.Spec.DatabaseHostname,
-		DatabaseName:         octavia.DatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		TransportURLSecret:   instance.Spec.TransportURLSecret,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         initVolumeMounts,
+		ContainerImage: instance.Spec.ContainerImage,
+		VolumeMounts:   initVolumeMounts,
 	}
 	deployment.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 

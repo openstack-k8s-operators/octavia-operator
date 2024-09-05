@@ -16,21 +16,13 @@ limitations under the License.
 package octavia
 
 import (
-	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
-
 	corev1 "k8s.io/api/core/v1"
 )
 
 // APIDetails information
 type APIDetails struct {
-	ContainerImage          string
-	DatabaseHost            string
-	DatabaseName            string
-	PersistenceDatabaseName string
-	TransportURLSecret      string
-	OSPSecret               string
-	UserPasswordSelector    string
-	VolumeMounts            []corev1.VolumeMount
+	ContainerImage string
+	VolumeMounts   []corev1.VolumeMount
 }
 
 const (
@@ -47,42 +39,6 @@ func InitContainer(init APIDetails) []corev1.Container {
 		InitContainerCommand,
 	}
 
-	envVars := map[string]env.Setter{}
-	envVars["DatabaseHost"] = env.SetValue(init.DatabaseHost)
-	envVars["DatabaseName"] = env.SetValue(init.DatabaseName)
-
-	envs := []corev1.EnvVar{
-		{
-			Name: "AdminPassword",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: init.OSPSecret,
-					},
-					Key: init.UserPasswordSelector,
-				},
-			},
-		},
-	}
-
-	// TODO(beagles): should this be conditional? It seems like it should be required.
-	if init.TransportURLSecret != "" {
-		envs = append(envs,
-			corev1.EnvVar{
-				Name: "TransportURL",
-				ValueFrom: &corev1.EnvVarSource{
-					SecretKeyRef: &corev1.SecretKeySelector{
-						LocalObjectReference: corev1.LocalObjectReference{
-							Name: init.TransportURLSecret,
-						},
-						Key: "transport_url",
-					},
-				},
-			},
-		)
-	}
-	envs = env.MergeEnvs(envs, envVars)
-
 	return []corev1.Container{
 		{
 			Name:  "init",
@@ -94,7 +50,6 @@ func InitContainer(init APIDetails) []corev1.Container {
 				"/bin/bash",
 			},
 			Args:         args,
-			Env:          envs,
 			VolumeMounts: GetInitVolumeMounts(),
 		},
 	}
