@@ -23,9 +23,7 @@ import (
 	"github.com/gophercloud/gophercloud"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imageimport"
 	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
-	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
-	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
 
@@ -40,23 +38,6 @@ type AmphoraImage struct {
 	Checksum string
 	Name     string
 	Status   images.ImageStatus
-}
-
-// TODO(gthiemonge) Remove when all the clients are used in the octavia controller
-func getOpenstackClient(
-	ctx context.Context,
-	instance *octaviav1.Octavia,
-	h *helper.Helper,
-) (*openstack.OpenStack, error) {
-	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
-	if err != nil {
-		return nil, err
-	}
-	o, _, err := GetServiceClient(ctx, h, instance, keystoneAPI)
-	if err != nil {
-		return nil, err
-	}
-	return o, nil
 }
 
 func getTags(
@@ -198,7 +179,7 @@ func EnsureAmphoraImages(
 	helper *helper.Helper,
 	imageList []AmphoraImage,
 ) (bool, error) {
-	osclient, err := getOpenstackClient(ctx, instance, helper)
+	osclient, err := GetOpenstackServiceClient(ctx, instance, helper)
 	if err != nil {
 		return false, fmt.Errorf("error while getting a service client when creating images: %w", err)
 	}
@@ -244,7 +225,7 @@ func GetImageOwnerID(
 	instance *octaviav1.Octavia,
 	helper *helper.Helper,
 ) (string, error) {
-	osclient, err := getOpenstackClient(ctx, instance, helper)
+	osclient, err := GetOpenstackServiceClient(ctx, instance, helper)
 	if err != nil {
 		return "", fmt.Errorf("error while getting a service client when getting image owner: %w", err)
 	}
