@@ -833,7 +833,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	//
 	if octaviaHealthManager.Status.ReadyCount != octaviaHealthManager.Status.DesiredNumberScheduled {
 		Log.Info("Health managers are not ready. Housekeeping and Worker services pending")
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
 
 	octaviaRsyslog, op, err := r.octaviaRsyslogDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaRsyslog)
@@ -1602,7 +1602,7 @@ func (r *OctaviaReconciler) checkAmphoraGeneration(
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), amph, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve OctaviaAPI %w")
+		r.Log.Error(err, "Unable to retrieve AmphoraController %w")
 		return false, err
 	}
 	for _, item := range amph.Items {
