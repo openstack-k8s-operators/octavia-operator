@@ -557,57 +557,8 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service")
 
-	// ConfigMap
-	configMapVars := make(map[string]env.Setter)
-
-	//
-	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
-	//
-	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
-
-	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
-	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
-		}
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.InputReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			condition.InputReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
-	}
-	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
-
-	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
-
-	// run check OpenStack secret - end
+	// Secrets
+	secretsVars := make(map[string]env.Setter)
 
 	//
 	// TLS input validation
@@ -641,7 +592,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		}
 
 		if hash != "" {
-			configMapVars[tls.CABundleKey] = env.SetValue(hash)
+			secretsVars[tls.CABundleKey] = env.SetValue(hash)
 		}
 
 		// Validate API service certs secrets
@@ -664,23 +615,22 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 			return ctrl.Result{}, err
 		}
 
-		configMapVars[tls.TLSHashName] = env.SetValue(certsHash)
+		secretsVars[tls.TLSHashName] = env.SetValue(certsHash)
 	}
 
 	// all cert input checks out so report InputReady
 	instance.Status.Conditions.MarkTrue(condition.TLSInputReadyCondition, condition.InputReadyMessage)
 
 	//
-	// Create ConfigMaps and Secrets required as input for the Service and calculate an overall hash of hashes
+	// Create Secrets required as input for the Service and calculate an overall hash of hashes
 	//
 
 	//
-	// create Configmap required for octavia input
-	// - %-scripts configmap holding scripts to e.g. bootstrap the service
-	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
-	// - parameters which has passwords gets added from the OpenStack secret via the init container
+	// create Secrets required for octavia input
+	// - %-scripts secret holding scripts to e.g. bootstrap the service
+	// - %-config secret holding minimal octavia config required to get the service up, user can add additional files to be added to the service
 	//
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
+	err := r.generateServiceSecrets(ctx, instance, helper, &secretsVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -695,7 +645,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	inputHash, hashChanged, err := r.createHashOfInputHashes(ctx, instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if hashChanged {
@@ -855,24 +805,68 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	return ctrl.Result{}, nil
 }
 
-// generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
+// generateServiceSecrets - create creates which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
+func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	ctx context.Context,
 	instance *octaviav1.OctaviaAPI,
 	h *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
 	Log := r.GetLogger(ctx)
-	Log.Info("Generating service config map")
+	Log.Info("Generating service secrets")
 	//
-	// create Configmap/Secret required for octavia input
-	// - %-scripts configmap holding scripts to e.g. bootstrap the service
-	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
-	// - parameters which has passwords gets added from the ospSecret via the init container
+	// create Secret required for octavia input
+	// - %-scripts secret holding scripts to e.g. bootstrap the service
+	// - %-config secret holding minimal octavia config required to get the service up, user can add additional files to be added to the service
 	//
 
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
+
+	//
+	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
+	//
+	ospSecret, _, err := oko_secret.GetSecret(ctx, h, instance.Spec.Secret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return err
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+	servicePassword := string(ospSecret.Data[instance.Spec.PasswordSelectors.Service])
+
+	transportURLSecret, _, err := oko_secret.GetSecret(ctx, h, instance.Spec.TransportURLSecret, instance.Namespace)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				condition.InputReadyWaitingMessage))
+			return err
+		}
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			condition.InputReadyErrorMessage,
+			err.Error()))
+		return err
+	}
+	transportURL := string(transportURLSecret.Data["transport_url"])
 
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, h, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
@@ -963,6 +957,9 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 		),
 	}
 
+	templateParameters["Password"] = servicePassword
+	templateParameters["TransportURL"] = transportURL
+
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
@@ -993,7 +990,6 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	templateParameters["VHosts"] = httpdVhostConfig
 
 	cms := []util.Template{
-		// ScriptsConfigMap
 		{
 			Name:               fmt.Sprintf("%s-scripts", instance.Name),
 			Namespace:          instance.Namespace,
@@ -1002,7 +998,6 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 			AdditionalTemplate: map[string]string{"common.sh": "/common/common.sh"},
 			Labels:             cmLabels,
 		},
-		// ConfigMap
 		{
 			Name:          fmt.Sprintf("%s-config-data", instance.Name),
 			Namespace:     instance.Namespace,
@@ -1016,10 +1011,10 @@ func (r *OctaviaAPIReconciler) generateServiceConfigMaps(
 	err = oko_secret.EnsureSecrets(ctx, h, instance, cms, envVars)
 
 	if err != nil {
-		Log.Error(err, "unable to process config map")
+		Log.Error(err, "unable to process secrets")
 		return err
 	}
-	Log.Info("Service config map generated")
+	Log.Info("Service secrets generated")
 
 	return nil
 }

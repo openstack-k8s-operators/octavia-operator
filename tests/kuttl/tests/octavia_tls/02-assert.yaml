@@ -220,21 +220,6 @@ spec:
         - /usr/local/bin/container-scripts/init.sh
         command:
         - /bin/bash
-        env:
-        - name: AdminPassword
-          valueFrom:
-            secretKeyRef:
-              key: OctaviaPassword
-              name: osp-secret
-        - name: TransportURL
-          valueFrom:
-            secretKeyRef:
-              key: transport_url
-              name: rabbitmq-transport-url-octavia-octavia-transport
-        - name: DatabaseHost
-          value: openstack.octavia-kuttl-tests.svc
-        - name: DatabaseName
-          value: octavia
         imagePullPolicy: IfNotPresent
         name: init
         resources: {}

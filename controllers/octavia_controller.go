@@ -303,8 +303,8 @@ func (r *OctaviaReconciler) reconcileInit(
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service init")
 
-	// ConfigMap
-	configMapVars := make(map[string]env.Setter)
+	// Secrets
+	secretsVars := make(map[string]env.Setter)
 
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
@@ -328,7 +328,7 @@ func (r *OctaviaReconciler) reconcileInit(
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	configMapVars[ospSecret.Name] = env.SetValue(hash)
+	secretsVars[ospSecret.Name] = env.SetValue(hash)
 
 	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Status.TransportURLSecret, instance.Namespace)
 	if err != nil {
@@ -349,7 +349,7 @@ func (r *OctaviaReconciler) reconcileInit(
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	configMapVars[transportURLSecret.Name] = env.SetValue(hash)
+	secretsVars[transportURLSecret.Name] = env.SetValue(hash)
 
 	octaviaDb, persistenceDb, result, err := r.ensureDB(ctx, helper, instance)
 	if err != nil {
@@ -359,12 +359,11 @@ func (r *OctaviaReconciler) reconcileInit(
 	}
 
 	//
-	// create Configmap required for octavia input
-	// - %-scripts configmap holding scripts to e.g. bootstrap the service
-	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
-	// - parameters which has passwords gets added from the OpenStack secret via the init container
+	// create Secrets required for octavia input
+	// - %-scripts secret holding scripts to e.g. bootstrap the service
+	// - %-config secret holding minimal octavia config required to get the service up, user can add additional files to be added to the service
 	//
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars, octaviaDb, persistenceDb)
+	err = r.generateServiceSecrets(ctx, instance, helper, &secretsVars, octaviaDb, persistenceDb)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -379,7 +378,7 @@ func (r *OctaviaReconciler) reconcileInit(
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, configMapVars)
+	_, hashChanged, err := r.createHashOfInputHashes(ctx, instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	} else if hashChanged {
@@ -1296,9 +1295,9 @@ func (r *OctaviaReconciler) getLocalImageURLs(
 	return ret, nil
 }
 
-// generateServiceConfigMaps - create create configmaps which hold scripts and service configuration
+// generateServiceSecrets - create secrets which hold scripts and service configuration
 // TODO add DefaultConfigOverwrite
-func (r *OctaviaReconciler) generateServiceConfigMaps(
+func (r *OctaviaReconciler) generateServiceSecrets(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
 	h *helper.Helper,
@@ -1307,10 +1306,9 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 	persistenceDb *mariadbv1.Database,
 ) error {
 	//
-	// create Configmap/Secret required for octavia input
-	// - %-scripts configmap holding scripts to e.g. bootstrap the service
-	// - %-config configmap holding minimal octavia config required to get the service up, user can add additional files to be added to the service
-	// - parameters which has passwords gets added from the ospSecret via the init container
+	// create Secret required for octavia input
+	// - %-scripts secret holding scripts to e.g. bootstrap the service
+	// - %-config secret holding minimal octavia config required to get the service up, user can add additional files to be added to the service
 	//
 
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
@@ -1357,7 +1355,6 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 
 	cms := []util.Template{
-		// ScriptsConfigMap
 		{
 			Name:               fmt.Sprintf("%s-scripts", instance.Name),
 			Namespace:          instance.Namespace,
@@ -1366,7 +1363,6 @@ func (r *OctaviaReconciler) generateServiceConfigMaps(
 			AdditionalTemplate: map[string]string{"common.sh": "/common/common.sh"},
 			Labels:             cmLabels,
 		},
-		// ConfigMap
 		{
 			Name:          fmt.Sprintf("%s-config-data", instance.Name),
 			Namespace:     instance.Namespace,

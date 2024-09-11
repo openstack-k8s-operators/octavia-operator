@@ -236,10 +236,10 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 		common.AppSelector: instance.ObjectMeta.Name,
 	}
 
-	// Handle config map
-	configMapVars := make(map[string]env.Setter)
+	// Handle secrets
+	secretsVars := make(map[string]env.Setter)
 
-	err = r.generateServiceConfigMaps(ctx, instance, helper, &configMapVars)
+	err = r.generateServiceSecrets(ctx, instance, helper, &secretsVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -256,7 +256,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(instance, configMapVars)
+	inputHash, err := r.createHashOfInputHashes(instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -360,7 +360,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	return ctrl.Result{}, nil
 }
 
-func (r *OctaviaRsyslogReconciler) generateServiceConfigMaps(
+func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 	ctx context.Context,
 	instance *octaviav1.OctaviaRsyslog,
 	helper *helper.Helper,

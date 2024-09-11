@@ -162,13 +162,8 @@ func DaemonSet(
 	}
 
 	initContainerDetails := octavia.APIDetails{
-		ContainerImage:       instance.Spec.ContainerImage,
-		DatabaseHost:         instance.Spec.DatabaseHostname,
-		DatabaseName:         octavia.DatabaseName,
-		OSPSecret:            instance.Spec.Secret,
-		TransportURLSecret:   instance.Spec.TransportURLSecret,
-		UserPasswordSelector: instance.Spec.PasswordSelectors.Service,
-		VolumeMounts:         octavia.GetInitVolumeMounts(),
+		ContainerImage: instance.Spec.ContainerImage,
+		VolumeMounts:   octavia.GetInitVolumeMounts(),
 	}
 	daemonset.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 
