@@ -270,3 +270,11 @@ commands:
         exit 1
       fi
       exit 0
+  - script: |
+      n_matches=$(oc get secrets -n $NAMESPACE octavia-worker-config-data -o jsonpath="{$.data['octavia\.conf']}" | base64 -d |
+          grep -e '^jobboard_enabled = true$' \
+               -e '^jobboard_backend_hosts = octavia-redis-redis-0\.octavia-redis-redis\.' | wc -l)
+      if [ "$n_matches" != 2 ]; then
+        exit 1
+      fi
+      exit 0
