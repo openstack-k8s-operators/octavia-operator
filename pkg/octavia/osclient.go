@@ -20,6 +20,7 @@ import (
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
+	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -34,6 +35,23 @@ func GetOpenstackClient(
 		return nil, err
 	}
 	o, _, err := GetAdminServiceClient(ctx, h, keystoneAPI)
+	if err != nil {
+		return nil, err
+	}
+	return o, nil
+}
+
+// GetOpenstackServiceClient returns an openstack service client object
+func GetOpenstackServiceClient(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	h *helper.Helper,
+) (*openstack.OpenStack, error) {
+	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
+	if err != nil {
+		return nil, err
+	}
+	o, _, err := GetServiceClient(ctx, h, instance, keystoneAPI)
 	if err != nil {
 		return nil, err
 	}

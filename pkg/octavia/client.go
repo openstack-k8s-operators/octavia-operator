@@ -28,15 +28,61 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
-// GetAdminServiceClient - get a client for the "admin" tenant
-func GetAdminServiceClient(
+type ClientType int
+
+const (
+	AdminClient   ClientType = iota
+	ServiceClient ClientType = iota
+)
+
+type ClientConfig struct {
+	User       string
+	TenantName string
+	Region     string
+	Secret     string
+	Selector   string
+}
+
+func getClientConfig(
+	clientType ClientType,
+	keystoneAPI *keystonev1.KeystoneAPI,
+	octavia *octaviav1.Octavia,
+) (ClientConfig, error) {
+	switch clientType {
+	case AdminClient:
+		return ClientConfig{
+			User:       keystoneAPI.Spec.AdminUser,
+			TenantName: keystoneAPI.Spec.AdminProject,
+			Region:     keystoneAPI.Spec.Region,
+			Secret:     keystoneAPI.Spec.Secret,
+			Selector:   keystoneAPI.Spec.PasswordSelectors.Admin,
+		}, nil
+	case ServiceClient:
+		if octavia == nil {
+			return ClientConfig{}, fmt.Errorf("cannot get service client config with nil instance")
+		}
+		return ClientConfig{
+			User:       octavia.Spec.ServiceUser,
+			TenantName: octavia.Spec.TenantName,
+			Region:     keystoneAPI.Spec.Region,
+			Secret:     octavia.Spec.Secret,
+			Selector:   octavia.Spec.PasswordSelectors.Service,
+		}, nil
+	}
+
+	return ClientConfig{}, fmt.Errorf("invalid client type %+v", clientType)
+}
+
+func getClient(
 	ctx context.Context,
 	h *helper.Helper,
+	clientConfig ClientConfig,
 	keystoneAPI *keystonev1.KeystoneAPI,
 ) (*openstack.OpenStack, ctrl.Result, error) {
 	// get internal endpoint as authurl from keystone instance
@@ -52,9 +98,24 @@ func GetAdminServiceClient(
 
 	tlsConfig := &openstack.TLSConfig{}
 	if parsedAuthURL.Scheme == "https" {
-		// TODO: (mschuppert) for now just set to insecure, when keystone got
-		// enabled for internal tls, get the CA secret name from the keystoneAPI
-		tlsConfig.Insecure = true
+		caCert, ctrlResult, err := secret.GetDataFromSecret(
+			ctx,
+			h,
+			keystoneAPI.Spec.TLS.CaBundleSecretName,
+			time.Duration(10)*time.Second,
+			tls.InternalCABundleKey)
+		if err != nil {
+			return nil, ctrl.Result{}, err
+		}
+		if (ctrlResult != ctrl.Result{}) {
+			return nil, ctrl.Result{}, fmt.Errorf("the CABundleSecret %s not found", keystoneAPI.Spec.TLS.CaBundleSecretName)
+		}
+
+		tlsConfig = &openstack.TLSConfig{
+			CACerts: []string{
+				caCert,
+			},
+		}
 	}
 
 	// get the password of the admin user from Spec.Secret
@@ -62,9 +123,9 @@ func GetAdminServiceClient(
 	authPassword, ctrlResult, err := secret.GetDataFromSecret(
 		ctx,
 		h,
-		keystoneAPI.Spec.Secret,
+		clientConfig.Secret,
 		time.Duration(10)*time.Second,
-		keystoneAPI.Spec.PasswordSelectors.Admin)
+		clientConfig.Selector)
 	if err != nil {
 		return nil, ctrl.Result{}, err
 	}
@@ -74,11 +135,11 @@ func GetAdminServiceClient(
 
 	authOpts := openstack.AuthOpts{
 		AuthURL:    authURL,
-		Username:   keystoneAPI.Spec.AdminUser,
+		Username:   clientConfig.User,
 		Password:   authPassword,
-		TenantName: keystoneAPI.Spec.AdminProject,
+		TenantName: clientConfig.TenantName,
 		DomainName: "Default",
-		Region:     keystoneAPI.Spec.Region,
+		Region:     clientConfig.Region,
 		TLS:        tlsConfig,
 	}
 
@@ -93,6 +154,19 @@ func GetAdminServiceClient(
 	return os, ctrl.Result{}, nil
 }
 
+// GetAdminServiceClient - get a client for the "admin" tenant
+func GetAdminServiceClient(
+	ctx context.Context,
+	h *helper.Helper,
+	keystoneAPI *keystonev1.KeystoneAPI,
+) (*openstack.OpenStack, ctrl.Result, error) {
+	clientConfig, err := getClientConfig(AdminClient, keystoneAPI, nil)
+	if err != nil {
+		return nil, ctrl.Result{}, err
+	}
+	return getClient(ctx, h, clientConfig, keystoneAPI)
+}
+
 // GetServiceClient - Get a client for the "service" tenant
 func GetServiceClient(
 	ctx context.Context,
@@ -100,58 +174,11 @@ func GetServiceClient(
 	octavia *octaviav1.Octavia,
 	keystoneAPI *keystonev1.KeystoneAPI,
 ) (*openstack.OpenStack, ctrl.Result, error) {
-	// get internal endpoint as authurl from keystone instance
-	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
+	clientConfig, err := getClientConfig(ServiceClient, keystoneAPI, octavia)
 	if err != nil {
 		return nil, ctrl.Result{}, err
 	}
-
-	parsedAuthURL, err := url.Parse(authURL)
-	if err != nil {
-		return nil, ctrl.Result{}, err
-	}
-
-	tlsConfig := &openstack.TLSConfig{}
-	if parsedAuthURL.Scheme == "https" {
-		// TODO: (mschuppert) for now just set to insecure, when keystone got
-		// enabled for internal tls, get the CA secret name from the keystoneAPI
-		tlsConfig.Insecure = true
-	}
-
-	// get the password of the admin user from Spec.Secret
-	// using PasswordSelectors.Admin
-	authPassword, ctrlResult, err := secret.GetDataFromSecret(
-		ctx,
-		h,
-		octavia.Spec.Secret,
-		time.Duration(10)*time.Second,
-		octavia.Spec.PasswordSelectors.Service)
-	if err != nil {
-		return nil, ctrl.Result{}, err
-	}
-	if (ctrlResult != ctrl.Result{}) {
-		return nil, ctrlResult, nil
-	}
-
-	authOpts := openstack.AuthOpts{
-		AuthURL:    authURL,
-		Username:   octavia.Spec.ServiceUser,
-		Password:   authPassword,
-		TenantName: octavia.Spec.TenantName,
-		DomainName: "Default",
-		Region:     keystoneAPI.Spec.Region,
-		TLS:        tlsConfig,
-	}
-
-	os, err := openstack.NewOpenStack(
-		h.GetLogger(),
-		authOpts,
-	)
-	if err != nil {
-		return nil, ctrl.Result{}, err
-	}
-
-	return os, ctrl.Result{}, nil
+	return getClient(ctx, h, clientConfig, keystoneAPI)
 }
 
 // GetProject -
