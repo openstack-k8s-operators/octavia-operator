@@ -486,6 +486,8 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	}
 	transportURL := string(transportURLSecret.Data["transport_url"])
 
+	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
+
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err
