@@ -40,6 +40,9 @@ const (
 
 	// ApacheImage - default fall-back image for Apache
 	ApacheContainerImage = "registry.redhat.io/ubi9/httpd-24:latest"
+
+	// Octavia API timeout
+	APITimeout = "120"
 )
 
 // OctaviaSpec defines the desired state of Octavia
@@ -201,6 +204,10 @@ type OctaviaSpecBase struct {
 	// Apache Container Image URL
 	ApacheContainerImage string `json:"apacheContainerImage"`
 
+	// +kubebuilder:validation:Optional
+	// Octavia API timeout
+	APITimeout string `json:"apiTimeout,omitempty"`
+
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default=octavia
 	// OctaviaNetworkAttachment is a NetworkAttachment resource name for the Octavia Management Network
@@ -343,6 +350,7 @@ func SetupDefaults() {
 		HealthManagerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
 		WorkerContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
 		ApacheContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_APACHE_IMAGE_URL_DEFAULT", ApacheContainerImage),
+		OctaviaAPIRouteTimeout:         util.GetEnvVar("OCTAVIA_API_TIMEOUT", APITimeout),
 		// No default for AmphoraImageContainerImageURL
 	}
 

@@ -74,6 +74,9 @@ spec:
               apacheContainerImage:
                 description: Apache Container Image URL
                 type: string
+              apiTimeout:
+                description: Octavia API timeout
+                type: string
               customServiceConfig:
                 default: '# add your customization here'
                 description: CustomServiceConfig - customize the service config using
