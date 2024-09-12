@@ -142,7 +142,7 @@ func CreateOctaviaSecret(namespace string) *corev1.Secret {
 	secret := th.CreateSecret(
 		types.NamespacedName{Namespace: namespace, Name: SecretName},
 		map[string][]byte{
-			"Password": []byte("12345678"),
+			"OctaviaPassword": []byte("OctaviaPassword12345678"),
 		},
 	)
 	logger.Info("Secret created", "name", SecretName, "namespace", namespace)

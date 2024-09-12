@@ -278,6 +278,18 @@ var _ = Describe("OctaviaAPI controller", func() {
 			Expect(conf).Should(
 				ContainSubstring(fmt.Sprintf(
 					"ovn_sb_connection=%s\n", OVNSBDBEndpoint)))
+
+			ospSecret := th.GetSecret(types.NamespacedName{
+				Name:      SecretName,
+				Namespace: namespace})
+			Expect(conf).Should(
+				ContainSubstring(fmt.Sprintf(
+					"\npassword=%s\n", string(ospSecret.Data["OctaviaPassword"]))))
+
+			transportURLSecret := th.GetSecret(transportURLSecretName)
+			Expect(conf).Should(
+				ContainSubstring(fmt.Sprintf(
+					"transport_url=%s\n", string(transportURLSecret.Data["transport_url"]))))
 		})
 
 		It("should create a Secret with customServiceConfig input", func() {
