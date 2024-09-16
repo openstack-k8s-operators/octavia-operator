@@ -37,6 +37,7 @@ type OctaviaDefaults struct {
 	HealthManagerContainerImageURL string
 	WorkerContainerImageURL        string
 	ApacheContainerImageURL        string
+	OctaviaAPIRouteTimeout         string
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -195,4 +196,11 @@ func (r *Octavia) ValidateDelete() (admission.Warnings, error) {
 
 	// TODO(user): fill in your validation logic upon object deletion.
 	return nil, nil
+}
+
+func (spec *OctaviaSpec) GetDefaultRouteAnnotations() (annotations map[string]string) {
+	annotations = map[string]string{
+		"haproxy.router.openshift.io/timeout": octaviaDefaults.OctaviaAPIRouteTimeout,
+	}
+	return
 }
