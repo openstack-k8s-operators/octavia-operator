@@ -355,7 +355,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 		instance.Status.Conditions.MarkTrue(
 			condition.ReadyCondition, condition.ReadyMessage)
 	} else {
-		Log.Info("Not all conditions are ready for Amphora controller")
+		Log.Info("Not all conditions are ready for OctaviaRsyslog controller")
 	}
 	return ctrl.Result{}, nil
 }
