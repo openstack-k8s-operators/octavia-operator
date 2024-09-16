@@ -870,6 +870,7 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
+	// TODO(gthiemonge) Check 3rd parameter, it's probably DatabaseCRName
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, h, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
 	if err != nil {
 		return err

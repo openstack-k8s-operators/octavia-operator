@@ -130,6 +130,8 @@ func getClient(
 		return nil, ctrl.Result{}, err
 	}
 	if (ctrlResult != ctrl.Result{}) {
+		// TODO(gthiemonge) callers are ignoring these return values
+		// It means that this function can return a nil client when ketystone is not fully initialized
 		return nil, ctrlResult, nil
 	}
 
