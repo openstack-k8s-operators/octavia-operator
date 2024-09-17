@@ -6,6 +6,7 @@ import (
 	"net/netip"
 
 	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
 
 // NetworkParameters - Parameters for the Octavia networks, based on the config of the NAD
@@ -87,6 +88,7 @@ func GetRangeFromCIDR(
 // GetNetworkParametersFromNAD - Extract network information from the Network Attachment Definition
 func GetNetworkParametersFromNAD(
 	nad *networkv1.NetworkAttachmentDefinition,
+	instance *octaviav1.Octavia,
 ) (*NetworkParameters, error) {
 	networkParameters := &NetworkParameters{}
 
@@ -117,6 +119,11 @@ func GetNetworkParametersFromNAD(
 	// The default gateway of the provider network is the gateway of our route
 	if len(nadConfig.IPAM.Routes) > 0 {
 		networkParameters.ProviderGateway = nadConfig.IPAM.Routes[0].Gateway
+	} else if instance.Spec.LbMgmtNetworks.LbMgmtRouterGateway != "" {
+		networkParameters.ProviderGateway, err = netip.ParseAddr(instance.Spec.LbMgmtNetworks.LbMgmtRouterGateway)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse gateway information: %w", err)
+		}
 	} else {
 		return nil, fmt.Errorf("cannot find gateway information in network attachment")
 	}
@@ -125,24 +132,26 @@ func GetNetworkParametersFromNAD(
 	// The NAD must contain one route to the Octavia Tenant Management network,
 	// the gateway is an IP address of the provider network and the destination
 	// is the CIDR of the Tenant network.
-	networkParameters.TenantCIDR = nadConfig.IPAM.Routes[0].Destination
+	if len(nadConfig.IPAM.Routes) > 0 {
+		networkParameters.TenantCIDR = nadConfig.IPAM.Routes[0].Destination
 
-	// For IPv4, we require a /16 subnet, for IPv6 a /64
-	var bitlen int
-	if networkParameters.TenantCIDR.Addr().Is6() {
-		bitlen = 64
-	} else {
-		bitlen = 16
+		// For IPv4, we require a /16 subnet, for IPv6 a /64
+		var bitlen int
+		if networkParameters.TenantCIDR.Addr().Is6() {
+			bitlen = 64
+		} else {
+			bitlen = 16
+		}
+
+		if networkParameters.TenantCIDR.Bits() != bitlen {
+			return nil, fmt.Errorf("the tenant CIDR is /%d, it should be /%d", networkParameters.TenantCIDR.Bits(), bitlen)
+		}
+
+		// Compute an allocation range based on the CIDR
+		start, end := GetRangeFromCIDR(networkParameters.TenantCIDR)
+		networkParameters.TenantAllocationStart = start
+		networkParameters.TenantAllocationEnd = end
 	}
-
-	if networkParameters.TenantCIDR.Bits() != bitlen {
-		return nil, fmt.Errorf("the tenant CIDR is /%d, it should be /%d", networkParameters.TenantCIDR.Bits(), bitlen)
-	}
-
-	// Compute an allocation range based on the CIDR
-	start, end := GetRangeFromCIDR(networkParameters.TenantCIDR)
-	networkParameters.TenantAllocationStart = start
-	networkParameters.TenantAllocationEnd = end
 
 	return networkParameters, err
 }

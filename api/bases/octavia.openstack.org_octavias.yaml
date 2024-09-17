@@ -122,6 +122,18 @@ spec:
                     items:
                       type: string
                     type: array
+                  createDefaultLbMgmtNetwork:
+                    description: CreateDefaultLbMgmtNetwork - when True, octavia-operator
+                      creates a Management Network for the default Availability Zone
+                      of the control plane. Can be set to false when deploying OpenStack
+                      in DCN mode.
+                    type: boolean
+                  lbMgmtRouterGateway:
+                    description: LbMgmtRouterGateway is the IP address of the Octavia
+                      router on the Provider network, it's optional and used only
+                      when the routing informations are not passed through the Network
+                      Attachment Definition
+                    type: string
                   manageLbMgmtNetworks:
                     default: true
                     type: boolean

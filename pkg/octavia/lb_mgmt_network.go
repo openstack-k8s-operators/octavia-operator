@@ -829,30 +829,42 @@ func EnsureAmphoraManagementNetwork(
 		return NetworkProvisioningSummary{}, err
 	}
 
-	tenantNetwork, err := ensureLbMgmtNetwork(client, nil, netDetails, serviceTenant.ID, log)
-	if err != nil {
-		return NetworkProvisioningSummary{}, err
-	}
-	tenantSubnet, err := ensureLbMgmtSubnet(client, nil, tenantNetwork, networkParameters, log)
-	if err != nil {
-		return NetworkProvisioningSummary{}, err
-	}
-
-	lbMgmtSecurityGroupID, err := ensureSecurityGroup(client, tenantNetwork.TenantID, LbMgmtNetworkSecurityGroupName, ensureMgmtRules, log)
+	lbMgmtSecurityGroupID, err := ensureSecurityGroup(client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, ensureMgmtRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
 	}
-	lbHealthSecurityGroupID, err := ensureSecurityGroup(client, tenantNetwork.TenantID, LbMgmtHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
+	lbHealthSecurityGroupID, err := ensureSecurityGroup(client, serviceTenant.ID, LbMgmtHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
 	}
 
 	securityGroups := []string{lbMgmtSecurityGroupID, lbHealthSecurityGroupID}
 
-	tenantRouterPort, _, err := ensurePort(client, nil, tenantNetwork, &securityGroups, log)
-	if err != nil {
-		return NetworkProvisioningSummary{}, err
+	var tenantNetwork *networks.Network
+	var tenantSubnet *subnets.Subnet
+	var tenantRouterPort *ports.Port
+	tenantNetworkID := ""
+	tenantSubnetID := ""
+
+	if netDetails.CreateDefaultLbMgmtNetwork {
+		tenantNetwork, err = ensureLbMgmtNetwork(client, nil, netDetails, serviceTenant.ID, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+		tenantNetworkID = tenantNetwork.ID
+
+		tenantSubnet, err = ensureLbMgmtSubnet(client, nil, tenantNetwork, networkParameters, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
+		tenantSubnetID = tenantSubnet.ID
+
+		tenantRouterPort, _, err = ensurePort(client, nil, tenantNetwork, &securityGroups, log)
+		if err != nil {
+			return NetworkProvisioningSummary{}, err
+		}
 	}
+
 	adminTenant, err := GetProject(o, AdminTenant)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
@@ -909,19 +921,23 @@ func EnsureAmphoraManagementNetwork(
 			return NetworkProvisioningSummary{}, err
 		}
 
-		interfaceOpts := routers.AddInterfaceOpts{
-			PortID: tenantRouterPort.ID,
-		}
-		_, err := routers.AddInterface(client, router.ID, interfaceOpts).Extract()
-		if err != nil {
-			log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
+		if tenantRouterPort != nil {
+			interfaceOpts := routers.AddInterfaceOpts{
+				PortID: tenantRouterPort.ID,
+			}
+			_, err := routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+			if err != nil {
+				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
+			}
 		}
 	}
-	// Set route on subnet
 
-	err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
-	if err != nil {
-		log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
+	if tenantSubnet != nil {
+		// Set route on subnet
+		err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
+		}
 	}
 
 	managementSubnetAZCIDRs := []string{}
@@ -974,13 +990,18 @@ func EnsureAmphoraManagementNetwork(
 		managementSubnetAZCIDRs = append(managementSubnetAZCIDRs, subnetCIDR.String())
 	}
 
+	managementSubnetCIDR := ""
+	if networkParameters.TenantCIDR.IsValid() {
+		managementSubnetCIDR = networkParameters.TenantCIDR.String()
+	}
+
 	return NetworkProvisioningSummary{
-		TenantNetworkID:            tenantNetwork.ID,
-		TenantSubnetID:             tenantSubnet.ID,
+		TenantNetworkID:            tenantNetworkID,
+		TenantSubnetID:             tenantSubnetID,
 		ProviderNetworkID:          providerNetwork.ID,
 		RouterID:                   router.ID,
 		SecurityGroupID:            lbMgmtSecurityGroupID,
-		ManagementSubnetCIDR:       networkParameters.TenantCIDR.String(),
+		ManagementSubnetCIDR:       managementSubnetCIDR,
 		ManagementSubnetGateway:    networkParameters.ProviderGateway.String(),
 		ManagementSubnetExtraCIDRs: managementSubnetAZCIDRs,
 	}, nil

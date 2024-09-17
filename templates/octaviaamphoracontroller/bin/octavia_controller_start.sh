@@ -15,7 +15,9 @@
 # under the License.
 set -ex
 
-/usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+if [ "$MGMT_CIDR" != "" ]; then
+    /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+fi
 
 idx=0
 while true; do

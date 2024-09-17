@@ -682,7 +682,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	networkParameters, err := octavia.GetNetworkParametersFromNAD(nad)
+	networkParameters, err := octavia.GetNetworkParametersFromNAD(nad, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
