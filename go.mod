@@ -1,6 +1,6 @@
 module github.com/openstack-k8s-operators/octavia-operator
 
-go 1.20
+go 1.21
 
 require (
 	github.com/go-logr/logr v1.4.2
@@ -16,10 +16,10 @@ require (
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20240805122347-074f3d876f74
 	go.uber.org/zap v1.27.0
-	k8s.io/api v0.28.13
-	k8s.io/apimachinery v0.28.13
-	k8s.io/client-go v0.28.13
-	sigs.k8s.io/controller-runtime v0.16.6
+	k8s.io/api v0.29.9
+	k8s.io/apimachinery v0.29.9
+	k8s.io/client-go v0.29.9
+	sigs.k8s.io/controller-runtime v0.17.6
 )
 
 require (
@@ -78,8 +78,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.28.13 // indirect
-	k8s.io/component-base v0.28.13 // indirect
+	k8s.io/apiextensions-apiserver v0.29.2 // indirect
+	k8s.io/component-base v0.29.2 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
@@ -89,6 +89,6 @@ require (
 
 replace github.com/openstack-k8s-operators/octavia-operator/api => ./api
 
-// mschuppert: map to latest commit from release-4.13 tag
+// mschuppert: map to latest commit from release-4.16 tag
 // must consistent within modules and service operators
-replace github.com/openshift/api => github.com/openshift/api v0.0.0-20230414143018-3367bc7e6ac7 //allow-merging
+replace github.com/openshift/api => github.com/openshift/api v0.0.0-20240830023148-b7d0481c9094 //allow-merging
