@@ -503,11 +503,10 @@ var _ = Describe("Octavia controller", func() {
 		})
 
 		It("should create appropriate resources in Neutron", func() {
-			// Replace with condition for LbMgmtNetwork when it's merged
 			th.ExpectCondition(
 				octaviaName,
 				ConditionGetterFunc(OctaviaConditionGetter),
-				condition.ExposeServiceReadyCondition,
+				octaviav1.OctaviaManagementNetworkReadyCondition,
 				corev1.ConditionTrue,
 			)
 

@@ -40,6 +40,8 @@ const (
 	OctaviaAmphoraImagesReadyCondition condition.Type = "OctaviaAmphoraImagesReady"
 
 	OctaviaRsyslogReadyCondition condition.Type = "OctaviaRsyslogReady"
+
+	OctaviaManagementNetworkReadyCondition condition.Type = "OctaviaManagementNetworkReady"
 )
 
 // Common Messages used by API objects
@@ -130,4 +132,16 @@ const (
 
 	// OctaviaAmphoraImagesReadyCompleteMessage
 	OctaviaAmphoraImagesReadyCompleteMessage = "Octavia Amphora Images setup completed"
+
+	//
+	// OctaviaManagementNetworkReady condition messages
+	//
+	// OctaviaManagementNetworkReadyInitMessage
+	OctaviaManagementNetworkReadyInitMessage = "Octavia Management Network setup is not initialized"
+
+	// OctaviaManagementNetworkReadyErrorMessage
+	OctaviaManagementNetworkReadyErrorMessage = "Octavia Management Network setup error occured %s"
+
+	// OctaviaManagementNetworkReadyCompleteMessage
+	OctaviaManagementNetworkReadyCompleteMessage = "Octavia Management Network setup completed"
 )
