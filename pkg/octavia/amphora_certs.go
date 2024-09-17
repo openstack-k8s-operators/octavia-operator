@@ -60,12 +60,7 @@ func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
 
 	var pemBlock *pem.Block
 	if passphrase != nil {
-		pemBlock, err = EncryptPEMBlock(
-			rand.Reader,
-			"PRIVATE KEY",
-			pkcs8Key,
-			passphrase,
-			PEMCipherAES128)
+		pemBlock, err = EncryptPrivateKey(pkcs8Key, passphrase)
 		if err != nil {
 			err = fmt.Errorf("Error encrypting private key: %w", err)
 			return priv, nil, err
