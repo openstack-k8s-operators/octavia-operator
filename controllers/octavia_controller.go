@@ -192,6 +192,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(octaviav1.OctaviaQuotasReadyCondition, condition.InitReason, octaviav1.OctaviaQuotasReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraSSHReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraSSHReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraImagesReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraImagesReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaManagementNetworkReadyCondition, condition.InitReason, octaviav1.OctaviaManagementNetworkReadyInitMessage),
 		amphoraControllerInitCondition(octaviav1.HealthManager),
 		amphoraControllerInitCondition(octaviav1.Housekeeping),
 		amphoraControllerInitCondition(octaviav1.Worker),
@@ -698,8 +699,15 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		helper,
 	)
 	if err != nil {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			octaviav1.OctaviaManagementNetworkReadyCondition,
+			condition.ErrorReason,
+			condition.SeverityWarning,
+			octaviav1.OctaviaManagementNetworkReadyErrorMessage,
+			err.Error()))
 		return ctrl.Result{}, err
 	}
+	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaManagementNetworkReadyCondition, octaviav1.OctaviaManagementNetworkReadyCompleteMessage)
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
 	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, helper)
