@@ -234,6 +234,16 @@ type OctaviaLbMgmtNetworks struct {
 	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
+	CreateDefaultLbMgmtNetwork bool `json:"createDefaultLbMgmtNetwork,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// LbMgmtRouterGateway is the IP address of the Octavia router on the
+	// Provider network, it's optional and used only when the routing
+	// informations are not passed through the Network Attachment Definition
+	LbMgmtRouterGateway string `json:"lbMgmtRouterGateway,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// Availability zones for the octavia management network resources
 	AvailabilityZones []string `json:"availabilityZones,omitempty"`
 
