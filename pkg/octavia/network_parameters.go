@@ -124,6 +124,8 @@ func GetNetworkParametersFromNAD(
 		if err != nil {
 			return nil, fmt.Errorf("cannot parse gateway information: %w", err)
 		}
+	} else if !instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks {
+		return networkParameters, nil
 	} else {
 		return nil, fmt.Errorf("cannot find gateway information in network attachment")
 	}

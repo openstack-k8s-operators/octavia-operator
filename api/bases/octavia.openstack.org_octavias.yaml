@@ -105,6 +105,7 @@ spec:
                 type: object
               lbMgmtNetwork:
                 default:
+                  createDefaultLbMgmtNetwork: true
                   manageLbMgmtNetworks: true
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
@@ -123,7 +124,6 @@ spec:
                       type: string
                     type: array
                   createDefaultLbMgmtNetwork:
-                    default: true
                     type: boolean
                   lbMgmtRouterGateway:
                     description: LbMgmtRouterGateway is the IP address of the Octavia
@@ -132,7 +132,6 @@ spec:
                       Attachment Definition
                     type: string
                   manageLbMgmtNetworks:
-                    default: true
                     type: boolean
                 type: object
               nodeSelector:

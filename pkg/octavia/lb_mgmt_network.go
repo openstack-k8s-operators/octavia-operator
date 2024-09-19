@@ -37,9 +37,6 @@ import (
 // Type for conveying the results of the EnsureAmphoraManagementNetwork call.
 type NetworkProvisioningSummary struct {
 	TenantNetworkID            string
-	TenantSubnetID             string
-	ProviderNetworkID          string
-	RouterID                   string
 	SecurityGroupID            string
 	ManagementSubnetCIDR       string
 	ManagementSubnetGateway    string
@@ -204,6 +201,25 @@ func getNetworkExt(client *gophercloud.ServiceClient, networkName string, servic
 	}
 	if len(allNetworks) > 0 {
 		return &allNetworks[0], nil
+	}
+	return nil, nil
+}
+
+func getSubnet(client *gophercloud.ServiceClient, subnetName string, serviceTenantID string) (*subnets.Subnet, error) {
+	listOpts := subnets.ListOpts{
+		Name:     subnetName,
+		TenantID: serviceTenantID,
+	}
+	allPages, err := subnets.List(client, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+	allSubnets, err := subnets.ExtractSubnets(allPages)
+	if err != nil {
+		return nil, err
+	}
+	if len(allSubnets) > 0 {
+		return &allSubnets[0], nil
 	}
 	return nil, nil
 }
@@ -805,6 +821,72 @@ func ensureSecurityGroup(
 	return secGroup.ID, nil
 }
 
+func HandleUnmanagedAmphoraManagementNetwork(
+	ctx context.Context,
+	ns string,
+	tenantName string,
+	netDetails *octaviav1.OctaviaLbMgmtNetworks,
+	log *logr.Logger,
+	helper *helper.Helper,
+) (NetworkProvisioningSummary, error) {
+	o, err := GetOpenstackClient(ctx, ns, helper)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+	client, err := GetNetworkClient(o)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+	serviceTenant, err := GetProject(o, tenantName)
+	if err != nil {
+		return NetworkProvisioningSummary{}, err
+	}
+
+	tenantNetworkID := ""
+	network, err := getNetwork(client, LbMgmtNetName, serviceTenant.ID)
+	if err == nil && network != nil {
+		tenantNetworkID = network.ID
+	}
+
+	managementSubnetGateway := ""
+	router, err := findRouter(client, log)
+	if err == nil && router != nil {
+		if len(router.GatewayInfo.ExternalFixedIPs) > 0 {
+			managementSubnetGateway = router.GatewayInfo.ExternalFixedIPs[0].IPAddress
+		} else {
+			log.Info("No external fixedIP on router %s, skipping", router.Name)
+		}
+	}
+
+	managementSubnetCIDR := ""
+	subnet, err := getSubnet(client, LbMgmtSubnetName, serviceTenant.ID)
+	if err == nil && subnet != nil {
+		managementSubnetCIDR = subnet.CIDR
+	}
+
+	managementSubnetExtraCIDRs := []string{}
+	for _, az := range netDetails.AvailabilityZones {
+		subnet, err := getSubnet(client, fmt.Sprintf(LbMgmtSubnetNameAZ, az), serviceTenant.ID)
+		if err == nil && subnet != nil {
+			managementSubnetExtraCIDRs = append(managementSubnetExtraCIDRs, subnet.CIDR)
+		}
+	}
+
+	securityGroupID := ""
+	securityGroup, err := findSecurityGroup(client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, log)
+	if err == nil && securityGroup != nil {
+		securityGroupID = securityGroup.ID
+	}
+
+	return NetworkProvisioningSummary{
+		TenantNetworkID:            tenantNetworkID,
+		SecurityGroupID:            securityGroupID,
+		ManagementSubnetCIDR:       managementSubnetCIDR,
+		ManagementSubnetGateway:    managementSubnetGateway,
+		ManagementSubnetExtraCIDRs: managementSubnetExtraCIDRs,
+	}, nil
+}
+
 // EnsureAmphoraManagementNetwork - retrieve, create and reconcile the Octavia management network for the in cluster link to the
 // management tenant network.
 func EnsureAmphoraManagementNetwork(
@@ -844,7 +926,6 @@ func EnsureAmphoraManagementNetwork(
 	var tenantSubnet *subnets.Subnet
 	var tenantRouterPort *ports.Port
 	tenantNetworkID := ""
-	tenantSubnetID := ""
 
 	if netDetails.CreateDefaultLbMgmtNetwork {
 		tenantNetwork, err = ensureLbMgmtNetwork(client, nil, netDetails, serviceTenant.ID, log)
@@ -857,7 +938,6 @@ func EnsureAmphoraManagementNetwork(
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
-		tenantSubnetID = tenantSubnet.ID
 
 		tenantRouterPort, _, err = ensurePort(client, nil, tenantNetwork, &securityGroups, log)
 		if err != nil {
@@ -997,9 +1077,6 @@ func EnsureAmphoraManagementNetwork(
 
 	return NetworkProvisioningSummary{
 		TenantNetworkID:            tenantNetworkID,
-		TenantSubnetID:             tenantSubnetID,
-		ProviderNetworkID:          providerNetwork.ID,
-		RouterID:                   router.ID,
 		SecurityGroupID:            lbMgmtSecurityGroupID,
 		ManagementSubnetCIDR:       managementSubnetCIDR,
 		ManagementSubnetGateway:    networkParameters.ProviderGateway.String(),
