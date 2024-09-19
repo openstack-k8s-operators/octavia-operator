@@ -105,6 +105,7 @@ spec:
                 type: object
               lbMgmtNetwork:
                 default:
+                  createDefaultLbMgmtNetwork: true
                   manageLbMgmtNetworks: true
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
@@ -135,7 +136,8 @@ spec:
                       Attachment Definition
                     type: string
                   manageLbMgmtNetworks:
-                    default: true
+                    description: ManageLbMgmtNetworks - when True, octavia-operator
+                      creates the Neutron resources needed for its Management Network
                     type: boolean
                 type: object
               nodeSelector:

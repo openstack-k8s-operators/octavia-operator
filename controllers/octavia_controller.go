@@ -687,25 +687,47 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
-	// multiple details.
-	networkInfo, err := octavia.EnsureAmphoraManagementNetwork(
-		ctx,
-		instance.Namespace,
-		instance.Spec.TenantName,
-		&instance.Spec.LbMgmtNetworks,
-		networkParameters,
-		&Log,
-		helper,
-	)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			octaviav1.OctaviaManagementNetworkReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			octaviav1.OctaviaManagementNetworkReadyErrorMessage,
-			err.Error()))
-		return ctrl.Result{}, err
+	var networkInfo octavia.NetworkProvisioningSummary
+
+	if instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks {
+		// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
+		// multiple details.
+		networkInfo, err = octavia.EnsureAmphoraManagementNetwork(
+			ctx,
+			instance.Namespace,
+			instance.Spec.TenantName,
+			&instance.Spec.LbMgmtNetworks,
+			networkParameters,
+			&Log,
+			helper,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaManagementNetworkReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				octaviav1.OctaviaManagementNetworkReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkInfo, err = octavia.HandleUnmanagedAmphoraManagementNetwork(
+			ctx,
+			instance.Namespace,
+			instance.Spec.TenantName,
+			&instance.Spec.LbMgmtNetworks,
+			&Log,
+			helper,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaManagementNetworkReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				octaviav1.OctaviaManagementNetworkReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
 	}
 	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaManagementNetworkReadyCondition, octaviav1.OctaviaManagementNetworkReadyCompleteMessage)
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
