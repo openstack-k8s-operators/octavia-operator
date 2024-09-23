@@ -26,6 +26,7 @@ import (
 
 	"github.com/go-logr/logr"
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
+	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
@@ -95,6 +96,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
+// +kubebuilder:rbac:groups=redis.openstack.org,resources=redises,verbs=get;list;watch;create;update;patch;delete
 
 // service account, role, rolebinding
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch
@@ -254,6 +256,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&corev1.Service{}).
 		Owns(&rabbitmqv1.TransportURL{}).
+		Owns(&redisv1.Redis{}).
 		Complete(r)
 }
 
@@ -480,6 +483,15 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return rbacResult, err
 	} else if (rbacResult != ctrl.Result{}) {
 		return rbacResult, nil
+	}
+
+	redis, op, err := r.redisCreateOrUpdate(ctx, instance, helper)
+	if err != nil {
+		// TODO(gthiemonge) Set conditions?
+		return ctrl.Result{}, err
+	}
+	if op != controllerutil.OperationResultNone {
+		Log.Info(fmt.Sprintf("Redis %s successfully reconciled - operation: %s", redis.Name, string(op)))
 	}
 
 	transportURL, op, err := r.transportURLCreateOrUpdate(instance)
@@ -1456,6 +1468,54 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 	return transportURL, op, err
 }
 
+func getRedisServiceIPs(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+	redis *redisv1.Redis,
+) ([]string, error) {
+	getOptions := metav1.GetOptions{}
+	service, err := helper.GetKClient().CoreV1().Services(instance.Namespace).Get(ctx, "redis", getOptions)
+	if err != nil {
+		return []string{}, err
+	}
+	// TODO Ensure that the correct port is exposed
+	return service.Spec.ClusterIPs, nil
+}
+
+func (r *OctaviaReconciler) redisCreateOrUpdate(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+) (*redisv1.Redis, controllerutil.OperationResult, error) {
+	redis := &redisv1.Redis{
+		// Use the "global" redis instance.
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "redis",
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, redis, func() error {
+		// We probably don't want to own the redis instance.
+		//err := controllerutil.SetControllerReference(instance, redis, r.Scheme)
+		//return err
+		return nil
+	})
+	if err != nil {
+		return nil, op, err
+	}
+
+	hostIPs, err := getRedisServiceIPs(ctx, instance, helper, redis)
+	if err != nil {
+		return redis, op, err
+	}
+
+	instance.Status.RedisHostIPs = hostIPs
+
+	return redis, op, err
+}
+
 func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
 	networkInfo octavia.NetworkProvisioningSummary,
@@ -1486,6 +1546,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.LbMgmtNetworkID = networkInfo.TenantNetworkID
 		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
+		daemonset.Spec.RedisHostIPs = instance.Status.RedisHostIPs
 		daemonset.Spec.TLS = instance.Spec.OctaviaAPI.TLS.Ca
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway

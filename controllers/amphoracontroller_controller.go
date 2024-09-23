@@ -635,6 +635,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 		templateParameters["ServerCAKeyPassphrase"] = ""
 	}
 	templateParameters["HeartbeatKey"] = string(ospSecret.Data["OctaviaHeartbeatKey"])
+	templateParameters["JobboardBackendHosts"] = strings.Join(spec.RedisHostIPs[:], ",")
 
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{

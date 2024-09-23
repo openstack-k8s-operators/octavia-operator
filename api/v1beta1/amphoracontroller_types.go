@@ -140,6 +140,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// +kubebuilder:default=""
 	AmphoraImageOwnerID string `json:"amphoraImageOwnerID,omitempty"`
 
+	// +kubebuilder:default={}
+	// List of Redis Host IP addresses
+	RedisHostIPs []string `json:"redisHostIPs,omitempty"`
+
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS tls.Ca `json:"tls,omitempty"`
