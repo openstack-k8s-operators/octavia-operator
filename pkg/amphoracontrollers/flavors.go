@@ -45,6 +45,7 @@ type OctaviaFlavors struct {
 // FlavorProfileData -
 type FlavorProfileData struct {
 	ComputeFlavorID string `json:"compute_flavor"`
+	AmpImageTag     string `json:"amp_image_tag"`
 }
 
 var (
@@ -217,6 +218,13 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 			flavorProfileData := FlavorProfileData{
 				ComputeFlavorID: amphoraFlavors[flavorOpts.Name].ID,
 			}
+
+			if amphoraFlavors[flavorOpts.Name].VCPUs == 1 {
+				flavorProfileData.AmpImageTag = octavia.AmphoraImageTag
+			} else {
+				flavorProfileData.AmpImageTag = octavia.AmphoraImageVertTag
+			}
+
 			fpDataJSON, err := json.Marshal(flavorProfileData)
 			if err != nil {
 				return "", err
