@@ -209,6 +209,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 		return "", fmt.Errorf("error getting flavors: %w", err)
 	}
 
+	flavorSuccess := false
 	for _, flavorOpts := range flavorsCreateOpts {
 		// Create FlavorProfiles if they don't exist
 
@@ -238,7 +239,12 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 			log.Info(fmt.Sprintf("Creating Octavia flavor profile \"%s\"", flavorProfileCreateOpts.Name))
 			fp, err := flavorprofiles.Create(lbClient, flavorProfileCreateOpts).Extract()
 			if err != nil {
-				return "", fmt.Errorf("error creating flavor profiles: %w", err)
+				errFmt := fmt.Errorf("error creating flavor profile: %w", err)
+				log.Error(errFmt, fmt.Sprintf("Amphora image might be missing or not "+
+					"tagged correctly. Skipping configuration of octavia "+
+					"flavor profile %s and octavia flavor %s.",
+					flavorProfileCreateOpts.Name, name))
+				continue
 			}
 			flavorProfileMap[fp.Name] = *fp
 		}
@@ -257,8 +263,11 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 				return "", fmt.Errorf("error creating flavor \"%s\": %w", flavorCreateOpts.Name, err)
 			}
 		}
+		flavorSuccess = true
 	}
-
+	if !flavorSuccess {
+		return "", fmt.Errorf("none of the Octavia flavors could be configured because of errors. last error: %w", err)
+	}
 	return defaultFlavorID, nil
 }
 
