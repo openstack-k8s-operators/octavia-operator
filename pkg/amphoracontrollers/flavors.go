@@ -220,9 +220,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 				ComputeFlavorID: amphoraFlavors[flavorOpts.Name].ID,
 			}
 
-			if amphoraFlavors[flavorOpts.Name].VCPUs == 1 {
-				flavorProfileData.AmpImageTag = octavia.AmphoraImageTag
-			} else {
+			if amphoraFlavors[flavorOpts.Name].VCPUs > 1 {
 				flavorProfileData.AmpImageTag = octavia.AmphoraImageVertTag
 			}
 
@@ -239,8 +237,8 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 			log.Info(fmt.Sprintf("Creating Octavia flavor profile \"%s\"", flavorProfileCreateOpts.Name))
 			fp, err := flavorprofiles.Create(lbClient, flavorProfileCreateOpts).Extract()
 			if err != nil {
-				errFmt := fmt.Errorf("error creating flavor profile: %w", err)
-				log.Error(errFmt, fmt.Sprintf("Amphora image might be missing or not "+
+				log.Info(fmt.Sprintf("Warning: Could not create flavor profile. "+
+					"Amphora image might be missing or not "+
 					"tagged correctly. Skipping configuration of octavia "+
 					"flavor profile %s and octavia flavor %s.",
 					flavorProfileCreateOpts.Name, name))
@@ -266,7 +264,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 		flavorSuccess = true
 	}
 	if !flavorSuccess {
-		return "", fmt.Errorf("none of the Octavia flavors could be configured because of errors. last error: %w", err)
+		return "", fmt.Errorf("none of the Octavia flavors could be configured")
 	}
 	return defaultFlavorID, nil
 }
