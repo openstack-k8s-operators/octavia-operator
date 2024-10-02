@@ -106,16 +106,17 @@ func EncryptPrivateKey(data, password []byte) (*pem.Block, error) {
 		return nil, err
 	}
 
-	cryptSource := make([]byte, encryptedSize)
-	copy(cryptSource, data)
-	// Set padding data according to RFC1423, 1.1
-	for i := dataLength; i < encryptedSize; i++ {
-		cryptSource[i] = byte(padSize)
-	}
-	encrypted := make([]byte, encryptedSize)
-
 	encrypter := cipher.NewCBCEncrypter(encryptedBlock, iv)
-	encrypter.CryptBlocks(encrypted, cryptSource)
+	encrypted := make([]byte, len(data), encryptedSize)
+	// We could save this copy by encrypting all the whole blocks in
+	// the data separately, but it doesn't seem worth the additional
+	// code.
+	copy(encrypted, data)
+	// See RFC 1423, section 1.1
+	for i := 0; i < padSize; i++ {
+		encrypted = append(encrypted, byte(padSize))
+	}
+	encrypter.CryptBlocks(encrypted, encrypted)
 
 	// Build encrypted ans1 data
 	pki := encryptedPrivateKeyInfo{
