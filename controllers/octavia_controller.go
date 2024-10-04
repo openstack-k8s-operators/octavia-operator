@@ -1271,7 +1271,7 @@ func (r *OctaviaReconciler) getLocalImageURLs(
 	endpoint string,
 ) ([]octavia.AmphoraImage, error) {
 	// Get the list of images and their hashes
-	listURL := fmt.Sprintf("%s/octavia-amphora-images.sha256sum", endpoint)
+	listURL := fmt.Sprintf("%s/octavia-amphora-image.sha256sum", endpoint)
 
 	resp, err := http.Get(listURL)
 	if err != nil {
