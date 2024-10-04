@@ -27,6 +27,7 @@ import (
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
 	keystone_helpers "github.com/openstack-k8s-operators/keystone-operator/api/test/helpers"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
@@ -172,11 +173,13 @@ func keystoneGetProject(
 	f.APIFixture.Log.Info(fmt.Sprintf("GetProject returns %s", string(bytes)))
 }
 
-func SetupAPIFixtures(logger logr.Logger) (
-	*keystone_helpers.KeystoneAPIFixture,
-	*NovaAPIFixture,
-	*NeutronAPIFixture,
-) {
+type APIFixtures struct {
+	Keystone *keystone_helpers.KeystoneAPIFixture
+	Nova     *NovaAPIFixture
+	Neutron  *NeutronAPIFixture
+}
+
+func SetupAPIFixtures(logger logr.Logger) APIFixtures {
 	nova := NewNovaAPIFixtureWithServer(logger)
 	nova.Setup()
 	DeferCleanup(nova.Cleanup)
@@ -188,6 +191,12 @@ func SetupAPIFixtures(logger logr.Logger) (
 	neutronURL := neutron.Endpoint()
 
 	keystone := keystone_helpers.NewKeystoneAPIFixtureWithServer(logger)
+	keystone.Users = map[string]users.User{
+		"octavia": {
+			Name: "octavia",
+			ID:   uuid.New().String(),
+		},
+	}
 	keystone.Setup(
 		api.Handler{Pattern: "/", Func: keystone.HandleVersion},
 		api.Handler{Pattern: "/v3/users", Func: keystone.HandleUsers},
@@ -205,5 +214,9 @@ func SetupAPIFixtures(logger logr.Logger) (
 			}
 		}})
 	DeferCleanup(keystone.Cleanup)
-	return keystone, nova, neutron
+	return APIFixtures{
+		Keystone: keystone,
+		Nova:     nova,
+		Neutron:  neutron,
+	}
 }
