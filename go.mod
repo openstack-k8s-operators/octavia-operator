@@ -4,17 +4,17 @@ go 1.21
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/gophercloud/gophercloud v1.14.0
-	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.4.0
+	github.com/gophercloud/gophercloud v1.14.1
+	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.4
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.4.1-0.20240805122347-7ed6e2796be0
-	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20240805122623-7ce0cb635485
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.4.1-0.20240905123813-174296c09ec6
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20240805121733-1c08e6b7e260
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20240805141244-ff694b3aaeda
+	github.com/openstack-k8s-operators/infra-operator/apis v0.4.1-0.20241007123426-3a3a6ce07d0c
+	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20241007094639-47b983c3ab77
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.4.1-0.20241007071524-66e6544525a3
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20241007071524-66e6544525a3
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20241003090345-178862fb12c3
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20240805122347-074f3d876f74
+	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20241007075619-241535441881
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.29.9
 	k8s.io/apimachinery v0.29.9
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.4.1-0.20240730142703-7fd3da600c9d
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.4.1-0.20241007071524-66e6544525a3
 	golang.org/x/crypto v0.28.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
@@ -78,8 +78,8 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	k8s.io/apiextensions-apiserver v0.29.2 // indirect
-	k8s.io/component-base v0.29.2 // indirect
+	k8s.io/apiextensions-apiserver v0.29.9 // indirect
+	k8s.io/component-base v0.29.9 // indirect
 	k8s.io/klog/v2 v2.120.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20240228011516-70dd3763d340 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
