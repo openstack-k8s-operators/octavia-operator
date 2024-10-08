@@ -267,7 +267,7 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.Deployment{}).
-		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNDBClusterNamespaceMapFunc(crs, mgr.GetClient()))).
+		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNCRNamespaceMapFunc(crs, mgr.GetClient()))).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
