@@ -25,6 +25,7 @@ import (
 
 	"github.com/go-logr/logr"
 
+	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
 	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
@@ -34,6 +35,7 @@ type NovaAPIFixture struct {
 	api.APIFixture
 	QuotaSets       map[string]quotasets.QuotaSet
 	DefaultQuotaSet quotasets.QuotaSet
+	KeyPairs        map[string]keypairs.KeyPair
 }
 
 func (f *NovaAPIFixture) registerHandler(handler api.Handler) {
@@ -41,7 +43,94 @@ func (f *NovaAPIFixture) registerHandler(handler api.Handler) {
 }
 
 func (f *NovaAPIFixture) Setup() {
+	f.registerHandler(api.Handler{Pattern: "/os-keypairs", Func: f.keyPairHandler})
+	f.registerHandler(api.Handler{Pattern: "/os-keypairs/", Func: f.keyPairHandler})
 	f.registerHandler(api.Handler{Pattern: "/os-quota-sets/", Func: f.quotaSetsHandler})
+}
+
+func (f *NovaAPIFixture) keyPairHandler(w http.ResponseWriter, r *http.Request) {
+	f.LogRequest(r)
+	switch r.Method {
+	case "GET":
+		f.getKeyPair(w, r)
+	case "POST":
+		f.postKeyPair(w, r)
+	case "DELETE":
+		f.deleteKeyPair(w, r)
+	default:
+		f.UnexpectedRequest(w, r)
+		return
+	}
+}
+
+func (f *NovaAPIFixture) getKeyPair(w http.ResponseWriter, r *http.Request) {
+	items := strings.Split(r.URL.Path, "/")
+	if len(items) == 3 {
+		type pair struct {
+			KeyPair keypairs.KeyPair `json:"keypair"`
+		}
+		var k struct {
+			KeyPairs []pair `json:"keypairs"`
+		}
+		k.KeyPairs = []pair{}
+		query := r.URL.Query()
+		userID := query["user_id"]
+		for _, keypair := range f.KeyPairs {
+			if len(userID) > 0 && userID[0] != keypair.UserID {
+				continue
+			}
+			k.KeyPairs = append(k.KeyPairs, pair{KeyPair: keypair})
+		}
+		bytes, err := json.Marshal(&k)
+		if err != nil {
+			f.InternalError(err, "Error during marshalling response", w, r)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, string(bytes))
+	}
+}
+
+func (f *NovaAPIFixture) postKeyPair(w http.ResponseWriter, r *http.Request) {
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		f.InternalError(err, "Error reading request body", w, r)
+		return
+	}
+
+	var k struct {
+		KeyPair keypairs.KeyPair `json:"keypair"`
+	}
+
+	err = json.Unmarshal(bytes, &k)
+	if err != nil {
+		f.InternalError(err, "Error during marshalling response", w, r)
+		return
+	}
+
+	f.KeyPairs[k.KeyPair.Name] = k.KeyPair
+
+	bytes, err = json.Marshal(&k)
+	if err != nil {
+		f.InternalError(err, "Error during marshalling response", w, r)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(201)
+	fmt.Fprint(w, string(bytes))
+}
+
+func (f *NovaAPIFixture) deleteKeyPair(w http.ResponseWriter, r *http.Request) {
+	items := strings.Split(r.URL.Path, "/")
+	keypair := items[len(items)-1]
+
+	delete(f.KeyPairs, keypair)
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(202)
 }
 
 func (f *NovaAPIFixture) quotaSetsHandler(w http.ResponseWriter, r *http.Request) {
@@ -128,6 +217,7 @@ func AddNovaAPIFixture(log logr.Logger, server *api.FakeAPIServer) *NovaAPIFixtu
 			ServerGroupMembers: 10,
 		},
 		QuotaSets: map[string]quotasets.QuotaSet{},
+		KeyPairs:  map[string]keypairs.KeyPair{},
 	}
 	return fixture
 }

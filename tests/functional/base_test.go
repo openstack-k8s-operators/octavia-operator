@@ -17,12 +17,14 @@ limitations under the License.
 package functional_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
 
+	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -32,6 +34,7 @@ import (
 	condition "github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
 const (
@@ -106,8 +109,14 @@ func SimulateKeystoneReady(
 
 func GetDefaultOctaviaSpec() map[string]interface{} {
 	return map[string]interface{}{
-		"databaseInstance": "test-octavia-db-instance",
-		"secret":           SecretName,
+		"databaseInstance":           "test-octavia-db-instance",
+		"secret":                     SecretName,
+		"octaviaNetworkAttachment":   "octavia-attachement",
+		"databaseAccount":            "octavia-db-account",
+		"persistenceDatabaseAccount": "octavia-persistence-db-account",
+		"lbMgmtNetwork": map[string]interface{}{
+			"availabilityZones": []string{"az0"},
+		},
 	}
 }
 
@@ -214,4 +223,82 @@ func GetOctaviaAPI(name types.NamespacedName) *octaviav1.OctaviaAPI {
 func OctaviaAPIConditionGetter(name types.NamespacedName) condition.Conditions {
 	instance := GetOctaviaAPI(name)
 	return instance.Status.Conditions
+}
+
+func SimulateOctaviaAPIReady(name types.NamespacedName) {
+	Eventually(func(g Gomega) {
+		octaviaAPI := GetOctaviaAPI(name)
+		octaviaAPI.Status.ObservedGeneration = octaviaAPI.Generation
+		octaviaAPI.Status.ReadyCount = 1
+		g.Expect(k8sClient.Status().Update(ctx, octaviaAPI)).To(Succeed())
+	}, timeout, interval).Should(Succeed())
+}
+
+func CreateNAD(name types.NamespacedName) client.Object {
+	raw := map[string]interface{}{
+		"apiVersion": "k8s.cni.cncf.io/v1",
+		"kind":       "NetworkAttachmentDefinition",
+		"metadata": map[string]interface{}{
+			"name":      name.Name,
+			"namespace": name.Namespace,
+		},
+		"spec": map[string]interface{}{
+			"config": `{
+				"cniVersion": "0.3.1",
+				"name": "octavia",
+				"type": "bridge",
+				"bridge": "octbr",
+				"ipam": {
+				    "type": "whereabouts",
+				    "range": "172.23.0.0/24",
+				    "range_start": "172.23.0.30",
+				    "range_end": "172.23.0.70",
+				    "routes": [{
+				        "dst": "172.24.0.0/16",
+				        "gw" : "172.23.0.150"
+		            }]
+		        }
+			}`,
+		},
+	}
+	return th.CreateUnstructured(raw)
+}
+
+func GetNADConfig(name types.NamespacedName) *octavia.NADConfig {
+	nad := &networkv1.NetworkAttachmentDefinition{}
+	Eventually(func(g Gomega) {
+		g.Expect(k8sClient.Get(ctx, name, nad)).Should(Succeed())
+	}, timeout, interval).Should(Succeed())
+
+	nadConfig := &octavia.NADConfig{}
+	jsonDoc := []byte(nad.Spec.Config)
+	err := json.Unmarshal(jsonDoc, nadConfig)
+	if err != nil {
+		return nil
+	}
+
+	return nadConfig
+}
+
+func CreateNode(name types.NamespacedName) client.Object {
+	raw := map[string]interface{}{
+		"apiVersion": "v1",
+		"kind":       "Node",
+		"metadata": map[string]interface{}{
+			"name":      name.Name,
+			"namespace": name.Namespace,
+		},
+		"spec": map[string]interface{}{},
+	}
+	return th.CreateUnstructured(raw)
+
+}
+
+func CreateSSHPubKey() client.Object {
+	return th.CreateConfigMap(types.NamespacedName{
+		Name:      "octavia-ssh-pubkey",
+		Namespace: namespace,
+	}, map[string]interface{}{
+		"key": []byte("public key"),
+	})
 }
