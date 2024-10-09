@@ -116,6 +116,11 @@ func GetDefaultOctaviaSpec() map[string]interface{} {
 		"persistenceDatabaseAccount": "octavia-persistence-db-account",
 		"lbMgmtNetwork": map[string]interface{}{
 			"availabilityZones": []string{"az0"},
+			// It seems that the functional tests don't use the correct default
+			// values for nested structures, when the default is defined in the
+			// parent struct
+			"manageLbMgmtNetworks":       true,
+			"createDefaultLbMgmtNetwork": true,
 		},
 	}
 }
