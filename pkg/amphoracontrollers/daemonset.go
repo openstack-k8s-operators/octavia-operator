@@ -85,8 +85,14 @@ func DaemonSet(
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 	envVars["NODE_NAME"] = env.DownwardAPI("spec.nodeName")
 
-	envVars["MGMT_CIDR"] = env.SetValue(instance.Spec.OctaviaProviderSubnetCIDR)
+	if instance.Spec.OctaviaProviderSubnetCIDR != "" {
+		envVars["MGMT_CIDR"] = env.SetValue(instance.Spec.OctaviaProviderSubnetCIDR)
+	}
 	envVars["MGMT_GATEWAY"] = env.SetValue(instance.Spec.OctaviaProviderSubnetGateway)
+
+	for idx, subnetCIDR := range instance.Spec.OctaviaProviderSubnetExtraCIDRs {
+		envVars[fmt.Sprintf("MGMT_CIDR%d", idx)] = env.SetValue(subnetCIDR)
+	}
 
 	// Add the CA bundle
 	if instance.Spec.TLS.CaBundleSecretName != "" {

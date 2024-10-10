@@ -151,6 +151,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// +kubebuilder:validation:Optional
 	// OctaviaProviderSubnetCIDR -
 	OctaviaProviderSubnetCIDR string `json:"octaviaProviderSubnetCIDR"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaProviderSubnetExtraCIDRs -
+	OctaviaProviderSubnetExtraCIDRs []string `json:"octaviaProviderSubnetExtraCIDRs,omitempty"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller
