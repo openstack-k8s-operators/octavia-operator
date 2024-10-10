@@ -309,7 +309,14 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ospSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
+	ospSecretHash, result, err := oko_secret.VerifySecret(
+		ctx,
+		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
+		[]string{instance.Spec.PasswordSelectors.Service},
+		helper.GetClient(),
+		time.Duration(10)*time.Second,
+	)
+
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
@@ -327,10 +334,23 @@ func (r *OctaviaReconciler) reconcileInit(
 			condition.InputReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
+	} else if (result != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.InputReadyWaitingMessage))
+		return result, err
 	}
-	secretsVars[ospSecret.Name] = env.SetValue(hash)
+	secretsVars[instance.Spec.Secret] = env.SetValue(ospSecretHash)
 
-	transportURLSecret, hash, err := oko_secret.GetSecret(ctx, helper, instance.Status.TransportURLSecret, instance.Namespace)
+	transportURLSecretHash, result, err := oko_secret.VerifySecret(
+		ctx,
+		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Status.TransportURLSecret},
+		[]string{"transport_url"},
+		helper.GetClient(),
+		time.Duration(10)*time.Second,
+	)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Status.TransportURLSecret))
@@ -348,8 +368,15 @@ func (r *OctaviaReconciler) reconcileInit(
 			condition.InputReadyErrorMessage,
 			err.Error()))
 		return ctrl.Result{}, err
+	} else if (result != ctrl.Result{}) {
+		instance.Status.Conditions.Set(condition.FalseCondition(
+			condition.InputReadyCondition,
+			condition.RequestedReason,
+			condition.SeverityInfo,
+			condition.InputReadyWaitingMessage))
+		return result, err
 	}
-	secretsVars[transportURLSecret.Name] = env.SetValue(hash)
+	secretsVars[instance.Status.TransportURLSecret] = env.SetValue(transportURLSecretHash)
 
 	octaviaDb, persistenceDb, result, err := r.ensureDB(ctx, helper, instance)
 	if err != nil {
