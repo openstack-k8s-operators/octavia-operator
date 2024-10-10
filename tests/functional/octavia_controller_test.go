@@ -632,6 +632,194 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+	When("The management network is created with AZ support", func() {
+		var apiFixtures APIFixtures
+
+		BeforeEach(func() {
+			apiFixtures = createAndSimulateKeystone(octaviaName)
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			createAndSimulateDB(spec)
+
+			createAndSimulateOctaviaAPI(octaviaName)
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateNAD(types.NamespacedName{
+				Name:      spec["octaviaNetworkAttachment"].(string),
+				Namespace: namespace,
+			}))
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateNode(types.NamespacedName{
+				Namespace: namespace,
+				Name:      "node1",
+			}))
+
+			spec["lbMgmtNetwork"].(map[string]interface{})["availabilityZoneCIDRs"] = map[string]string{
+				"az1": "172.34.0.0/16",
+				"az2": "172.44.0.0/16",
+			}
+			spec["lbMgmtNetwork"].(map[string]interface{})["createDefaultLbMgmtNetwork"] = false
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+		})
+
+		It("should create appropriate resources in Neutron", func() {
+			th.ExpectCondition(
+				octaviaName,
+				ConditionGetterFunc(OctaviaConditionGetter),
+				octaviav1.OctaviaManagementNetworkReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			instance := GetOctavia(octaviaName)
+			tenant := GetProject(instance.Spec.TenantName)
+			adminTenant := GetProject(octavia.AdminTenant)
+
+			nadConfig := GetNADConfig(types.NamespacedName{
+				Name:      instance.Spec.OctaviaNetworkAttachment,
+				Namespace: namespace})
+
+			// Networks
+			netNameAZ1 := fmt.Sprintf(octavia.LbMgmtNetNameAZ, "az1")
+			netNameAZ2 := fmt.Sprintf(octavia.LbMgmtNetNameAZ, "az2")
+			expectedNetworks := map[string]networks.Network{
+				netNameAZ1: {
+					Description:           fmt.Sprintf(octavia.LbMgmtNetDescriptionAZ, "az1"),
+					TenantID:              tenant.ID,
+					AvailabilityZoneHints: []string{"az1"},
+				},
+				netNameAZ2: {
+					Description:           fmt.Sprintf(octavia.LbMgmtNetDescriptionAZ, "az2"),
+					TenantID:              tenant.ID,
+					AvailabilityZoneHints: []string{"az2"},
+				},
+				octavia.LbProvNetName: {
+					Description:           octavia.LbProvNetDescription,
+					TenantID:              adminTenant.ID,
+					AvailabilityZoneHints: instance.Spec.LbMgmtNetworks.AvailabilityZones,
+				},
+			}
+
+			resultNetworks := map[string]networks.Network{}
+			for _, network := range apiFixtures.Neutron.Networks {
+				resultNetworks[network.Name] = network
+			}
+			Expect(resultNetworks).To(HaveLen(3))
+			for name, expectedNetwork := range expectedNetworks {
+				network := resultNetworks[name]
+				Expect(network).ToNot(Equal(networks.Network{}), "Network %s doesn't appear to exist", name)
+				Expect(network.Description).To(Equal(expectedNetwork.Description))
+				Expect(network.TenantID).To(Equal(expectedNetwork.TenantID))
+				Expect(network.AvailabilityZoneHints).To(Equal(expectedNetwork.AvailabilityZoneHints))
+			}
+
+			lbMgmtPortAddress := map[string]string{}
+			lbMgmtPortID := map[string]string{}
+			for _, az := range []string{"az1", "az2"} {
+				for _, port := range apiFixtures.Neutron.Ports {
+					if port.Name == fmt.Sprintf(octavia.LbMgmtRouterPortNameAZ, az) {
+						lbMgmtPortAddress[az] = port.FixedIPs[0].IPAddress
+						lbMgmtPortID[az] = port.ID
+						break
+					}
+				}
+			}
+			// Subnets
+			subnetNameAZ1 := fmt.Sprintf(octavia.LbMgmtSubnetNameAZ, "az1")
+			subnetNameAZ2 := fmt.Sprintf(octavia.LbMgmtSubnetNameAZ, "az2")
+			expectedSubnets := map[string]subnets.Subnet{
+				subnetNameAZ1: {
+					Description: fmt.Sprintf(octavia.LbMgmtSubnetDescriptionAZ, "az1"),
+					TenantID:    tenant.ID,
+					NetworkID:   resultNetworks[netNameAZ1].ID,
+					CIDR:        instance.Spec.LbMgmtNetworks.AvailabilityZoneCIDRs["az1"],
+					HostRoutes: []subnets.HostRoute{{
+						DestinationCIDR: nadConfig.IPAM.CIDR.String(),
+						NextHop:         lbMgmtPortAddress["az1"],
+					}},
+				},
+				subnetNameAZ2: {
+					Description: fmt.Sprintf(octavia.LbMgmtSubnetDescriptionAZ, "az2"),
+					TenantID:    tenant.ID,
+					NetworkID:   resultNetworks[netNameAZ2].ID,
+					CIDR:        instance.Spec.LbMgmtNetworks.AvailabilityZoneCIDRs["az2"],
+					HostRoutes: []subnets.HostRoute{{
+						DestinationCIDR: nadConfig.IPAM.CIDR.String(),
+						NextHop:         lbMgmtPortAddress["az2"],
+					}},
+				},
+				octavia.LbProvSubnetName: {
+					Description: octavia.LbProvSubnetDescription,
+					TenantID:    adminTenant.ID,
+					NetworkID:   resultNetworks[octavia.LbProvNetName].ID,
+					CIDR:        nadConfig.IPAM.CIDR.String(),
+				},
+			}
+
+			resultSubnets := map[string]subnets.Subnet{}
+			for _, subnet := range apiFixtures.Neutron.Subnets {
+				resultSubnets[subnet.Name] = subnet
+			}
+			Expect(resultSubnets).To(HaveLen(3))
+			for name, expectedSubnet := range expectedSubnets {
+				subnet := resultSubnets[name]
+				Expect(subnet).ToNot(Equal(subnets.Subnet{}), "Subnet %s doesn't appear to exist", name)
+				Expect(subnet.Description).To(Equal(expectedSubnet.Description))
+				Expect(subnet.TenantID).To(Equal(expectedSubnet.TenantID))
+				Expect(subnet.NetworkID).To(Equal(expectedSubnet.NetworkID))
+				Expect(subnet.CIDR).To(Equal(expectedSubnet.CIDR))
+				Expect(subnet.HostRoutes).To(Equal(expectedSubnet.HostRoutes))
+			}
+
+			// Routers
+			expectedRouters := map[string]routers.Router{
+				octavia.LbRouterName: {
+					GatewayInfo: routers.GatewayInfo{
+						NetworkID: resultNetworks[octavia.LbProvNetName].ID,
+						ExternalFixedIPs: []routers.ExternalFixedIP{
+							{
+								SubnetID: resultSubnets[octavia.LbProvSubnetName].ID,
+							},
+						},
+					},
+					AvailabilityZoneHints: instance.Spec.LbMgmtNetworks.AvailabilityZones,
+				},
+			}
+
+			resultRouters := map[string]routers.Router{}
+			for _, router := range apiFixtures.Neutron.Routers {
+				resultRouters[router.Name] = router
+			}
+			Expect(resultRouters).To(HaveLen(1))
+			for name, expectedRouter := range expectedRouters {
+				router := resultRouters[name]
+				Expect(router).ToNot(Equal(routers.Router{}), "Router %s doesn't appear to exist", name)
+				Expect(router.GatewayInfo.NetworkID).To(Equal(expectedRouter.GatewayInfo.NetworkID))
+				Expect(router.GatewayInfo.ExternalFixedIPs[0].SubnetID).To(Equal(expectedRouter.GatewayInfo.ExternalFixedIPs[0].SubnetID))
+				Expect(router.AvailabilityZoneHints).To(Equal(expectedRouter.AvailabilityZoneHints))
+			}
+
+			expectedInterfaces := map[string]routers.InterfaceInfo{
+				fmt.Sprintf("%s:%s", resultRouters[octavia.LbRouterName].ID, resultSubnets[subnetNameAZ1].ID): {
+					SubnetID: resultSubnets[subnetNameAZ1].ID,
+					PortID:   lbMgmtPortID["az1"],
+				},
+				fmt.Sprintf("%s:%s", resultRouters[octavia.LbRouterName].ID, resultSubnets[subnetNameAZ2].ID): {
+					SubnetID: resultSubnets[subnetNameAZ2].ID,
+					PortID:   lbMgmtPortID["az2"],
+				},
+			}
+			for id, expectedInterfaces := range expectedInterfaces {
+				iface := apiFixtures.Neutron.InterfaceInfos[id]
+				Expect(iface).ToNot(Equal(routers.InterfaceInfo{}), "Interface %s doesn't appear to exist", id)
+				Expect(iface.SubnetID).To(Equal(expectedInterfaces.SubnetID))
+				Expect(iface.PortID).To(Equal(expectedInterfaces.PortID))
+			}
+		})
+	})
+
 	// Predictable IPs
 
 	// Amphora Controller Daemonsets
