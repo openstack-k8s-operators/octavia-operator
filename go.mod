@@ -9,12 +9,12 @@ require (
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
 	github.com/openstack-k8s-operators/infra-operator/apis v0.4.1-0.20241010211630-1da98a9fb3f9
-	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20241010164950-7b08059ab809
+	github.com/openstack-k8s-operators/keystone-operator/api v0.4.1-0.20241012151742-8030171def4e
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.4.1-0.20241007071524-66e6544525a3
 	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.4.1-0.20241007071524-66e6544525a3
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20241010184758-ab6bb1c87d6f
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.4.1-0.20241012153655-4666731b845c
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20241007075619-241535441881
+	github.com/openstack-k8s-operators/ovn-operator/api v0.4.1-0.20241012135226-198edaa843c4
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.29.9
 	k8s.io/apimachinery v0.29.9
