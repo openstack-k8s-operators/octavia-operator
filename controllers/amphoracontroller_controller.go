@@ -729,6 +729,11 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 
 	l := log.FromContext(ctx).WithName("Controllers").WithName("Amphora")
 
+	allWatchFields := []string{
+		passwordSecretField,
+		caBundleSecretNameField,
+	}
+
 	for _, field := range allWatchFields {
 		crList := &octaviav1.OctaviaAmphoraControllerList{}
 		listOps := &client.ListOptions{
