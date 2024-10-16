@@ -15,7 +15,20 @@
 # under the License.
 set -ex
 
-/usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+if [ "$MGMT_CIDR" != "" ]; then
+    /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+fi
+
+idx=0
+while true; do
+    var_name="MGMT_CIDR${idx}"
+    cidr="${!var_name}"
+    if [ "$cidr" = "" ]; then
+        break
+    fi
+    /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$cidr" "$MGMT_GATEWAY"
+    idx=$((idx+1))
+done
 
 if [ "$1" = "octavia-health-manager" ]; then
     /usr/local/bin/container-scripts/setipalias.py octavia hm

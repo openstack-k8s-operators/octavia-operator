@@ -192,6 +192,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(octaviav1.OctaviaQuotasReadyCondition, condition.InitReason, octaviav1.OctaviaQuotasReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraSSHReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraSSHReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraImagesReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraImagesReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaManagementNetworkReadyCondition, condition.InitReason, octaviav1.OctaviaManagementNetworkReadyInitMessage),
 		amphoraControllerInitCondition(octaviav1.HealthManager),
 		amphoraControllerInitCondition(octaviav1.Housekeeping),
 		amphoraControllerInitCondition(octaviav1.Worker),
@@ -681,25 +682,54 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, err
 	}
 
-	networkParameters, err := octavia.GetNetworkParametersFromNAD(nad)
+	networkParameters, err := octavia.GetNetworkParametersFromNAD(nad, instance)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
 
-	// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
-	// multiple details.
-	networkInfo, err := octavia.EnsureAmphoraManagementNetwork(
-		ctx,
-		instance.Namespace,
-		instance.Spec.TenantName,
-		&instance.Spec.LbMgmtNetworks,
-		networkParameters,
-		&Log,
-		helper,
-	)
-	if err != nil {
-		return ctrl.Result{}, err
+	var networkInfo octavia.NetworkProvisioningSummary
+
+	if instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks {
+		// Create load balancer management network and get its Id (networkInfo is actually a struct and contains
+		// multiple details.
+		networkInfo, err = octavia.EnsureAmphoraManagementNetwork(
+			ctx,
+			instance.Namespace,
+			instance.Spec.TenantName,
+			&instance.Spec.LbMgmtNetworks,
+			networkParameters,
+			&Log,
+			helper,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaManagementNetworkReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				octaviav1.OctaviaManagementNetworkReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
+	} else {
+		networkInfo, err = octavia.HandleUnmanagedAmphoraManagementNetwork(
+			ctx,
+			instance.Namespace,
+			instance.Spec.TenantName,
+			&instance.Spec.LbMgmtNetworks,
+			&Log,
+			helper,
+		)
+		if err != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaManagementNetworkReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				octaviav1.OctaviaManagementNetworkReadyErrorMessage,
+				err.Error()))
+			return ctrl.Result{}, err
+		}
 	}
+	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaManagementNetworkReadyCondition, octaviav1.OctaviaManagementNetworkReadyCompleteMessage)
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
 
 	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, helper)
@@ -1517,6 +1547,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
+		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
 		if len(daemonset.Spec.NodeSelector) == 0 {
 			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
 		}

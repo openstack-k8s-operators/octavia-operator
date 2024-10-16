@@ -171,7 +171,7 @@ type OctaviaSpecBase struct {
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default={manageLbMgmtNetworks: true}
+	// +kubebuilder:default={manageLbMgmtNetworks: true, createDefaultLbMgmtNetwork: true}
 	LbMgmtNetworks OctaviaLbMgmtNetworks `json:"lbMgmtNetwork"`
 
 	// +kubebuilder:validation:Optional
@@ -230,12 +230,28 @@ type PasswordSelector struct {
 // OctaviaLbMgmtNetworks Settings for Octavia management networks
 type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default=true
-	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks,omitempty"`
+	// ManageLbMgmtNetworks - when True, octavia-operator creates the Neutron resources needed for its Management Network
+	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks"`
+
+	// +kubebuilder:validation:Optional
+	// CreateDefaultLbMgmtNetwork - when True, octavia-operator creates a
+	// Management Network for the default Availability Zone of the control
+	// plane. Can be set to false when deploying OpenStack in DCN mode.
+	CreateDefaultLbMgmtNetwork bool `json:"createDefaultLbMgmtNetwork"`
+
+	// +kubebuilder:validation:Optional
+	// LbMgmtRouterGateway is the IP address of the Octavia router on the
+	// Provider network, it's optional and used only when the routing
+	// informations are not passed through the Network Attachment Definition
+	LbMgmtRouterGateway string `json:"lbMgmtRouterGateway,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// Availability zones for the octavia management network resources
 	AvailabilityZones []string `json:"availabilityZones,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// AvailabilityZoneCIDRs are the CIDRs of each management network associated with an Availability Zone (ex: {"az":"172.34.0.0/24", ...})
+	AvailabilityZoneCIDRs map[string]string `json:"availabilityZoneCIDRs,omitempty"`
 }
 
 // OctaviaAmphoraFlavor Settings for custom Amphora flavors

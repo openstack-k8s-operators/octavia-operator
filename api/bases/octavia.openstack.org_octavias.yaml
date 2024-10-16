@@ -105,18 +105,39 @@ spec:
                 type: object
               lbMgmtNetwork:
                 default:
+                  createDefaultLbMgmtNetwork: true
                   manageLbMgmtNetworks: true
                 description: OctaviaLbMgmtNetworks Settings for Octavia management
                   networks
                 properties:
+                  availabilityZoneCIDRs:
+                    additionalProperties:
+                      type: string
+                    description: 'AvailabilityZoneCIDRs are the CIDRs of each management
+                      network associated with an Availability Zone (ex: {"az":"172.34.0.0/24",
+                      ...})'
+                    type: object
                   availabilityZones:
                     description: Availability zones for the octavia management network
                       resources
                     items:
                       type: string
                     type: array
+                  createDefaultLbMgmtNetwork:
+                    description: CreateDefaultLbMgmtNetwork - when True, octavia-operator
+                      creates a Management Network for the default Availability Zone
+                      of the control plane. Can be set to false when deploying OpenStack
+                      in DCN mode.
+                    type: boolean
+                  lbMgmtRouterGateway:
+                    description: LbMgmtRouterGateway is the IP address of the Octavia
+                      router on the Provider network, it's optional and used only
+                      when the routing informations are not passed through the Network
+                      Attachment Definition
+                    type: string
                   manageLbMgmtNetworks:
-                    default: true
+                    description: ManageLbMgmtNetworks - when True, octavia-operator
+                      creates the Neutron resources needed for its Management Network
                     type: boolean
                 type: object
               nodeSelector:
@@ -586,6 +607,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string
@@ -787,6 +813,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string
@@ -1122,6 +1153,11 @@ spec:
                   octaviaProviderSubnetCIDR:
                     description: OctaviaProviderSubnetCIDR -
                     type: string
+                  octaviaProviderSubnetExtraCIDRs:
+                    description: OctaviaProviderSubnetExtraCIDRs -
+                    items:
+                      type: string
+                    type: array
                   octaviaProviderSubnetGateway:
                     description: OctaviaProviderSubnetGateway -
                     type: string
