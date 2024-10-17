@@ -22,11 +22,12 @@ import (
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 const (
-	// DBSyncCommand -
-	DBSyncCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
+	// InitContainerCommand -
+	InitContainerCommand = "/usr/local/bin/container-scripts/init.sh"
 )
 
 // DbSyncJob func
@@ -35,12 +36,8 @@ func DbSyncJob(
 	labels map[string]string,
 	annotations map[string]string,
 ) *batchv1.Job {
-	runAsUser := int64(0)
-	initVolumeMounts := GetInitVolumeMounts()
 	volumeMounts := GetVolumeMounts("db-sync")
 	volumes := GetVolumes(instance.Name)
-
-	args := []string{"-c", DBSyncCommand}
 
 	envVars := map[string]env.Setter{}
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
@@ -49,6 +46,11 @@ func DbSyncJob(
 	if instance.Spec.OctaviaAPI.TLS.CaBundleSecretName != "" {
 		volumes = append(volumes, instance.Spec.OctaviaAPI.TLS.CreateVolume())
 		volumeMounts = append(volumeMounts, instance.Spec.OctaviaAPI.TLS.CreateVolumeMounts(nil)...)
+	}
+
+	args := []string{
+		"-c",
+		InitContainerCommand,
 	}
 
 	job := &batchv1.Job{
@@ -63,21 +65,30 @@ func DbSyncJob(
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup: ptr.To(OctaviaUID),
+					},
 					RestartPolicy:      corev1.RestartPolicyOnFailure,
 					ServiceAccountName: instance.RbacResourceName(),
 					Containers: []corev1.Container{
 						{
-							Name: ServiceName + "-db-sync",
+							Name:            ServiceName + "-db-sync",
+							Image:           instance.Spec.OctaviaAPI.ContainerImage,
+							SecurityContext: GetOctaviaSecurityContext(),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    volumeMounts,
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            "init",
+							Image:           instance.Spec.OctaviaAPI.ContainerImage,
+							SecurityContext: GetOctaviaSecurityContext(),
 							Command: []string{
 								"/bin/bash",
 							},
-							Args:  args,
-							Image: instance.Spec.OctaviaAPI.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
-							},
-							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts: volumeMounts,
+							Args:         args,
+							VolumeMounts: GetInitVolumeMounts(),
 						},
 					},
 					Volumes: volumes,
@@ -85,12 +96,6 @@ func DbSyncJob(
 			},
 		},
 	}
-
-	initContainerDetails := APIDetails{
-		ContainerImage: instance.Spec.OctaviaAPI.ContainerImage,
-		VolumeMounts:   initVolumeMounts,
-	}
-	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 
 	return job
 }
