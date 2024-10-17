@@ -265,7 +265,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
 	if err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{RequeueAfter: time.Duration(180) * time.Second}, nil
 	}
 	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
