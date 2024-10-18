@@ -96,7 +96,7 @@ spec:
       containers:
       - args:
         - -c
-        - /usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start
+        - /usr/local/bin/kolla_start
         command:
         - /bin/bash
         imagePullPolicy: IfNotPresent
@@ -121,6 +121,10 @@ spec:
           periodSeconds: 15
           successThreshold: 1
           timeoutSeconds: 15
+        securityContext:
+          runAsUser: 42437
+          runAsGroup: 42437
+          runAsNonRoot: true
       - env:
         - name: CONFIG_HASH
         - name: KOLLA_CONFIG_STRATEGY
@@ -155,6 +159,10 @@ spec:
         imagePullPolicy: IfNotPresent
         name: init
         resources: {}
+        securityContext:
+          runAsUser: 42437
+          runAsGroup: 42437
+          runAsNonRoot: true
       restartPolicy: Always
       serviceAccount: octavia-octavia
       serviceAccountName: octavia-octavia
@@ -235,4 +243,19 @@ commands:
           fi
         fi
       done
+      exit 0
+  - script: |
+      pod=$(oc get pods -n $NAMESPACE -l service=octavia-healthmanager --field-selector=status.phase=Running -o name | head -1)
+      if [ "$pod" = "" ]; then
+        exit 1
+      fi
+      # Check that the octavia-healthmanager pods has 2 IP addresses on the octavia interface
+      n_addresses=$(oc logs -n $NAMESPACE -c init "$pod" | grep "addr 172\.23\..* dev octavia" | wc -l)
+      if [ "$n_addresses" != "2" ]; then
+        exit 1
+      fi
+      # and a route to the lb-mgmt-subnet
+      if ! oc logs -n $NAMESPACE -c init "$pod" | grep 'route 172.24.0.0/16 via 172.23.0.150 dev octavia'; then
+        exit 1
+      fi
       exit 0
