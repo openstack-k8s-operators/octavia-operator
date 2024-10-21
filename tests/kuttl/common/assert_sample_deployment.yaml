@@ -372,3 +372,9 @@ commands:
         exit 1
       fi
       exit 0
+  - script: |
+      n_images=$(oc exec -n $NAMESPACE openstackclient -- openstack image list -f value --tag amphora-image | wc -l)
+      if [ "$n_images" != "0" ]; then
+        exit 0
+      fi
+      exit 1
