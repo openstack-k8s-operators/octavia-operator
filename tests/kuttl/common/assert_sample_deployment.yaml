@@ -69,6 +69,101 @@ spec:
       service: OctaviaPassword
     secret: osp-secret
     serviceUser: octavia
+status:
+  apireadyCount: 1
+  healthmanagerreadyCount: 1
+  housekeepingreadyCount: 1
+  rsyslogreadyCount: 1
+  databaseHostname: openstack.octavia-kuttl-tests.svc
+  conditions:
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: Ready
+  - message: DB create completed
+    reason: Ready
+    status: "True"
+    type: DBReady
+  - message: DBsync completed
+    reason: Ready
+    status: "True"
+    type: DBSyncReady
+  - message: Exposing service completed
+    reason: Ready
+    status: "True"
+    type: ExposeServiceReady
+  - message: Input data complete
+    reason: Ready
+    status: "True"
+    type: InputReady
+  - message: MariaDBAccount creation complete
+    reason: Ready
+    status: "True"
+    type: MariaDBAccountReady
+  - message: NetworkAttachments completed
+    reason: Ready
+    status: "True"
+    type: NetworkAttachmentsReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: OctaviaAPIReady
+  - message: Octavia Amphora certificates setup completed
+    reason: Ready
+    status: "True"
+    type: OctaviaAmphoraCertsReady
+  - message: Octavia Amphora Images setup completed
+    reason: Ready
+    status: "True"
+    type: OctaviaAmphoraImagesReady
+  - message: Octavia Amphora SSH setup completed
+    reason: Ready
+    status: "True"
+    type: OctaviaAmphoraSSHReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: OctaviaHealthManagerReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: OctaviaHousekeepingReady
+  - message: Octavia Management Network setup completed
+    reason: Ready
+    status: "True"
+    type: OctaviaManagementNetworkReady
+  - message: Octavia quotas setup completed
+    reason: Ready
+    status: "True"
+    type: OctaviaQuotasReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: OctaviaRsyslogReady
+  - message: Setup complete
+    reason: Ready
+    status: "True"
+    type: OctaviaWorkerReady
+  - message: RabbitMqTransportURL successfully created
+    reason: Ready
+    status: "True"
+    type: RabbitMqTransportURLReady
+  - message: RoleBinding created
+    reason: Ready
+    status: "True"
+    type: RoleBindingReady
+  - message: Role created
+    reason: Ready
+    status: "True"
+    type: RoleReady
+  - message: ServiceAccount created
+    reason: Ready
+    status: "True"
+    type: ServiceAccountReady
+  - message: Service config create completed
+    reason: Ready
+    status: "True"
+    type: ServiceConfigReady
 ---
 apiVersion: apps/v1
 kind: Deployment
