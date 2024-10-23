@@ -75,8 +75,9 @@ spec:
                 description: Apache Container Image URL
                 type: string
               apiTimeout:
+                default: 120
                 description: Octavia API timeout
-                type: string
+                type: integer
               customServiceConfig:
                 default: '# add your customization here'
                 description: CustomServiceConfig - customize the service config using
@@ -150,6 +151,10 @@ spec:
                 description: OctaviaAPI - Spec definition for the API service of the
                   Octavia deployment
                 properties:
+                  apiTimeout:
+                    description: APITimeout for HAProxy and Apache defaults to OctaviaSpecCore
+                      APITimeout (seconds)
+                    type: integer
                   containerImage:
                     description: Octavia Container Image URL
                     type: string
@@ -1381,6 +1386,7 @@ spec:
                 type: string
             required:
             - apacheContainerImage
+            - apiTimeout
             - databaseInstance
             - octaviaAPI
             - octaviaNetworkAttachment

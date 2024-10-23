@@ -37,7 +37,7 @@ type OctaviaDefaults struct {
 	HealthManagerContainerImageURL string
 	WorkerContainerImageURL        string
 	ApacheContainerImageURL        string
-	OctaviaAPIRouteTimeout         string
+	OctaviaAPIRouteTimeout         int
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -198,9 +198,34 @@ func (r *Octavia) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (spec *OctaviaSpec) GetDefaultRouteAnnotations() (annotations map[string]string) {
-	annotations = map[string]string{
-		"haproxy.router.openshift.io/timeout": octaviaDefaults.OctaviaAPIRouteTimeout,
+func (spec *OctaviaSpecCore) GetDefaultRouteAnnotations() (annotations map[string]string) {
+	return map[string]string{
+		"haproxy.router.openshift.io/timeout": fmt.Sprintf("%ds", octaviaDefaults.OctaviaAPIRouteTimeout),
 	}
-	return
+}
+
+// SetDefaultRouteAnnotations sets HAProxy timeout values of the route
+func (spec *OctaviaSpecCore) SetDefaultRouteAnnotations(annotations map[string]string) {
+	const haProxyAnno = "haproxy.router.openshift.io/timeout"
+	// Use a custom annotation to flag when the operator has set the default HAProxy timeout
+	// With the annotation func determines when to overwrite existing HAProxy timeout with the APITimeout
+	const octaviaAnno = "api.octavia.openstack.org/timeout"
+
+	valOctavia, okOctavia := annotations[octaviaAnno]
+	valHAProxy, okHAProxy := annotations[haProxyAnno]
+
+	// Human operator set the HAProxy timeout manually
+	if !okOctavia && okHAProxy {
+		return
+	}
+
+	// Human operator modified the HAProxy timeout manually without removing the Octavia flag
+	if okOctavia && okHAProxy && valOctavia != valHAProxy {
+		delete(annotations, octaviaAnno)
+		return
+	}
+
+	timeout := fmt.Sprintf("%ds", spec.APITimeout)
+	annotations[octaviaAnno] = timeout
+	annotations[haProxyAnno] = timeout
 }
