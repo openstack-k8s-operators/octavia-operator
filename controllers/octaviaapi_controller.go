@@ -978,6 +978,8 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	}
 	templateParameters["OVNDB_TLS"] = instance.Spec.TLS.Ovn.Enabled()
 
+	templateParameters["TimeOut"] = instance.Spec.APITimeout
+
 	// create httpd  vhost template parameters
 	httpdVhostConfig := map[string]interface{}{}
 	for _, endpt := range []service.Endpoint{service.EndpointInternal, service.EndpointPublic} {

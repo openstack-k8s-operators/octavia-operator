@@ -1481,6 +1481,8 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		deployment.Spec.TLS = instance.Spec.OctaviaAPI.TLS
+		deployment.Spec.APITimeout = instance.Spec.APITimeout
+
 		if len(deployment.Spec.NodeSelector) == 0 {
 			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
 		}
