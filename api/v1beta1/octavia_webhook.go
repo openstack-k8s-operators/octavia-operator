@@ -198,7 +198,7 @@ func (r *Octavia) ValidateDelete() (admission.Warnings, error) {
 	return nil, nil
 }
 
-func (spec *OctaviaSpec) GetDefaultRouteAnnotations() (annotations map[string]string) {
+func (spec *OctaviaSpecCore) GetDefaultRouteAnnotations() (annotations map[string]string) {
 	annotations = map[string]string{
 		"haproxy.router.openshift.io/timeout": octaviaDefaults.OctaviaAPIRouteTimeout,
 	}
