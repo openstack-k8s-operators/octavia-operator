@@ -3,6 +3,7 @@ kind: Octavia
 metadata:
   name: octavia
 spec:
+  amphoraImageContainerImage: quay.io/gthiemonge/octavia-amphora-image
   databaseInstance: openstack
   databaseAccount: octavia
   persistenceDatabaseAccount: octavia-persistence

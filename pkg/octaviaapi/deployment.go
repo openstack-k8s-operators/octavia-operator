@@ -35,7 +35,10 @@ import (
 
 const (
 	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_set_configs && /usr/local/bin/kolla_start"
+	ServiceCommand = "/usr/local/bin/kolla_start"
+
+	// InitContainerCommand -
+	InitContainerCommand = "/usr/local/bin/container-scripts/init.sh"
 )
 
 // Deployment func
@@ -45,8 +48,6 @@ func Deployment(
 	labels map[string]string,
 	annotations map[string]string,
 ) (*appsv1.Deployment, error) {
-	runAsUser := int64(0)
-	initVolumeMounts := octavia.GetInitVolumeMounts()
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -133,6 +134,11 @@ func Deployment(
 
 	serviceName := fmt.Sprintf("%s-api", octavia.ServiceName)
 
+	initArgs := []string{
+		"-c",
+		InitContainerCommand,
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -149,6 +155,9 @@ func Deployment(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup: ptr.To(octavia.OctaviaUID),
+					},
 					ServiceAccountName: instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
@@ -156,25 +165,36 @@ func Deployment(
 							Command: []string{
 								"/bin/bash",
 							},
-							Args:  args,
-							Image: instance.Spec.ContainerImage,
-							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
-							},
-							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   volumeMounts,
-							Resources:      instance.Spec.Resources,
-							ReadinessProbe: readinessProbe,
-							LivenessProbe:  livenessProbe,
+							Args:            args,
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    volumeMounts,
+							Resources:       instance.Spec.Resources,
+							ReadinessProbe:  readinessProbe,
+							LivenessProbe:   livenessProbe,
 						},
 						{
-							Name:           fmt.Sprintf("%s-provider-agent", serviceName),
-							Image:          instance.Spec.ContainerImage,
-							Env:            env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
-							VolumeMounts:   volumeMountsDriverAgent,
-							Resources:      instance.Spec.Resources,
-							ReadinessProbe: readinessProbe,
-							LivenessProbe:  livenessProbe,
+							Name:            fmt.Sprintf("%s-provider-agent", serviceName),
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
+							VolumeMounts:    volumeMountsDriverAgent,
+							Resources:       instance.Spec.Resources,
+							ReadinessProbe:  readinessProbe,
+							LivenessProbe:   livenessProbe,
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:            "init",
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							Command: []string{
+								"/bin/bash",
+							},
+							Args:         initArgs,
+							VolumeMounts: octavia.GetInitVolumeMounts(),
 						},
 					},
 					Volumes: volumes,
@@ -192,15 +212,9 @@ func Deployment(
 		},
 		corev1.LabelHostname,
 	)
-	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
+	if len(instance.Spec.NodeSelector) > 0 {
 		deployment.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
-
-	initContainerDetails := octavia.APIDetails{
-		ContainerImage: instance.Spec.ContainerImage,
-		VolumeMounts:   initVolumeMounts,
-	}
-	deployment.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 
 	return deployment, nil
 }
