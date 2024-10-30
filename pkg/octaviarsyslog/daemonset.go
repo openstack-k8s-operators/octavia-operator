@@ -25,6 +25,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+)
+
+const (
+	// InitContainerCommand -
+	InitContainerCommand = "/usr/local/bin/container-scripts/init.sh"
 )
 
 // DaemonSet func
@@ -34,18 +40,13 @@ func DaemonSet(
 	labels map[string]string,
 	annotations map[string]string,
 ) *appsv1.DaemonSet {
-	runAsUser := int64(0)
 	serviceName := "octavia-rsyslog"
 
 	// The API pod has an extra volume so the API and the provider agent can
 	// communicate with each other.
 	volumes := GetVolumes(instance.Name)
-	//parentOctaviaName := octavia.GetOwningOctaviaControllerName(instance)
-	//certsSecretName := fmt.Sprintf("%s-certs-secret", parentOctaviaName)
-	//volumes = append(volumes, GetCertVolume(certsSecretName)...)
 
 	volumeMounts := octavia.GetVolumeMounts(serviceName)
-	//volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -74,6 +75,11 @@ func DaemonSet(
 		Command: []string{
 			"/usr/bin/pgrep", "-r", "DRST", "rsyslog",
 		},
+	}
+
+	args := []string{
+		"-c",
+		InitContainerCommand,
 	}
 
 	envVars := map[string]env.Setter{}
@@ -107,9 +113,28 @@ func DaemonSet(
 							Resources:      instance.Spec.Resources,
 							ReadinessProbe: readinessProbe,
 							LivenessProbe:  livenessProbe,
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name: "init",
+							// TODO(gthiemonge) Using Octavia HM Container image is a workaround to get a container with pyroute2
+							// Replace it by an init container image with pyroute2 when it's available
+							// OSPRH-8434
+							Image: octaviav1.OctaviaHealthManagerContainerImage,
 							SecurityContext: &corev1.SecurityContext{
-								RunAsUser: &runAsUser,
+								RunAsUser: ptr.To(int64(0)),
+								Capabilities: &corev1.Capabilities{
+									Add:  []corev1.Capability{"NET_ADMIN", "NET_RAW", "SYS_ADMIN", "SYS_NICE"},
+									Drop: []corev1.Capability{},
+								},
 							},
+							Command: []string{
+								"/bin/bash",
+							},
+							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							Args:         args,
+							VolumeMounts: GetInitVolumeMounts(),
 						},
 					},
 					Volumes: volumes,
@@ -127,19 +152,9 @@ func DaemonSet(
 		},
 		corev1.LabelHostname,
 	)
-	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
+	if len(instance.Spec.NodeSelector) > 0 {
 		daemonset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
-
-	initContainerDetails := APIDetails{
-		// TODO(gthiemonge) Using Octavia HM Container image is a workaround to get a container with pyroute2
-		// Replace it by an init container image with pyroute2 when it's available
-		// OSPRH-8434
-		ContainerImage: octaviav1.OctaviaHealthManagerContainerImage,
-		VolumeMounts:   octavia.GetInitVolumeMounts(),
-		Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-	}
-	daemonset.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
 
 	return daemonset
 }

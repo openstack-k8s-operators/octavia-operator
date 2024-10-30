@@ -27,6 +27,12 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
+)
+
+const (
+	// InitContainerCommand -
+	InitContainerCommand = "/usr/local/bin/container-scripts/init.sh %s"
 )
 
 // DaemonSet func
@@ -36,8 +42,6 @@ func DaemonSet(
 	labels map[string]string,
 	annotations map[string]string,
 ) *appsv1.DaemonSet {
-	runAsUser := int64(0)
-	privileged := true
 	serviceName := fmt.Sprintf("octavia-%s", instance.Spec.Role)
 
 	// The API pod has an extra volume so the API and the provider agent can
@@ -47,7 +51,7 @@ func DaemonSet(
 	certsSecretName := fmt.Sprintf("%s-certs-secret", parentOctaviaName)
 	volumes = append(volumes, GetCertVolume(certsSecretName)...)
 
-	volumeMounts := GetVolumeMounts(serviceName)
+	volumeMounts := octavia.GetVolumeMounts(serviceName)
 	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
 
 	livenessProbe := &corev1.Probe{
@@ -100,6 +104,11 @@ func DaemonSet(
 		volumeMounts = append(volumeMounts, instance.Spec.TLS.CreateVolumeMounts(nil)...)
 	}
 
+	args := []string{
+		"-c",
+		fmt.Sprintf(InitContainerCommand, instance.Name),
+	}
+
 	// Because we don't use jobboard, we need to ensure that the octavia
 	// controllers are gracefully shutdown, so after they receive the signal,
 	// they need to complete the jobs that are being executed (creating a LB,
@@ -111,6 +120,12 @@ func DaemonSet(
 	// TODO(gthiemonge) This setting must be updated/removed when Jobboard is
 	// re-enabled
 	terminationGracePeriodSeconds := int64(600)
+
+	capabilities := []corev1.Capability{"NET_ADMIN", "SYS_ADMIN", "SYS_NICE"}
+	if instance.Spec.Role == octaviav1.HealthManager {
+		// NET_RAW is required for IP advertisements
+		capabilities = append(capabilities, corev1.Capability("NET_RAW"))
+	}
 
 	daemonset := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -127,25 +142,40 @@ func DaemonSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
+					SecurityContext: &corev1.PodSecurityContext{
+						FSGroup: ptr.To(octavia.OctaviaUID),
+					},
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 					ServiceAccountName:            instance.Spec.ServiceAccount,
 					Containers: []corev1.Container{
 						{
-							Name:           serviceName,
-							Image:          instance.Spec.ContainerImage,
-							Env:            env.MergeEnvs([]corev1.EnvVar{}, envVars),
-							VolumeMounts:   volumeMounts,
-							Resources:      instance.Spec.Resources,
-							ReadinessProbe: readinessProbe,
-							LivenessProbe:  livenessProbe,
+							Name:            serviceName,
+							Image:           instance.Spec.ContainerImage,
+							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							VolumeMounts:    volumeMounts,
+							Resources:       instance.Spec.Resources,
+							ReadinessProbe:  readinessProbe,
+							LivenessProbe:   livenessProbe,
+						},
+					},
+					InitContainers: []corev1.Container{
+						{
+							Name:  "init",
+							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
-									Add:  []corev1.Capability{"NET_ADMIN", "SYS_ADMIN", "SYS_NICE"},
+									Add:  capabilities,
 									Drop: []corev1.Capability{},
 								},
-								RunAsUser:  &runAsUser,
-								Privileged: &privileged,
+								RunAsUser: ptr.To(int64(0)),
 							},
+							Command: []string{
+								"/bin/bash",
+							},
+							Env:          env.MergeEnvs([]corev1.EnvVar{}, envVars),
+							Args:         args,
+							VolumeMounts: GetInitVolumeMounts(),
 						},
 					},
 					Volumes: volumes,
@@ -163,15 +193,9 @@ func DaemonSet(
 		},
 		corev1.LabelHostname,
 	)
-	if instance.Spec.NodeSelector != nil && len(instance.Spec.NodeSelector) > 0 {
+	if len(instance.Spec.NodeSelector) > 0 {
 		daemonset.Spec.Template.Spec.NodeSelector = instance.Spec.NodeSelector
 	}
-
-	initContainerDetails := octavia.APIDetails{
-		ContainerImage: instance.Spec.ContainerImage,
-		VolumeMounts:   octavia.GetInitVolumeMounts(),
-	}
-	daemonset.Spec.Template.Spec.InitContainers = octavia.InitContainer(initContainerDetails)
 
 	return daemonset
 }
