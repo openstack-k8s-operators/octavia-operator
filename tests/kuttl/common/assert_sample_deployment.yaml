@@ -23,6 +23,11 @@ spec:
   preserveJobs: false
   secret: osp-secret
   serviceUser: octavia
+  lbMgmtNetwork:
+    availabilityZones:
+    - zone-1
+    manageLbMgmtNetworks: true
+    createDefaultLbMgmtNetwork: true
   octaviaAPI:
     customServiceConfig: |
       [DEFAULT]
