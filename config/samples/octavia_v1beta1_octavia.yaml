@@ -10,6 +10,9 @@ spec:
   rabbitMqClusterName: rabbitmq
   secret: osp-secret
   preserveJobs: false
+  lbMgmtNetwork:
+    availabilityZones:
+    - zone-1
   customServiceConfig: |
     [DEFAULT]
     debug = true
