@@ -231,10 +231,12 @@ type PasswordSelector struct {
 // OctaviaLbMgmtNetworks Settings for Octavia management networks
 type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
 	// ManageLbMgmtNetworks - when True, octavia-operator creates the Neutron resources needed for its Management Network
 	ManageLbMgmtNetworks bool `json:"manageLbMgmtNetworks"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=true
 	// CreateDefaultLbMgmtNetwork - when True, octavia-operator creates a
 	// Management Network for the default Availability Zone of the control
 	// plane. Can be set to false when deploying OpenStack in DCN mode.

@@ -187,7 +187,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(condition.RoleBindingReadyCondition, condition.InitReason, condition.RoleBindingReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAPIReadyCondition, condition.InitReason, octaviav1.OctaviaAPIReadyInitMessage),
 		condition.UnknownCondition(condition.NetworkAttachmentsReadyCondition, condition.InitReason, condition.NetworkAttachmentsReadyInitMessage),
-		condition.UnknownCondition(condition.ExposeServiceReadyCondition, condition.InitReason, condition.ExposeServiceReadyInitMessage),
+		condition.UnknownCondition(condition.CreateServiceReadyCondition, condition.InitReason, condition.CreateServiceReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraCertsReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraCertsReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaQuotasReadyCondition, condition.InitReason, octaviav1.OctaviaQuotasReadyInitMessage),
 		condition.UnknownCondition(octaviav1.OctaviaAmphoraSSHReadyCondition, condition.InitReason, octaviav1.OctaviaAmphoraSSHReadyInitMessage),
@@ -1020,7 +1020,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		octaviav1.OctaviaAmphoraImagesReadyCondition,
 		octaviav1.OctaviaAmphoraImagesReadyCompleteMessage)
 
-	instance.Status.Conditions.MarkTrue(condition.ExposeServiceReadyCondition, condition.ExposeServiceReadyMessage)
+	instance.Status.Conditions.MarkTrue(condition.CreateServiceReadyCondition, condition.CreateServiceReadyMessage)
 
 	// create Deployment - end
 
@@ -1213,10 +1213,10 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
+			condition.CreateServiceReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
+			condition.CreateServiceReadyErrorMessage,
 			err.Error()))
 
 		return ctrl.Result{}, err
@@ -1231,19 +1231,19 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 	ctrlResult, err = svc.CreateOrPatch(ctx, helper)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
+			condition.CreateServiceReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
-			condition.ExposeServiceReadyErrorMessage,
+			condition.CreateServiceReadyErrorMessage,
 			err.Error()))
 
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
 		instance.Status.Conditions.Set(condition.FalseCondition(
-			condition.ExposeServiceReadyCondition,
+			condition.CreateServiceReadyCondition,
 			condition.RequestedReason,
 			condition.SeverityInfo,
-			condition.ExposeServiceReadyRunningMessage))
+			condition.CreateServiceReadyRunningMessage))
 		return ctrlResult, nil
 	}
 	Log.Info("Initializing amphora image upload deployment")

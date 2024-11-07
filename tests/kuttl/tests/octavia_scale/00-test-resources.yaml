@@ -1,0 +1,12 @@
+apiVersion: kuttl.dev/v1beta1
+kind: TestStep
+commands:
+  - script: |
+      oc kustomize ../../../../config/samples/network-attachment-definition | oc apply -n $NAMESPACE -f -
+  - script: |
+      oc patch -n $NAMESPACE ovncontrollers ovncontroller-sample --type merge -p '
+      spec:
+        external-ids:
+          availability-zones:
+          - zone-1
+      '

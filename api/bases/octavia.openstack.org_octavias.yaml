@@ -125,6 +125,7 @@ spec:
                       type: string
                     type: array
                   createDefaultLbMgmtNetwork:
+                    default: true
                     description: CreateDefaultLbMgmtNetwork - when True, octavia-operator
                       creates a Management Network for the default Availability Zone
                       of the control plane. Can be set to false when deploying OpenStack
@@ -137,6 +138,7 @@ spec:
                       Attachment Definition
                     type: string
                   manageLbMgmtNetworks:
+                    default: true
                     description: ManageLbMgmtNetworks - when True, octavia-operator
                       creates the Neutron resources needed for its Management Network
                     type: boolean

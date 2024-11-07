@@ -220,6 +220,6 @@ func init() {
 
 // IsReady - returns true if service is ready to server requests
 func (instance OctaviaAPI) IsReady() bool {
-	return instance.Status.Conditions.IsTrue(condition.ExposeServiceReadyCondition) &&
+	return instance.Status.Conditions.IsTrue(condition.CreateServiceReadyCondition) &&
 		instance.Status.Conditions.IsTrue(condition.DeploymentReadyCondition)
 }

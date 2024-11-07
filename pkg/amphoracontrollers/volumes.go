@@ -48,9 +48,9 @@ func GetVolumes(name string) []corev1.Volume {
 	)
 }
 
-func GetVolumeMounts(serviceName string) []corev1.VolumeMount {
+func GetInitVolumeMounts() []corev1.VolumeMount {
 	return append(
-		octavia.GetVolumeMounts(serviceName),
+		octavia.GetInitVolumeMounts(),
 		corev1.VolumeMount{
 			Name:      "hm-ports",
 			MountPath: "/var/lib/hmports",

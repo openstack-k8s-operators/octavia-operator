@@ -60,6 +60,10 @@
             "path": "/run/octavia",
             "owner": "octavia:octavia",
             "recurse": true
+        }, {
+            "path": "/etc/httpd/run/",
+            "owner": "octavia:apache",
+            "recurse": true
         }
     ]
 }
