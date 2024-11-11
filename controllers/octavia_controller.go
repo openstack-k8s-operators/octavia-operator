@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -575,8 +576,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		common.AppSelector: octavia.ServiceName,
 	}
 
+	nadList := []networkv1.NetworkAttachmentDefinition{}
 	for _, networkAttachment := range instance.Spec.OctaviaAPI.NetworkAttachments {
-		_, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
+		nad, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
 				Log.Info(fmt.Sprintf("network-attachment-definition %s not found", networkAttachment))
@@ -596,9 +598,13 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 				err.Error()))
 			return ctrl.Result{}, err
 		}
+
+		if nad != nil {
+			nadList = append(nadList, *nad)
+		}
 	}
 
-	serviceAnnotations, err := nad.CreateNetworksAnnotation(instance.Namespace, instance.Spec.OctaviaAPI.NetworkAttachments)
+	serviceAnnotations, err := nad.EnsureNetworksAnnotation(nadList)
 	if err != nil {
 		return ctrl.Result{}, fmt.Errorf("failed create network annotation from %s: %w",
 			instance.Spec.OctaviaAPI.NetworkAttachments, err)
