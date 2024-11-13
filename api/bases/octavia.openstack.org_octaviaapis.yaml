@@ -48,6 +48,10 @@ spec:
           spec:
             description: OctaviaAPISpec defines the desired state of OctaviaAPI
             properties:
+              apiTimeout:
+                description: APITimeout for HAProxy and Apache defaults to OctaviaSpecCore
+                  APITimeout (seconds)
+                type: integer
               containerImage:
                 description: Octavia Container Image URL
                 type: string
