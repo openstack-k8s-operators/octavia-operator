@@ -204,7 +204,7 @@ type OctaviaSpecBase struct {
 	// Apache Container Image URL
 	ApacheContainerImage string `json:"apacheContainerImage"`
 
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=120
 	// Octavia API timeout
 	APITimeout int `json:"apiTimeout"`
