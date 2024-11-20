@@ -133,6 +133,10 @@ func ImageUploadDeployment(
 	}
 	depl.Spec.Template.Spec.InitContainers = initContainer(initContainerDetails)
 
+	if instance.Spec.NodeSelector != nil {
+		depl.Spec.Template.Spec.NodeSelector = *instance.Spec.NodeSelector
+	}
+
 	return depl
 }
 

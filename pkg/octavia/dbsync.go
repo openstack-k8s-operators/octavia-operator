@@ -97,5 +97,9 @@ func DbSyncJob(
 		},
 	}
 
+	if instance.Spec.NodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = *instance.Spec.NodeSelector
+	}
+
 	return job
 }

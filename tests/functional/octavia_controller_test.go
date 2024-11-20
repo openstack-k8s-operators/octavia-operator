@@ -109,6 +109,7 @@ var _ = Describe("Octavia controller", func() {
 	var octaviaName types.NamespacedName
 	var transportURLName types.NamespacedName
 	var transportURLSecretName types.NamespacedName
+	var octaviaDBSyncName types.NamespacedName
 
 	BeforeEach(func() {
 		name = fmt.Sprintf("octavia-%s", uuid.New().String())
@@ -127,6 +128,11 @@ var _ = Describe("Octavia controller", func() {
 		transportURLSecretName = types.NamespacedName{
 			Namespace: namespace,
 			Name:      RabbitmqSecretName,
+		}
+
+		octaviaDBSyncName = types.NamespacedName{
+			Namespace: namespace,
+			Name:      octaviaName.Name + "-db-sync",
 		}
 	})
 
@@ -337,7 +343,7 @@ var _ = Describe("Octavia controller", func() {
 			mariadb.SimulateMariaDBDatabaseCompleted(types.NamespacedName{Namespace: namespace, Name: octavia.DatabaseCRName})
 			mariadb.SimulateMariaDBAccountCompleted(types.NamespacedName{Namespace: namespace, Name: GetOctavia(octaviaName).Spec.PersistenceDatabaseAccount})
 			mariadb.SimulateMariaDBDatabaseCompleted(types.NamespacedName{Namespace: namespace, Name: octavia.PersistenceDatabaseCRName})
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 			octavia := GetOctavia(octaviaName)
 			hostname := "hostname-for-" + octavia.Spec.DatabaseInstance + "." + namespace + ".svc"
 			Expect(octavia.Status.DatabaseHostname).To(Equal(hostname))
@@ -369,7 +375,7 @@ var _ = Describe("Octavia controller", func() {
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
 		It("should set Service Config Ready Condition", func() {
@@ -499,7 +505,7 @@ var _ = Describe("Octavia controller", func() {
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
 		It("should create appropriate resources in Neutron", func() {
@@ -662,7 +668,7 @@ var _ = Describe("Octavia controller", func() {
 			spec["lbMgmtNetwork"].(map[string]interface{})["createDefaultLbMgmtNetwork"] = false
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
 		It("should create appropriate resources in Neutron", func() {
@@ -820,6 +826,95 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+	When("Ocatavia is created with nodeSelector", func() {
+		BeforeEach(func() {
+			spec["nodeSelector"] = map[string]interface{}{
+				"foo": "bar",
+			}
+
+			createAndSimulateKeystone(octaviaName)
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			createAndSimulateDB(spec)
+
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			th.SimulateJobSuccess(octaviaDBSyncName)
+
+			// TODO: assert nodeSelector on more resources when supported
+		})
+
+		It("sets nodeSelector in resource specs", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("updates nodeSelector in resource specs when changed", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				newNodeSelector := map[string]string{
+					"foo2": "bar2",
+				}
+				octavia.Spec.NodeSelector = &newNodeSelector
+				g.Expect(k8sClient.Update(ctx, octavia)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(octaviaDBSyncName)
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo2": "bar2"}))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("removes nodeSelector from resource specs when cleared", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				emptyNodeSelector := map[string]string{}
+				octavia.Spec.NodeSelector = &emptyNodeSelector
+				g.Expect(k8sClient.Update(ctx, octavia)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(octaviaDBSyncName)
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("removes nodeSelector from resource specs when nilled", func() {
+			Eventually(func(g Gomega) {
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(Equal(map[string]string{"foo": "bar"}))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				octavia.Spec.NodeSelector = nil
+				g.Expect(k8sClient.Update(ctx, octavia)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				th.SimulateJobSuccess(octaviaDBSyncName)
+				g.Expect(th.GetJob(octaviaDBSyncName).Spec.Template.Spec.NodeSelector).To(BeNil())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		// It("allows nodeSelector service override", func() {
+		// })
+
+		// It("allows nodeSelector service override to empty", func() {
+		// })
+
+	})
+
 	// Predictable IPs
 
 	// Amphora Controller Daemonsets
@@ -852,7 +947,7 @@ var _ = Describe("Octavia controller", func() {
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
 		It("should set OctaviaAmphoraSSHReady condition", func() {
@@ -913,7 +1008,7 @@ var _ = Describe("Octavia controller", func() {
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
-			th.SimulateJobSuccess(types.NamespacedName{Namespace: namespace, Name: octaviaName.Name + "-db-sync"})
+			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
 		// PENDING https://issues.redhat.com/browse/OSPRH-10543

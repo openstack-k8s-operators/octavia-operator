@@ -1476,6 +1476,10 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		},
 	}
 
+	if instance.Spec.OctaviaAPI.NodeSelector == nil {
+		instance.Spec.OctaviaAPI.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
@@ -1489,9 +1493,6 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.TLS = instance.Spec.OctaviaAPI.TLS
 		deployment.Spec.APITimeout = instance.Spec.APITimeout
 
-		if len(deployment.Spec.NodeSelector) == 0 {
-			deployment.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
 			return err
@@ -1537,6 +1538,10 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		},
 	}
 
+	if controllerSpec.NodeSelector == nil {
+		controllerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
 		daemonset.Spec = controllerSpec
 		daemonset.Spec.Role = role
@@ -1556,9 +1561,6 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
 		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
-		if len(daemonset.Spec.NodeSelector) == 0 {
-			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err
@@ -1618,13 +1620,14 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 		},
 	}
 
+	if controllerSpec.NodeSelector == nil {
+		controllerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
 		daemonset.Spec = controllerSpec
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
-		if len(daemonset.Spec.NodeSelector) == 0 {
-			daemonset.Spec.NodeSelector = instance.Spec.NodeSelector
-		}
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err
