@@ -162,9 +162,13 @@ func (in *OctaviaAPISpecCore) DeepCopyInto(out *OctaviaAPISpecCore) {
 	out.PasswordSelectors = in.PasswordSelectors
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+		*out = new(map[string]string)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]string, len(*in))
+			for key, val := range *in {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.DefaultConfigOverwrite != nil {
@@ -319,9 +323,13 @@ func (in *OctaviaAmphoraControllerSpecCore) DeepCopyInto(out *OctaviaAmphoraCont
 	out.PasswordSelectors = in.PasswordSelectors
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+		*out = new(map[string]string)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]string, len(*in))
+			for key, val := range *in {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.DefaultConfigOverwrite != nil {
@@ -591,9 +599,13 @@ func (in *OctaviaRsyslogSpecCore) DeepCopyInto(out *OctaviaRsyslogSpecCore) {
 	*out = *in
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+		*out = new(map[string]string)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]string, len(*in))
+			for key, val := range *in {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.DefaultConfigOverwrite != nil {
@@ -717,9 +729,13 @@ func (in *OctaviaSpecBase) DeepCopyInto(out *OctaviaSpecBase) {
 	out.PasswordSelectors = in.PasswordSelectors
 	if in.NodeSelector != nil {
 		in, out := &in.NodeSelector, &out.NodeSelector
-		*out = make(map[string]string, len(*in))
-		for key, val := range *in {
-			(*out)[key] = val
+		*out = new(map[string]string)
+		if **in != nil {
+			in, out := *in, *out
+			*out = make(map[string]string, len(*in))
+			for key, val := range *in {
+				(*out)[key] = val
+			}
 		}
 	}
 	if in.DefaultConfigOverwrite != nil {
