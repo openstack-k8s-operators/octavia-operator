@@ -91,6 +91,9 @@ func DbSyncJob(
 		VolumeMounts:   initVolumeMounts,
 	}
 	job.Spec.Template.Spec.InitContainers = InitContainer(initContainerDetails)
+	if instance.Spec.NodeSelector != nil {
+		job.Spec.Template.Spec.NodeSelector = *instance.Spec.NodeSelector
+	}
 
 	return job
 }
