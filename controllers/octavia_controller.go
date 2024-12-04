@@ -52,6 +52,7 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
+	k8s_labels "k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -781,7 +782,11 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	// * do we want to provide a mechanism to temporarily disabling this list
 	// for maintenance windows where nodes might be "coming and going"
 
-	nodes, err := helper.GetKClient().CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	listOpts := metav1.ListOptions{}
+	if instance.Spec.NodeSelector != nil {
+		listOpts.LabelSelector = k8s_labels.Set(*instance.Spec.NodeSelector).String()
+	}
+	nodes, err := helper.GetKClient().CoreV1().Nodes().List(ctx, listOpts)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
