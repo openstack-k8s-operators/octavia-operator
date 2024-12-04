@@ -663,7 +663,7 @@ var _ = Describe("Octavia controller", func() {
 
 			spec["lbMgmtNetwork"].(map[string]interface{})["availabilityZoneCIDRs"] = map[string]string{
 				"az1": "172.34.0.0/16",
-				"az2": "172.44.0.0/16",
+				"az2": "172.44.8.0/21",
 			}
 			spec["lbMgmtNetwork"].(map[string]interface{})["createDefaultLbMgmtNetwork"] = false
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
@@ -763,6 +763,16 @@ var _ = Describe("Octavia controller", func() {
 					CIDR:        nadConfig.IPAM.CIDR.String(),
 				},
 			}
+			expectedAllocationPools := map[string]subnets.AllocationPool{
+				subnetNameAZ1: {
+					Start: "172.34.0.5",
+					End:   "172.34.255.254",
+				},
+				subnetNameAZ2: {
+					Start: "172.44.8.5",
+					End:   "172.44.15.254",
+				},
+			}
 
 			resultSubnets := map[string]subnets.Subnet{}
 			for _, subnet := range apiFixtures.Neutron.Subnets {
@@ -777,6 +787,10 @@ var _ = Describe("Octavia controller", func() {
 				Expect(subnet.NetworkID).To(Equal(expectedSubnet.NetworkID))
 				Expect(subnet.CIDR).To(Equal(expectedSubnet.CIDR))
 				Expect(subnet.HostRoutes).To(Equal(expectedSubnet.HostRoutes))
+				if expectedAllocationPool, ok := expectedAllocationPools[name]; ok {
+					Expect(subnet.AllocationPools[0].Start).To(Equal(expectedAllocationPool.Start))
+					Expect(subnet.AllocationPools[0].End).To(Equal(expectedAllocationPool.End))
+				}
 			}
 
 			// Routers

@@ -55,33 +55,31 @@ func getConfigFromNAD(
 func GetRangeFromCIDR(
 	cidr netip.Prefix,
 ) (start netip.Addr, end netip.Addr) {
-	// For IPv6, a /64 is expected, if the CIDR is aaaa:bbbb:cccc:dddd::/64,
-	// the range is aaaa:bbbb:cccc:dddd::5 - aaaa:bbbb:cccc:dddd:ffff:ffff:ffff:fffe
-	// For IPv4, a /16 is expected, if the CIDR is a.b.0.0/16
-	// the range is a.b.0.5 - a.b.255.254
-	// IPs from from 1 to 5 are reserved for later user
-	addr := cidr.Addr()
-	if addr.Is6() {
-		addrBytes := addr.As16()
-		for i := 8; i < 15; i++ {
-			addrBytes[i] = 0
-		}
-		addrBytes[15] = 5
-		start = netip.AddrFrom16(addrBytes)
-		for i := 8; i < 15; i++ {
-			addrBytes[i] = 0xff
-		}
-		addrBytes[15] = 0xfe
-		end = netip.AddrFrom16(addrBytes)
-	} else {
-		addrBytes := addr.As4()
-		addrBytes[2] = 0
-		addrBytes[3] = 5
-		start = netip.AddrFrom4(addrBytes)
-		addrBytes[2] = 0xff
-		addrBytes[3] = 0xfe
-		end = netip.AddrFrom4(addrBytes)
+	// start is the 5th address of the Cidr
+	start = cidr.Masked().Addr()
+	for i := 0; i < 5; i++ {
+		start = start.Next()
 	}
+
+	bits := cidr.Bits()
+	if start.Is4() {
+		// Padding for ipv4 addresses in a [16]bytes table
+		bits += 96
+	}
+	// convert it to a [16]bytes table, set the remaining bits to 1
+	addrBytes := start.As16()
+	for b := bits; b < 128; b++ {
+		addrBytes[b/8] |= 1 << uint(7-(b%8))
+	}
+	// convert the table to an ip address to get the last IP
+	// in case of IPv4, the address should be unmapped
+	last := netip.AddrFrom16(addrBytes)
+	if start.Is4() {
+		last = last.Unmap()
+	}
+	// end is the 2nd last
+	end = last.Prev()
+
 	return
 }
 
