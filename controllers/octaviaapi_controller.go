@@ -965,6 +965,7 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	templateParameters["TransportURL"] = transportURL
 
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
+	templateParameters["TenantName"] = instance.Spec.TenantName
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()

@@ -366,6 +366,11 @@ spec:
                 default: octavia
                 description: ServiceUser - service user name
                 type: string
+              tenantName:
+                default: service
+                description: TenantName - the name of the OpenStack tenant that controls
+                  the Octavia resources
+                type: string
               tls:
                 description: TLS - Parameters related to the TLS
                 properties:
