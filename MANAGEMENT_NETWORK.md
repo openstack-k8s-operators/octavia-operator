@@ -316,3 +316,24 @@ The `fixed_ips`, `device_id` and `device_owner` are all of interest:
 * `fixed_ips` will match the IP for the `interfaces_info` of the `octavia-link-router`
 * `device_id` will match the ID for the `octavia-link-router`
 * `device_owner` indicates that OpenStack is using the port as a router interface
+
+## Running the Octavia Amphora Controller Pods on specific Nodes
+
+By default, the Amphora Controller pods are deployed on all the nodes of a
+cluster. In case of a cluster with a high number of nodes, it's not needed,
+it's preferable to use only 3 nodes.
+An admin can limit the number of instances of these services by using
+a `nodeSelector`. They add a label on specific nodes to indicate that they will
+host the Octavia services.
+
+For instance, set a label on master-2:
+
+```shell
+$ oc patch nodes master-2 --type merge --patch '{"metadata":{"labels":{"openstack.org/octavia-controller":""}}}'
+```
+
+Make the Octavia services run only on these nodes:
+
+```shell
+$ oc patch -n openstack openstackcontrolplane controlplane --type merge --patch '{"spec":{"octavia":{"template":{"nodeSelector":{"openstack.org/octavia-controller":""}}}}}'
+```
