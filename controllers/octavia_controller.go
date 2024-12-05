@@ -1416,6 +1416,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 		),
 	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
+	templateParameters["TenantName"] = instance.Spec.TenantName
 
 	cms := []util.Template{
 		{
@@ -1487,6 +1488,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		deployment.Spec.PersistenceDatabaseAccount = instance.Spec.PersistenceDatabaseAccount
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
+		deployment.Spec.TenantName = instance.Spec.TenantName
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
@@ -1550,6 +1552,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.DatabaseAccount = instance.Spec.DatabaseAccount
 		daemonset.Spec.PersistenceDatabaseAccount = instance.Spec.PersistenceDatabaseAccount
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
+		daemonset.Spec.TenantName = instance.Spec.TenantName
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()

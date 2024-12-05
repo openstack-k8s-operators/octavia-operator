@@ -120,7 +120,6 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=service
 	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
-	// TODO(gthiemonge) same as ServiceAccount?
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
