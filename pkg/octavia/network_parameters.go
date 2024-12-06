@@ -135,18 +135,6 @@ func GetNetworkParametersFromNAD(
 	if len(nadConfig.IPAM.Routes) > 0 {
 		networkParameters.TenantCIDR = nadConfig.IPAM.Routes[0].Destination
 
-		// For IPv4, we require a /16 subnet, for IPv6 a /64
-		var bitlen int
-		if networkParameters.TenantCIDR.Addr().Is6() {
-			bitlen = 64
-		} else {
-			bitlen = 16
-		}
-
-		if networkParameters.TenantCIDR.Bits() != bitlen {
-			return nil, fmt.Errorf("the tenant CIDR is /%d, it should be /%d", networkParameters.TenantCIDR.Bits(), bitlen)
-		}
-
 		// Compute an allocation range based on the CIDR
 		start, end := GetRangeFromCIDR(networkParameters.TenantCIDR)
 		networkParameters.TenantAllocationStart = start
