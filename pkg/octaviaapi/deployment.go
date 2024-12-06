@@ -158,7 +158,8 @@ func Deployment(
 					SecurityContext: &corev1.PodSecurityContext{
 						FSGroup: ptr.To(octavia.OctaviaUID),
 					},
-					ServiceAccountName: instance.Spec.ServiceAccount,
+					ServiceAccountName:           instance.Spec.ServiceAccount,
+					AutomountServiceAccountToken: ptr.To(false),
 					Containers: []corev1.Container{
 						{
 							Name: serviceName,
