@@ -138,6 +138,11 @@ type OctaviaAPISpecCore struct {
 	NetworkAttachments []string `json:"networkAttachments,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=service
+	// TenantName - the name of the OpenStack tenant that controls the Octavia resources
+	TenantName string `json:"tenantName"`
+
+	// +kubebuilder:validation:Optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS OctaviaApiTLS `json:"tls,omitempty"`
