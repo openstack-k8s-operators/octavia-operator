@@ -98,6 +98,7 @@ spec:
                   - octavia-api
               topologyKey: kubernetes.io/hostname
             weight: 100
+      automountServiceAccountToken: false
       containers:
       - args:
         - -c
