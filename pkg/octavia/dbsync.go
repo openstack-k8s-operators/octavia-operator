@@ -68,8 +68,9 @@ func DbSyncJob(
 					SecurityContext: &corev1.PodSecurityContext{
 						FSGroup: ptr.To(OctaviaUID),
 					},
-					RestartPolicy:      corev1.RestartPolicyOnFailure,
-					ServiceAccountName: instance.RbacResourceName(),
+					RestartPolicy:                corev1.RestartPolicyOnFailure,
+					ServiceAccountName:           instance.RbacResourceName(),
+					AutomountServiceAccountToken: ptr.To(false),
 					Containers: []corev1.Container{
 						{
 							Name:            ServiceName + "-db-sync",

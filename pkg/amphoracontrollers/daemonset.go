@@ -147,6 +147,7 @@ func DaemonSet(
 					},
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 					ServiceAccountName:            instance.Spec.ServiceAccount,
+					AutomountServiceAccountToken:  ptr.To(false),
 					Containers: []corev1.Container{
 						{
 							Name:            serviceName,
