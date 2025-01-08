@@ -538,17 +538,25 @@ var _ = Describe("Octavia controller", func() {
 				},
 			}
 
-			resultNetworks := map[string]networks.Network{}
+			resultNetworks := map[string]Network{}
 			for _, network := range apiFixtures.Neutron.Networks {
 				resultNetworks[network.Name] = network
 			}
 			Expect(resultNetworks).To(HaveLen(2))
 			for name, expectedNetwork := range expectedNetworks {
 				network := resultNetworks[name]
-				Expect(network).ToNot(Equal(networks.Network{}), "Network %s doesn't appear to exist", name)
+				Expect(network).ToNot(Equal(Network{}), "Network %s doesn't appear to exist", name)
 				Expect(network.Description).To(Equal(expectedNetwork.Description))
 				Expect(network.TenantID).To(Equal(expectedNetwork.TenantID))
 				Expect(network.AvailabilityZoneHints).To(Equal(expectedNetwork.AvailabilityZoneHints))
+			}
+
+			Expect(apiFixtures.Neutron.RBACs).To(HaveLen(1))
+			for _, rbacPolicy := range apiFixtures.Neutron.RBACs {
+				providerNetwork := resultNetworks[octavia.LbProvNetName]
+				Expect(rbacPolicy.ObjectID).To(Equal(providerNetwork.ID))
+				Expect(rbacPolicy.TenantID).To(Equal(providerNetwork.TenantID))
+				Expect(rbacPolicy.TargetTenant).To(Equal(providerNetwork.TenantID))
 			}
 
 			lbMgmtPortAddress := ""
@@ -708,14 +716,14 @@ var _ = Describe("Octavia controller", func() {
 				},
 			}
 
-			resultNetworks := map[string]networks.Network{}
+			resultNetworks := map[string]Network{}
 			for _, network := range apiFixtures.Neutron.Networks {
 				resultNetworks[network.Name] = network
 			}
 			Expect(resultNetworks).To(HaveLen(3))
 			for name, expectedNetwork := range expectedNetworks {
 				network := resultNetworks[name]
-				Expect(network).ToNot(Equal(networks.Network{}), "Network %s doesn't appear to exist", name)
+				Expect(network).ToNot(Equal(Network{}), "Network %s doesn't appear to exist", name)
 				Expect(network.Description).To(Equal(expectedNetwork.Description))
 				Expect(network.TenantID).To(Equal(expectedNetwork.TenantID))
 				Expect(network.AvailabilityZoneHints).To(Equal(expectedNetwork.AvailabilityZoneHints))

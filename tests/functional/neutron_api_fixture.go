@@ -25,26 +25,35 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/quotas"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/rbacpolicies"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
+
+type Network struct {
+	networks.Network
+	external.NetworkExternalExt
+}
 
 type NeutronAPIFixture struct {
 	api.APIFixture
 	Quotas         map[string]quotas.Quota
 	DefaultQuota   quotas.Quota
-	Networks       map[string]networks.Network
+	Networks       map[string]Network
 	Subnets        map[string]subnets.Subnet
 	SecGroups      map[string]groups.SecGroup
 	Ports          map[string]ports.Port
 	Routers        map[string]routers.Router
 	InterfaceInfos map[string]routers.InterfaceInfo
+	RBACs          map[string]rbacpolicies.RBACPolicy
 }
 
 func (f *NeutronAPIFixture) registerHandler(handler api.Handler) {
@@ -63,6 +72,8 @@ func (f *NeutronAPIFixture) Setup() {
 	f.registerHandler(api.Handler{Pattern: "/v2.0/routers/", Func: f.routerHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/routers", Func: f.routerHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/quotas/", Func: f.quotasHandler})
+	f.registerHandler(api.Handler{Pattern: "/v2.0/rbac-policies/", Func: f.rbacHandler})
+	f.registerHandler(api.Handler{Pattern: "/v2.0/rbac-policies", Func: f.rbacHandler})
 }
 
 // Network
@@ -83,9 +94,9 @@ func (f *NeutronAPIFixture) getNetwork(w http.ResponseWriter, r *http.Request) {
 	items := strings.Split(r.URL.Path, "/")
 	if len(items) == 4 {
 		var n struct {
-			Networks []networks.Network `json:"networks"`
+			Networks []Network `json:"networks"`
 		}
-		n.Networks = []networks.Network{}
+		n.Networks = []Network{}
 		query := r.URL.Query()
 		name := query["name"]
 		tenantID := query["tenant_id"]
@@ -118,7 +129,7 @@ func (f *NeutronAPIFixture) postNetwork(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var n struct {
-		Network networks.Network `json:"network"`
+		Network Network `json:"network"`
 	}
 
 	err = json.Unmarshal(bytes, &n)
@@ -130,6 +141,19 @@ func (f *NeutronAPIFixture) postNetwork(w http.ResponseWriter, r *http.Request) 
 	networkID := uuid.New().String()
 	n.Network.ID = networkID
 	f.Networks[networkID] = n.Network
+
+	// Note(gthiemonge) it seems that router:external is not correctly
+	// unmarshall by the go code, let's assume that only octavia-provider-net is
+	// an external network
+	if n.Network.Name == octavia.LbProvNetName {
+		rbacID := uuid.New().String()
+		f.RBACs[rbacID] = rbacpolicies.RBACPolicy{
+			ID:           rbacID,
+			ObjectID:     networkID,
+			TenantID:     n.Network.TenantID,
+			TargetTenant: "*",
+		}
+	}
 
 	bytes, err = json.Marshal(&n)
 	if err != nil {
@@ -624,6 +648,78 @@ func (f *NeutronAPIFixture) putQuotas(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprint(w, string(bytes))
 }
 
+func (f *NeutronAPIFixture) rbacHandler(w http.ResponseWriter, r *http.Request) {
+	f.LogRequest(r)
+	switch r.Method {
+	case "GET":
+		f.getRBAC(w, r)
+	case "PUT":
+		f.putRBAC(w, r)
+	default:
+		f.UnexpectedRequest(w, r)
+		return
+	}
+}
+
+func (f *NeutronAPIFixture) getRBAC(w http.ResponseWriter, r *http.Request) {
+	items := strings.Split(r.URL.Path, "/")
+	if len(items) == 4 {
+		var resp struct {
+			RBACs []rbacpolicies.RBACPolicy `json:"rbac_policies"`
+		}
+		resp.RBACs = []rbacpolicies.RBACPolicy{}
+		query := r.URL.Query()
+		objectID := query["object_id"][0]
+		tenantID := query["tenant_id"][0]
+		targetTenant := query["target_tenant"][0]
+		for _, rbac := range f.RBACs {
+			if objectID == rbac.ObjectID &&
+				tenantID == rbac.TenantID &&
+				targetTenant == rbac.TargetTenant {
+				resp.RBACs = append(resp.RBACs, rbac)
+			}
+		}
+		bytes, err := json.Marshal(&resp)
+		if err != nil {
+			f.InternalError(err, "Error during marshalling response", w, r)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, string(bytes))
+	}
+}
+
+func (f *NeutronAPIFixture) putRBAC(w http.ResponseWriter, r *http.Request) {
+	items := strings.Split(r.URL.Path, "/")
+	rbacID := items[len(items)-1]
+
+	bytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		f.InternalError(err, "Error reading request body", w, r)
+		return
+	}
+	var rbac struct {
+		RBAC rbacpolicies.RBACPolicy `json:"rbac_policy"`
+	}
+	err = json.Unmarshal(bytes, &rbac)
+	if err != nil {
+		f.InternalError(err, "Error during unmarshalling request", w, r)
+		return
+	}
+	updatedRBAC := f.RBACs[rbacID]
+	if rbac.RBAC.TargetTenant != "" {
+		updatedRBAC.TargetTenant = rbac.RBAC.TargetTenant
+	}
+	f.APIFixture.Log.Info(fmt.Sprintf("Set RBAC %s to %+v\n", rbacID, updatedRBAC))
+	f.RBACs[rbacID] = updatedRBAC
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(200)
+	fmt.Fprint(w, string(bytes))
+}
+
 func NewNeutronAPIFixtureWithServer(log logr.Logger) *NeutronAPIFixture {
 	server := &api.FakeAPIServer{}
 	server.Setup(log)
@@ -646,12 +742,13 @@ func AddNeutronAPIFixture(log logr.Logger, server *api.FakeAPIServer) *NeutronAP
 			SecurityGroupRule: 10,
 		},
 		Quotas:         map[string]quotas.Quota{},
-		Networks:       map[string]networks.Network{},
+		Networks:       map[string]Network{},
 		Subnets:        map[string]subnets.Subnet{},
 		SecGroups:      map[string]groups.SecGroup{},
 		Ports:          map[string]ports.Port{},
 		Routers:        map[string]routers.Router{},
 		InterfaceInfos: map[string]routers.InterfaceInfo{},
+		RBACs:          map[string]rbacpolicies.RBACPolicy{},
 	}
 	return fixture
 }

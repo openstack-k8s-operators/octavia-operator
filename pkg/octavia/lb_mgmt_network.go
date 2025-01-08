@@ -24,6 +24,7 @@ import (
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider"
+	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/rbacpolicies"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
 	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
@@ -356,6 +357,35 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 	provNet, err := ensureNetworkExt(client, createOpts, log, serviceTenantID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Creating an external network adds a RBAC rule to allow all the tenants to use the network.
+	// Update this rule to make it accessible only by the owner of the network.
+	// This also fixes the already existing network after an update
+	listOpts := rbacpolicies.ListOpts{
+		TenantID:     serviceTenantID,
+		ObjectID:     provNet.ID,
+		TargetTenant: "*",
+	}
+	allPages, err := rbacpolicies.List(client, listOpts).AllPages()
+	if err != nil {
+		return nil, err
+	}
+
+	allRBACPolicies, err := rbacpolicies.ExtractRBACPolicies(allPages)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, rbacpolicy := range allRBACPolicies {
+		updateOpts := rbacpolicies.UpdateOpts{
+			TargetTenant: serviceTenantID,
+		}
+
+		_, err := rbacpolicies.Update(client, rbacpolicy.ID, updateOpts).Extract()
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Cannot update RBAC policy %s", rbacpolicy.ID))
+		}
 	}
 
 	return provNet, nil
