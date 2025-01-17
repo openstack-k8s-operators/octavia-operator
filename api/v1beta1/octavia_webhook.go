@@ -38,6 +38,7 @@ type OctaviaDefaults struct {
 	WorkerContainerImageURL        string
 	ApacheContainerImageURL        string
 	OctaviaAPIRouteTimeout         int
+	RsyslogContainerImageURL       string
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -85,6 +86,9 @@ func (spec *OctaviaSpec) Default() {
 	}
 	if spec.ApacheContainerImage == "" {
 		spec.ApacheContainerImage = octaviaDefaults.ApacheContainerImageURL
+	}
+	if spec.OctaviaRsyslog.ContainerImage == "" {
+		spec.OctaviaRsyslog.ContainerImage = octaviaDefaults.RsyslogContainerImageURL
 	}
 }
 
