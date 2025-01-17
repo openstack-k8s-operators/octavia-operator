@@ -232,6 +232,9 @@ commands:
             APACHE)
               template='{{.spec.apacheContainerImage}}'
               ;;
+            RSYSLOG)
+              template='{{.spec.octaviaRsyslog.containerImage}}'
+              ;;
           esac
           SERVICE_IMAGE=$(oc get -n $NAMESPACE octavia octavia -o go-template="$template")
           if [ "$SERVICE_IMAGE" != "$IMG_FROM_ENV" ]; then
