@@ -26,7 +26,9 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+
 	//revive:disable-next-line:dot-imports
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -301,6 +303,107 @@ var _ = Describe("OctaviaAPI controller", func() {
 			conf := string(configData.Data["custom.conf"])
 			Expect(conf).Should(
 				ContainSubstring("[DEFAULT]\ndebug=True\n"))
+		})
+	})
+
+	When("A OctaviaAPI is created with HttpdCustomization.CustomConfigSecret", func() {
+		var keystoneInternalEndpoint string
+		var keystonePublicEndpoint string
+
+		BeforeEach(func() {
+			customServiceConfigSecretName := types.NamespacedName{Name: "foo", Namespace: namespace}
+			customConfig := []byte(`CustomParam "foo"
+CustomKeystonePublicURL "{{ .KeystonePublicURL }}"`)
+			th.CreateSecret(
+				customServiceConfigSecretName,
+				map[string][]byte{
+					"bar.conf": customConfig,
+				},
+			)
+
+			keystoneName := keystone.CreateKeystoneAPI(namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneName)
+			keystoneInternalEndpoint = fmt.Sprintf("http://keystone-for-%s-internal", octaviaAPIName.Name)
+			keystonePublicEndpoint = fmt.Sprintf("http://keystone-for-%s-public", octaviaAPIName.Name)
+			SimulateKeystoneReady(keystoneName, keystonePublicEndpoint, keystoneInternalEndpoint)
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(namespace))
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
+
+			spec["httpdCustomization"] = map[string]interface{}{
+				"customConfigSecret": customServiceConfigSecretName.Name,
+			}
+
+			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
+
+			mariaDBDatabaseName := mariadb.CreateMariaDBDatabase(namespace, octavia.DatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase := mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			octaviaAPI := GetOctaviaAPI(octaviaAPIName)
+			apiMariaDBAccount, apiMariaDBSecret := mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.DatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+
+			mariaDBDatabaseName = mariadb.CreateMariaDBDatabase(namespace, octavia.PersistenceDatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase = mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			apiMariaDBAccount, apiMariaDBSecret = mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.PersistenceDatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+
+			ovndbCluster := ovn.CreateOVNDBCluster(namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+		})
+
+		It("it renders the custom template and adds it to the placement-config-data secret", func() {
+			scrt := th.GetSecret(
+				types.NamespacedName{
+					Namespace: octaviaAPIName.Namespace,
+					Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
+			Expect(scrt).ShouldNot(BeNil())
+			Expect(scrt.Data).Should(HaveKey(common.TemplateParameters))
+			configData := string(scrt.Data[common.TemplateParameters])
+			Expect(configData).Should(ContainSubstring(fmt.Sprintf("KeystonePublicURL: %s", keystonePublicEndpoint)))
+
+			for _, cfg := range []string{"httpd_custom_internal_bar.conf", "httpd_custom_public_bar.conf"} {
+				Expect(scrt.Data).Should(HaveKey(cfg))
+				configData := string(scrt.Data[cfg])
+				Expect(configData).Should(ContainSubstring("CustomParam \"foo\""))
+				Expect(configData).Should(ContainSubstring(fmt.Sprintf("CustomKeystonePublicURL \"%s\"", keystonePublicEndpoint)))
+			}
 		})
 	})
 
