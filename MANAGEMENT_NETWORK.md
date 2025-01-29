@@ -34,17 +34,15 @@ interface for the VLAN interfaces configured for network isolation on your
 OpenShift nodes.
 
 The vlan interface is added as a port to the `octbr` bridge to allow pods
- connected to `octavia` network attachment to communicate with pods running on
-other worker nodes. As it is a VLAN interfaces, it also provides desirable
+connected to `octavia` network attachment to communicate with pods running on
+other worker nodes. As it is a VLAN interface, it also provides desirable
 isolation from other networks that might share the same base interface or the
 physical medium that the base interface is connected to.
 
-```sh
-oc get -n openstack --no-headers nncp | cut -f 1 -d ' ' | while read ; do
-    oc patch -n openstack nncp $REPLY --type=merge --patch '
-    spec:
-      desiredState:
-        interfaces:
+In general, the following interfaces must be added to each relevant
+`NodeNetworkConfigurationPolicy` in the cluster.
+
+```
         - description: Octavia vlan host interface
           name: enp6s0.24
           state: up
@@ -63,7 +61,50 @@ oc get -n openstack --no-headers nncp | cut -f 1 -d ' ' | while read ; do
           name: octbr
           state: up
           type: linux-bridge
-    '
+```
+
+This changes can be affected by editing the policy directly with `oc edit` or
+by modifying the `NodeNetworkConfigurationPolicy` yaml files used for
+deployment and applying `oc apply`. The edits can also be made using JSON patch
+commands similar to the following:
+
+```sh
+oc get -n openstack --no-headers nncp | cut -f 1 -d ' ' | while read; do
+
+interfaces=$(oc get nncp $REPLY -o jsonpath="{.spec.desiredState.interfaces[*].name}")
+
+(echo $interfaces | grep -w -q "octbr|enp6s0.24") || \
+        oc patch -n openstack nncp $REPLY --type json --patch '
+[{
+    "op": "add",
+    "path": "/spec/desiredState/interfaces/-",
+    "value": {
+       "description": "Octavia VLAN host interface",
+       "name": "enp6s0.24",
+       "state": "up",
+       "type": "vlan",
+       "vlan": {
+         "base-iface": "enp6s0",
+         "id": 24
+         }
+    }
+},
+{
+    "op": "add",
+    "path": "/spec/desiredState/interfaces/-",
+    "value": {
+       "description": "Octavia Bridge",
+       "mtu": 1500,
+       "state": "up",
+       "type": "linux-bridge",
+       "name": "octbr",
+       "bridge": {
+         "options": { "stp": { "enabled": "false" } },
+         "port": [ { "name": "enp6s0.24" } ]
+         }
+    }
+}]'
+
 done
 ```
 
