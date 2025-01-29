@@ -31,6 +31,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
+	"gopkg.in/yaml.v2"
 
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
@@ -387,6 +388,13 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 	spec := instance.Spec
 	templateParameters["ServiceUser"] = spec.ServiceUser
 
+	// Marshal the templateParameters map to YAML
+	yamlData, err := yaml.Marshal(templateParameters)
+	if err != nil {
+		return fmt.Errorf("Error marshalling to YAML: %w", err)
+	}
+	customData[common.TemplateParameters] = string(yamlData)
+
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
 		// ScriptsConfigMap
@@ -409,7 +417,7 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 		},
 	}
 
-	err := oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
+	err = oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
 	if err != nil {
 		r.Log.Error(err, "unable to process config map")
 		return err

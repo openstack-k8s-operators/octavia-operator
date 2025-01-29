@@ -43,6 +43,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
+	"gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -223,11 +224,12 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 
 // fields to index to reconcile when change
 const (
-	passwordSecretField     = ".spec.secret"
-	caBundleSecretNameField = ".spec.tls.caBundleSecretName"
-	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
-	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
-	tlsOvnField             = ".spec.tls.ovn.secretName"
+	passwordSecretField                 = ".spec.secret"
+	caBundleSecretNameField             = ".spec.tls.caBundleSecretName"
+	tlsAPIInternalField                 = ".spec.tls.api.internal.secretName"
+	tlsAPIPublicField                   = ".spec.tls.api.public.secretName"
+	tlsOvnField                         = ".spec.tls.ovn.secretName"
+	httpdCustomServiceConfigSecretField = ".spec.httpdCustomization.customServiceConfigSecret"
 )
 
 var (
@@ -237,6 +239,7 @@ var (
 		tlsAPIInternalField,
 		tlsAPIPublicField,
 		tlsOvnField,
+		httpdCustomServiceConfigSecretField,
 	}
 )
 
@@ -1423,6 +1426,13 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["TenantName"] = instance.Spec.TenantName
 
+	// Marshal the templateParameters map to YAML
+	yamlData, err := yaml.Marshal(templateParameters)
+	if err != nil {
+		return fmt.Errorf("Error marshalling to YAML: %w", err)
+	}
+	customData[common.TemplateParameters] = string(yamlData)
+
 	cms := []util.Template{
 		{
 			Name:               fmt.Sprintf("%s-scripts", instance.Name),
@@ -1442,7 +1452,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 			Labels:        cmLabels,
 		},
 	}
-	err := oko_secret.EnsureSecrets(ctx, h, instance, cms, envVars)
+	err = oko_secret.EnsureSecrets(ctx, h, instance, cms, envVars)
 	if err != nil {
 		return err
 	}
