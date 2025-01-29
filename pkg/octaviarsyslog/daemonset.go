@@ -118,11 +118,8 @@ func DaemonSet(
 					},
 					InitContainers: []corev1.Container{
 						{
-							Name: "init",
-							// TODO(gthiemonge) Using Octavia HM Container image is a workaround to get a container with pyroute2
-							// Replace it by an init container image with pyroute2 when it's available
-							// OSPRH-8434
-							Image: octaviav1.OctaviaHealthManagerContainerImage,
+							Name:  "init",
+							Image: instance.Spec.InitContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								RunAsUser: ptr.To(int64(0)),
 								Capabilities: &corev1.Capabilities{
