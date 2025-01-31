@@ -38,6 +38,7 @@ type OctaviaDefaults struct {
 	WorkerContainerImageURL        string
 	ApacheContainerImageURL        string
 	OctaviaAPIRouteTimeout         int
+	RsyslogContainerImageURL       string
 }
 
 var octaviaDefaults OctaviaDefaults
@@ -85,6 +86,15 @@ func (spec *OctaviaSpec) Default() {
 	}
 	if spec.ApacheContainerImage == "" {
 		spec.ApacheContainerImage = octaviaDefaults.ApacheContainerImageURL
+	}
+	if spec.OctaviaRsyslog.ContainerImage == "" {
+		spec.OctaviaRsyslog.ContainerImage = octaviaDefaults.RsyslogContainerImageURL
+	}
+	if spec.OctaviaRsyslog.InitContainerImage == "" {
+		// TODO(gthiemonge) Using Octavia HM Container image is a workaround to get a container with pyroute2
+		// Replace it by an init container image with pyroute2 when it's available
+		// OSPRH-8434
+		spec.OctaviaRsyslog.InitContainerImage = octaviaDefaults.HealthManagerContainerImageURL
 	}
 }
 

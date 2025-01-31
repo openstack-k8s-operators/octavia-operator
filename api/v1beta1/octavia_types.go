@@ -41,6 +41,9 @@ const (
 	// ApacheImage - default fall-back image for Apache
 	ApacheContainerImage = "registry.redhat.io/ubi9/httpd-24:latest"
 
+	// OctaviaRsyslogContainer image is the fall-back container image for OctaviaRsyslog
+	RsyslogContainerImage = "quay.io/podified-antelope-centos9/openstack-rsyslog:current-podified"
+
 	// Octavia API timeout
 	APITimeout = 120
 )
@@ -369,6 +372,7 @@ func SetupDefaults() {
 		HealthManagerContainerImageURL: util.GetEnvVar("RELATED_IMAGE_OCTAVIA_HEALTHMANAGER_IMAGE_URL_DEFAULT", OctaviaHealthManagerContainerImage),
 		WorkerContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_WORKER_IMAGE_URL_DEFAULT", OctaviaWorkerContainerImage),
 		ApacheContainerImageURL:        util.GetEnvVar("RELATED_IMAGE_OCTAVIA_APACHE_IMAGE_URL_DEFAULT", ApacheContainerImage),
+		RsyslogContainerImageURL:       util.GetEnvVar("RELATED_IMAGE_OCTAVIA_RSYSLOG_IMAGE_URL_DEFAULT", RsyslogContainerImage),
 		OctaviaAPIRouteTimeout:         APITimeout,
 		// No default for AmphoraImageContainerImageURL
 	}
