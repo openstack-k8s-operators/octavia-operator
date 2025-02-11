@@ -17,6 +17,7 @@ package amphoracontrollers
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
@@ -94,8 +95,14 @@ func DaemonSet(
 	}
 	envVars["MGMT_GATEWAY"] = env.SetValue(instance.Spec.OctaviaProviderSubnetGateway)
 
-	for idx, subnetCIDR := range instance.Spec.OctaviaProviderSubnetExtraCIDRs {
-		envVars[fmt.Sprintf("MGMT_CIDR%d", idx)] = env.SetValue(subnetCIDR)
+	if len(instance.Spec.OctaviaProviderSubnetExtraCIDRs) > 0 {
+		// Sort the array to make it stable across calls to reconcile
+		var extraCIDRs = make([]string, len(instance.Spec.OctaviaProviderSubnetExtraCIDRs))
+		copy(extraCIDRs, instance.Spec.OctaviaProviderSubnetExtraCIDRs)
+		sort.Strings(extraCIDRs)
+		for idx, subnetCIDR := range extraCIDRs {
+			envVars[fmt.Sprintf("MGMT_CIDR%d", idx)] = env.SetValue(subnetCIDR)
+		}
 	}
 
 	// Add the CA bundle
