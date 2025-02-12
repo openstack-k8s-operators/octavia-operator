@@ -1,0 +1,9 @@
+#
+# Check for:
+#
+# - octavia-topology
+
+apiVersion: topology.openstack.org/v1beta1
+kind: Topology
+metadata:
+  name: octavia-topology

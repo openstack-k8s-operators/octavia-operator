@@ -1,0 +1,12 @@
+apiVersion: topology.openstack.org/v1beta1
+kind: Topology
+metadata:
+  name: octavia-topology
+spec:
+  topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: "topology.kubernetes.io/hostname"
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        service: octavia

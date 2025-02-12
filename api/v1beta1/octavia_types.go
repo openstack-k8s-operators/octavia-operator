@@ -21,6 +21,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
 
 const (
@@ -216,6 +217,11 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:default=octavia
 	// OctaviaNetworkAttachment is a NetworkAttachment resource name for the Octavia Management Network
 	OctaviaNetworkAttachment string `json:"octaviaNetworkAttachment"`
+
+	// +kubebuilder:validation:Optional
+	// TopologyRef to apply the Topology defined by the associated CR referenced
+	// by name
+	TopologyRef *topologyv1.TopoRef `json:"topologyRef,omitempty"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret

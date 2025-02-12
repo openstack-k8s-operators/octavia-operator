@@ -37,6 +37,8 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func createAndSimulateKeystone(
@@ -848,7 +850,7 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
-	When("Ocatavia is created with nodeSelector", func() {
+	When("Octavia is created with nodeSelector", func() {
 		BeforeEach(func() {
 			spec["nodeSelector"] = map[string]interface{}{
 				"foo": "bar",
@@ -1040,5 +1042,32 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+	It("rejects a wrong TopologyRef on a different namespace", func() {
+		spec := GetDefaultOctaviaSpec()
+
+		// Inject a topologyRef that points to a different namespace
+		spec["topologyRef"] = map[string]interface{}{
+			"name":      "foo",
+			"namespace": "bar",
+		}
+		raw := map[string]interface{}{
+			"apiVersion": "octavia.openstack.org/v1beta1",
+			"kind":       "Octavia",
+			"metadata": map[string]interface{}{
+				"name":      octaviaName.Name,
+				"namespace": octaviaName.Namespace,
+			},
+			"spec": spec,
+		}
+
+		unstructuredObj := &unstructured.Unstructured{Object: raw}
+		_, err := controllerutil.CreateOrPatch(
+			th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
+		Expect(err).To(HaveOccurred())
+		Expect(err.Error()).To(
+			ContainSubstring(
+				"Invalid value: \"namespace\": Customizing namespace field is not supported"),
+		)
+	})
 	// Amphora Image
 })
