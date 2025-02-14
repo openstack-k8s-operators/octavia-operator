@@ -903,7 +903,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrl.Result{}, nil
 	}
 
-	octaviaRsyslog, op, err := r.octaviaRsyslogDaemonSetCreateOrUpdate(instance, instance.Spec.OctaviaRsyslog)
+	octaviaRsyslog, op, err := r.octaviaRsyslogDaemonSetCreateOrUpdate(instance, networkInfo, instance.Spec.OctaviaRsyslog)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
@@ -1617,6 +1617,7 @@ func amphoraControllerErrorMessage(role string) string {
 
 func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
+	networkInfo octavia.NetworkProvisioningSummary,
 	controllerSpec octaviav1.OctaviaRsyslogSpec,
 ) (*octaviav1.OctaviaRsyslog,
 	controllerutil.OperationResult, error) {
@@ -1636,6 +1637,9 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 		daemonset.Spec = controllerSpec
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
+		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
+		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
+		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err

@@ -77,6 +77,19 @@ type OctaviaRsyslogSpecCore struct {
 	// TenantLogTargets is a list of OctaviaRsyslogTarget, the tenant logs are forwarded to those targets.
 	// Use only when forwarding to an external Rsyslog server.
 	TenantLogTargets []OctaviaRsyslogTarget `json:"tenantLogTargets,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaProviderSubnetGateway -
+	OctaviaProviderSubnetGateway string `json:"octaviaProviderSubnetGateway"`
+
+	// +kubebuilder:validation:Optional
+	// OctaviaProviderSubnetCIDR -
+	OctaviaProviderSubnetCIDR string `json:"octaviaProviderSubnetCIDR"`
+
+	// +kubebuilder:validation:Optional
+	// +listType:=atomic
+	// OctaviaProviderSubnetExtraCIDRs -
+	OctaviaProviderSubnetExtraCIDRs []string `json:"octaviaProviderSubnetExtraCIDRs,omitempty"`
 }
 
 // OctaviaRsyslogStatus defines the observed state of the Octavia Amphora Controller
