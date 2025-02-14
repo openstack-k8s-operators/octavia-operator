@@ -98,6 +98,18 @@ spec:
                 description: NodeSelector to target subset of worker nodes running
                   this service
                 type: object
+              octaviaProviderSubnetCIDR:
+                description: OctaviaProviderSubnetCIDR -
+                type: string
+              octaviaProviderSubnetExtraCIDRs:
+                description: OctaviaProviderSubnetExtraCIDRs -
+                items:
+                  type: string
+                type: array
+                x-kubernetes-list-type: atomic
+              octaviaProviderSubnetGateway:
+                description: OctaviaProviderSubnetGateway -
+                type: string
               resources:
                 description: Resources - Compute Resources required by this service
                   (Limits/Requests). https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
