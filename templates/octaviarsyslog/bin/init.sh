@@ -24,6 +24,22 @@ for dir in /var/lib/config-data/default; do
     merge_config_dir ${dir}
 done
 
+# Network configuration
+if [ "$MGMT_CIDR" != "" ]; then
+    /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$MGMT_CIDR" "$MGMT_GATEWAY"
+fi
+
+idx=0
+while true; do
+    var_name="MGMT_CIDR${idx}"
+    cidr="${!var_name}"
+    if [ "$cidr" = "" ]; then
+        break
+    fi
+    /usr/local/bin/container-scripts/octavia_mgmt_subnet_route.py octavia "$cidr" "$MGMT_GATEWAY"
+    idx=$((idx+1))
+done
+
 /usr/local/bin/container-scripts/setipalias.py octavia rsyslog
 /usr/local/bin/container-scripts/octavia_hm_advertisement.py octavia
 
