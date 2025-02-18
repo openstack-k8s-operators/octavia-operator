@@ -173,7 +173,7 @@ var _ = Describe("OctaviaAPI controller", func() {
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
 
-			ovndbCluster := ovn.CreateOVNDBCluster(namespace,
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
 				ovnv1.OVNDBClusterSpec{
 					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
 						DBType: ovnv1.NBDBType,
@@ -186,7 +186,7 @@ var _ = Describe("OctaviaAPI controller", func() {
 			}).Should(Succeed())
 			ovn.SimulateOVNDBClusterReady(ovndbCluster)
 
-			ovndbCluster = ovn.CreateOVNDBCluster(namespace,
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
 				ovnv1.OVNDBClusterSpec{
 					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
 						DBType: ovnv1.SBDBType,
