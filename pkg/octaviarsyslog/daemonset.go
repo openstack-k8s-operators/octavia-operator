@@ -16,6 +16,9 @@ limitations under the License.
 package octaviarsyslog
 
 import (
+	"fmt"
+	"sort"
+
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
@@ -81,6 +84,21 @@ func DaemonSet(
 	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 	envVars["NODE_NAME"] = env.DownwardAPI("spec.nodeName")
+
+	if instance.Spec.OctaviaProviderSubnetCIDR != "" {
+		envVars["MGMT_CIDR"] = env.SetValue(instance.Spec.OctaviaProviderSubnetCIDR)
+	}
+	envVars["MGMT_GATEWAY"] = env.SetValue(instance.Spec.OctaviaProviderSubnetGateway)
+
+	if len(instance.Spec.OctaviaProviderSubnetExtraCIDRs) > 0 {
+		// Sort the array to make it stable across calls to reconcile
+		var extraCIDRs = make([]string, len(instance.Spec.OctaviaProviderSubnetExtraCIDRs))
+		copy(extraCIDRs, instance.Spec.OctaviaProviderSubnetExtraCIDRs)
+		sort.Strings(extraCIDRs)
+		for idx, subnetCIDR := range extraCIDRs {
+			envVars[fmt.Sprintf("MGMT_CIDR%d", idx)] = env.SetValue(subnetCIDR)
+		}
+	}
 
 	daemonset := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
