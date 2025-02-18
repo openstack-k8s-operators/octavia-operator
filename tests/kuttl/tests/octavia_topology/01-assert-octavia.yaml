@@ -1,0 +1,22 @@
+apiVersion: octavia.openstack.org/v1beta1
+kind: Octavia
+metadata:
+  name: octavia
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia-api
+spec:
+  template:
+    spec:
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: "topology.kubernetes.io/hostname"
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            service: octavia
+status:
+  availableReplicas: 1
+  replicas: 1

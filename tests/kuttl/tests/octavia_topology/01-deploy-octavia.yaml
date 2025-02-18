@@ -1,0 +1,59 @@
+apiVersion: octavia.openstack.org/v1beta1
+kind: Octavia
+metadata:
+  name: octavia
+spec:
+  topologyRef:
+    name: octavia-topology
+  databaseInstance: openstack
+  databaseUser: octavia
+  serviceUser: octavia
+  rabbitMqClusterName: rabbitmq
+  secret: osp-secret
+  preserveJobs: false
+  customServiceConfig: |
+    [DEFAULT]
+    debug = true
+  octaviaHousekeeping:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: housekeeping
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+  octaviaHealthManager:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: healthmanager
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+  octaviaWorker:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    role: worker
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true
+  octaviaAPI:
+    databaseInstance: openstack
+    databaseUser: octavia
+    serviceUser: octavia
+    serviceAccount: octavia
+    secret: osp-secret
+    preserveJobs: false
+    customServiceConfig: |
+      [DEFAULT]
+      debug = true

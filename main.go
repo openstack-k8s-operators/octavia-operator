@@ -46,6 +46,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	ovn1beta1 "github.com/openstack-k8s-operators/ovn-operator/api/v1beta1"
 
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -64,6 +65,7 @@ func init() {
 	utilruntime.Must(octaviav1.AddToScheme(scheme))
 	utilruntime.Must(ovn1beta1.AddToScheme(scheme))
 	utilruntime.Must(networkv1.AddToScheme(scheme))
+	utilruntime.Must(topologyv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

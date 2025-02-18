@@ -28,6 +28,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
 
 // OctaviaDefaults -
@@ -114,10 +115,12 @@ func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
+
 	if err := r.Spec.ValidateCreate(basePath); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 
+	allErrs = r.Spec.ValidateOctaviaTopology(basePath, r.Namespace)
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
@@ -166,6 +169,7 @@ func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	if err := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath); err != nil {
 		allErrs = append(allErrs, err...)
 	}
+	allErrs = r.Spec.ValidateOctaviaTopology(basePath, r.Namespace)
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
@@ -238,4 +242,44 @@ func (spec *OctaviaSpecCore) SetDefaultRouteAnnotations(annotations map[string]s
 	timeout := fmt.Sprintf("%ds", spec.APITimeout)
 	annotations[octaviaAnno] = timeout
 	annotations[haProxyAnno] = timeout
+}
+
+// ValidateOctaviaTopology - Returns an ErrorList if the Topology is referenced
+// on a different namespace
+func (spec *OctaviaSpec) ValidateOctaviaTopology(basePath *field.Path, namespace string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// When a TopologyRef CR is referenced, fail if a different Namespace is
+	// referenced because is not supported
+	if spec.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to OctaviaAPI, fail
+	// if a different Namespace is referenced because not supported
+	if spec.OctaviaAPI.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to OctaviaHousekeeping,
+	// fail if a different Namespace is referenced because not supported
+	if spec.OctaviaHousekeeping.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHousekeeping.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaHealthManager, fail if a different Namespace is referenced
+	// because not supported
+	if spec.OctaviaHealthManager.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHealthManager.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+	return allErrs
 }

@@ -228,6 +228,7 @@ const (
 	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
 	tlsOvnField             = ".spec.tls.ovn.secretName"
+	topologyField           = ".spec.topologyRef.Name"
 )
 
 var (
@@ -237,6 +238,10 @@ var (
 		tlsAPIInternalField,
 		tlsAPIPublicField,
 		tlsOvnField,
+		topologyField,
+	}
+	rsyslogWatchFields = []string{
+		topologyField,
 	}
 )
 
@@ -1486,6 +1491,12 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		instance.Spec.OctaviaAPI.NodeSelector = instance.Spec.NodeSelector
 	}
 
+	// If topology is not present in the underlying OctaviaAPI Spec,
+	// inherit from the top-level CR
+	if instance.Spec.OctaviaAPI.TopologyRef == nil {
+		instance.Spec.OctaviaAPI.TopologyRef = instance.Spec.TopologyRef
+	}
+
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
@@ -1547,6 +1558,12 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 
 	if controllerSpec.NodeSelector == nil {
 		controllerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
+	// If topology is not present in the underlying AmphoraController Spec,
+	// inherit from the top-level CR
+	if controllerSpec.TopologyRef == nil {
+		controllerSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
@@ -1631,6 +1648,12 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 
 	if controllerSpec.NodeSelector == nil {
 		controllerSpec.NodeSelector = instance.Spec.NodeSelector
+	}
+
+	// If topology is not present in the underlying OctaviaRsyslog Spec,
+	// inherit from the top-level CR
+	if controllerSpec.TopologyRef == nil {
+		controllerSpec.TopologyRef = instance.Spec.TopologyRef
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {

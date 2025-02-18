@@ -1,0 +1,22 @@
+#
+# Check for:
+#
+# No OctaviaAPI CR
+# No Deployment for OctaviaAPI CR
+# No Pods in octavia Deployment
+#
+apiVersion: octavia.openstack.org/v1beta1
+kind: Octavia
+metadata:
+  name: octavia
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia-api
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    service: octavia
