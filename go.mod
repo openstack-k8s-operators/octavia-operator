@@ -8,13 +8,13 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.5
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250213131341-8e63f078f923
-	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250212103445-ad7aee2e95d1
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250211124440-b44f6585b825
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20250211124440-b44f6585b825
+	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250218115938-ae95bdfefded
+	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250220113356-66f9a1c66db4
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250220094812-174a6a440f37
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20250220094812-174a6a440f37
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.0
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.5.1-0.20250214191310-a272664d208a
+	github.com/openstack-k8s-operators/ovn-operator/api v0.5.1-0.20250218092018-75e8a0a0aa41
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.29.14
 	k8s.io/apimachinery v0.29.14
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250211124440-b44f6585b825
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250220094812-174a6a440f37
 	golang.org/x/crypto v0.33.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
