@@ -1,6 +1,8 @@
 module github.com/openstack-k8s-operators/octavia-operator
 
-go 1.21
+go 1.23.0
+
+toolchain go1.23.6
 
 require (
 	github.com/go-logr/logr v1.4.2
@@ -25,7 +27,7 @@ require (
 require (
 	github.com/google/uuid v1.6.0
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250211124440-b44f6585b825
-	golang.org/x/crypto v0.33.0
+	golang.org/x/crypto v0.34.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
 
