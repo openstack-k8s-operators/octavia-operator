@@ -116,11 +116,10 @@ func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	if err := r.Spec.ValidateCreate(basePath); err != nil {
+	if err := r.Spec.ValidateCreate(basePath, r.Namespace); err != nil {
 		allErrs = append(allErrs, err...)
 	}
 
-	allErrs = r.Spec.ValidateOctaviaTopology(basePath, r.Namespace)
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
 			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
@@ -132,24 +131,28 @@ func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 
 // ValidateCreate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an octavia spec.
-func (r *OctaviaSpec) ValidateCreate(basePath *field.Path) field.ErrorList {
+func (r *OctaviaSpec) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+
+	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
 	return allErrs
 }
 
-func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path) field.ErrorList {
+func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+
+	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
 	return allErrs
 }
@@ -166,10 +169,9 @@ func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	if err := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath); err != nil {
+	if err := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath, r.Namespace); err != nil {
 		allErrs = append(allErrs, err...)
 	}
-	allErrs = r.Spec.ValidateOctaviaTopology(basePath, r.Namespace)
 
 	if len(allErrs) != 0 {
 		return nil, apierrors.NewInvalid(
@@ -182,24 +184,28 @@ func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 
 // ValidateUpdate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an barbican spec.
-func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path) field.ErrorList {
+func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+
+	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
 	return allErrs
 }
 
-func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path) field.ErrorList {
+func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+
+	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
 	return allErrs
 }
@@ -244,6 +250,45 @@ func (spec *OctaviaSpecCore) SetDefaultRouteAnnotations(annotations map[string]s
 	annotations[haProxyAnno] = timeout
 }
 
+// ValidateOctaviaTopology - Returns an ErrorList if the Topology is referenced
+// on a different namespace
+func (spec *OctaviaSpecCore) ValidateOctaviaTopology(basePath *field.Path, namespace string) field.ErrorList {
+	var allErrs field.ErrorList
+
+	// When a TopologyRef CR is referenced, fail if a different Namespace is
+	// referenced because is not supported
+	if spec.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to OctaviaAPI, fail
+	// if a different Namespace is referenced because not supported
+	if spec.OctaviaAPI.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to OctaviaHousekeeping,
+	// fail if a different Namespace is referenced because not supported
+	if spec.OctaviaHousekeeping.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHousekeeping.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaHealthManager, fail if a different Namespace is referenced
+	// because not supported
+	if spec.OctaviaHealthManager.TopologyRef != nil {
+		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHealthManager.TopologyRef.Namespace, *basePath, namespace); err != nil {
+			allErrs = append(allErrs, err)
+		}
+	}
+	return allErrs
+}
 // ValidateOctaviaTopology - Returns an ErrorList if the Topology is referenced
 // on a different namespace
 func (spec *OctaviaSpec) ValidateOctaviaTopology(basePath *field.Path, namespace string) field.ErrorList {
