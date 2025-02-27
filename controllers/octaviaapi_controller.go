@@ -766,9 +766,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		instance,      // topologyHandler
 		instance.Name, // finalizer
 		&instance.Status.Conditions,
-		labels.GetAppLabelSelector(
-			octavia.ServiceName,
-		),
+		labels.GetLabelSelector(serviceLabels),
 	)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
