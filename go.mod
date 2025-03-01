@@ -8,13 +8,13 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.5
 	github.com/onsi/ginkgo/v2 v2.20.1
 	github.com/onsi/gomega v1.34.1
-	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250224135717-7d751fb24aaa
-	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250224101200-743a4b3fb404
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250227072032-4046ee8c6a91
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20250225091304-b66d960fb024
+	github.com/openstack-k8s-operators/infra-operator/apis v0.5.1-0.20250301104950-9a202ca63f62
+	github.com/openstack-k8s-operators/keystone-operator/api v0.5.1-0.20250301143520-5336fe8cc39e
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.5.1-0.20250228124213-cd63da392f97
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.5.1-0.20250228124213-cd63da392f97
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.5.0
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.5.1-0.20250224101201-53811064bfea
+	github.com/openstack-k8s-operators/ovn-operator/api v0.5.1-0.20250301125052-7c4576212d57
 	go.uber.org/zap v1.27.0
 	k8s.io/api v0.29.14
 	k8s.io/apimachinery v0.29.14
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250225091304-b66d960fb024
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.5.1-0.20250228124213-cd63da392f97
 	golang.org/x/crypto v0.33.0
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
@@ -61,6 +61,7 @@ require (
 	github.com/prometheus/client_model v0.6.0 // indirect
 	github.com/prometheus/common v0.51.1 // indirect
 	github.com/prometheus/procfs v0.13.0 // indirect
+	github.com/rabbitmq/cluster-operator/v2 v2.9.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/exp v0.0.0-20240719175910-8a7402abbf56 // indirect
