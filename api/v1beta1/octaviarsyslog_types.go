@@ -28,12 +28,10 @@ type OctaviaRsyslogSpec struct {
 	OctaviaRsyslogSpecCore `json:",inline"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="quay.io/podified-antelope-centos9/openstack-rsyslog:current-podified"
 	// ContainerImage - Rsyslog Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +kubebuilder:default="quay.io/podified-antelope-centos9/openstack-octavia-health-manager:current-podified"
 	// InitContainerImage - Rsyslog init Container Image URL for
 	InitContainerImage string `json:"initContainerImage,omitempty"`
 }
