@@ -23,6 +23,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	"k8s.io/apimachinery/pkg/util/validation/field"
 )
 
 const (
@@ -251,4 +252,16 @@ func (instance *OctaviaAPI) GetLastAppliedTopology() *topologyv1.TopoRef {
 // SetLastAppliedTopology - Sets the LastAppliedTopology value in the Status
 func (instance *OctaviaAPI) SetLastAppliedTopology(topologyRef *topologyv1.TopoRef) {
 	instance.Status.LastAppliedTopology = topologyRef
+}
+
+// ValidateTopology -
+func (instance *OctaviaAPISpecCore) ValidateTopology(
+	basePath *field.Path,
+	namespace string,
+) field.ErrorList {
+	var allErrs field.ErrorList
+	allErrs = append(allErrs, topologyv1.ValidateTopologyRef(
+		instance.TopologyRef,
+		*basePath.Child("topologyRef"), namespace)...)
+	return allErrs
 }

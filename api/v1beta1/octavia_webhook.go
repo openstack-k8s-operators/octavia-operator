@@ -257,38 +257,40 @@ func (spec *OctaviaSpecCore) ValidateOctaviaTopology(basePath *field.Path, names
 
 	// When a TopologyRef CR is referenced, fail if a different Namespace is
 	// referenced because is not supported
-	if spec.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	allErrs = append(allErrs, topologyv1.ValidateTopologyRef(
+		spec.TopologyRef, *basePath.Child("topologyRef"), namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to OctaviaAPI, fail
 	// if a different Namespace is referenced because not supported
-	if spec.OctaviaAPI.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	apiPath := basePath.Child("octaviaAPI")
+	allErrs = append(allErrs, spec.OctaviaAPI.ValidateTopology(apiPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to OctaviaHousekeeping,
 	// fail if a different Namespace is referenced because not supported
-	if spec.OctaviaHousekeeping.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHousekeeping.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	hkPath := basePath.Child("OctaviaHousekeeping")
+	allErrs = append(allErrs, spec.OctaviaHousekeeping.ValidateTopology(hkPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to an instance of
 	// OctaviaHealthManager, fail if a different Namespace is referenced
 	// because not supported
-	if spec.OctaviaHealthManager.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHealthManager.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	hmPath := basePath.Child("octaviaHealthManager")
+	allErrs = append(allErrs, spec.OctaviaHealthManager.ValidateTopology(hmPath, namespace)...)
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaRsyslog, fail if a different Namespace is referenced
+	// because not supported
+	rsPath := basePath.Child("octaviaRsyslog")
+	allErrs = append(allErrs, spec.OctaviaRsyslog.ValidateTopology(rsPath, namespace)...)
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaWorker, fail if a different Namespace is referenced
+	// because not supported
+	wPath := basePath.Child("octaviaWorker")
+	allErrs = append(allErrs, spec.OctaviaWorker.ValidateTopology(wPath, namespace)...)
+
 	return allErrs
 }
+
 // ValidateOctaviaTopology - Returns an ErrorList if the Topology is referenced
 // on a different namespace
 func (spec *OctaviaSpec) ValidateOctaviaTopology(basePath *field.Path, namespace string) field.ErrorList {
@@ -296,35 +298,36 @@ func (spec *OctaviaSpec) ValidateOctaviaTopology(basePath *field.Path, namespace
 
 	// When a TopologyRef CR is referenced, fail if a different Namespace is
 	// referenced because is not supported
-	if spec.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	allErrs = append(allErrs, topologyv1.ValidateTopologyRef(
+		spec.TopologyRef, *basePath.Child("topologyRef"), namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to OctaviaAPI, fail
 	// if a different Namespace is referenced because not supported
-	if spec.OctaviaAPI.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaAPI.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	apiPath := basePath.Child("octaviaAPI")
+	allErrs = append(allErrs, spec.OctaviaAPI.ValidateTopology(apiPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to OctaviaHousekeeping,
 	// fail if a different Namespace is referenced because not supported
-	if spec.OctaviaHousekeeping.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHousekeeping.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	hkPath := basePath.Child("octaviaHousekeeping")
+	allErrs = append(allErrs, spec.OctaviaHousekeeping.ValidateTopology(hkPath, namespace)...)
 
 	// When a TopologyRef CR is referenced with an override to an instance of
 	// OctaviaHealthManager, fail if a different Namespace is referenced
 	// because not supported
-	if spec.OctaviaHealthManager.TopologyRef != nil {
-		if err := topologyv1.ValidateTopologyNamespace(spec.OctaviaHealthManager.TopologyRef.Namespace, *basePath, namespace); err != nil {
-			allErrs = append(allErrs, err)
-		}
-	}
+	hmPath := basePath.Child("octaviaHealthManager")
+	allErrs = append(allErrs, spec.OctaviaHealthManager.ValidateTopology(hmPath, namespace)...)
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaRsyslog, fail if a different Namespace is referenced
+	// because not supported
+	rsPath := basePath.Child("octaviaRsyslog")
+	allErrs = append(allErrs, spec.OctaviaRsyslog.ValidateTopology(rsPath, namespace)...)
+
+	// When a TopologyRef CR is referenced with an override to an instance of
+	// OctaviaWorker, fail if a different Namespace is referenced
+	// because not supported
+	wPath := basePath.Child("octaviaWorker")
+	allErrs = append(allErrs, spec.OctaviaWorker.ValidateTopology(wPath, namespace)...)
+
 	return allErrs
 }
