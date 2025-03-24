@@ -1042,32 +1042,69 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
-	It("rejects a wrong TopologyRef on a different namespace", func() {
-		spec := GetDefaultOctaviaSpec()
+	DescribeTable("rejects wrong topology for",
+		func(serviceNameFunc func() (string, string)) {
 
-		// Inject a topologyRef that points to a different namespace
-		spec["topologyRef"] = map[string]interface{}{
-			"name":      "foo",
-			"namespace": "bar",
-		}
-		raw := map[string]interface{}{
-			"apiVersion": "octavia.openstack.org/v1beta1",
-			"kind":       "Octavia",
-			"metadata": map[string]interface{}{
-				"name":      octaviaName.Name,
-				"namespace": octaviaName.Namespace,
-			},
-			"spec": spec,
-		}
+			component, errorPath := serviceNameFunc()
+			expectedErrorMessage := fmt.Sprintf("spec.%s.namespace: Invalid value: \"namespace\": Customizing namespace field is not supported", errorPath)
 
-		unstructuredObj := &unstructured.Unstructured{Object: raw}
-		_, err := controllerutil.CreateOrPatch(
-			th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
-		Expect(err).To(HaveOccurred())
-		Expect(err.Error()).To(
-			ContainSubstring(
-				"Invalid value: \"namespace\": Customizing namespace field is not supported"),
-		)
-	})
+			spec := GetDefaultOctaviaSpec()
+
+			// API, Worker and KeystoneListener
+			if component != "top-level" {
+				spec[component] = map[string]interface{}{
+					"topologyRef": map[string]interface{}{
+						"name":      "bar",
+						"namespace": "foo",
+					},
+				}
+				// top-level topologyRef
+			} else {
+				spec["topologyRef"] = map[string]interface{}{
+					"name":      "bar",
+					"namespace": "foo",
+				}
+			}
+			// Build the octavia CR
+			raw := map[string]interface{}{
+				"apiVersion": "octavia.openstack.org/v1beta1",
+				"kind":       "Octavia",
+				"metadata": map[string]interface{}{
+					"name":      octaviaName.Name,
+					"namespace": octaviaName.Namespace,
+				},
+				"spec": spec,
+			}
+			unstructuredObj := &unstructured.Unstructured{Object: raw}
+			_, err := controllerutil.CreateOrPatch(
+				th.Ctx, th.K8sClient, unstructuredObj, func() error { return nil })
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(
+				ContainSubstring(expectedErrorMessage))
+		},
+		Entry("top-level topologyRef", func() (string, string) {
+			return "top-level", "topologyRef"
+		}),
+		Entry("octaviaAPI topologyRef", func() (string, string) {
+			component := "octaviaAPI"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("octaviaRsyslog topologyRef", func() (string, string) {
+			component := "octaviaRsyslog"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("octaviaHealthManager topologyRef", func() (string, string) {
+			component := "octaviaHealthManager"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("octaviaHousekeeping topologyRef", func() (string, string) {
+			component := "octaviaHousekeeping"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+		Entry("octaviaWorker topologyRef", func() (string, string) {
+			component := "octaviaWorker"
+			return component, fmt.Sprintf("%s.topologyRef", component)
+		}),
+	)
 	// Amphora Image
 })
