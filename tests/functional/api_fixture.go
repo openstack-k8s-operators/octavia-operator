@@ -43,6 +43,10 @@ var (
 			Name: "service",
 			ID:   uuid.New().String(),
 		},
+		{
+			Name: "project1234",
+			ID:   uuid.New().String(),
+		},
 	}
 )
 

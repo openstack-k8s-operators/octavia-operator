@@ -189,6 +189,11 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 		instance.Status.NetworkAttachments = map[string][]string{}
 	}
 
+	// Default for env without an updated CRD
+	if instance.Spec.TenantDomainName == "" {
+		instance.Spec.TenantDomainName = "Default"
+	}
+
 	// Handle non-deleted clusters
 	return r.reconcileNormal(ctx, instance, helper)
 }
@@ -668,6 +673,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["TransportURL"] = transportURL
 	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["TenantName"] = spec.TenantName
+	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL

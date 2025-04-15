@@ -145,6 +145,11 @@ type OctaviaAPISpecCore struct {
 	TenantName string `json:"tenantName"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=Default
+	// TenantDomainName - the name of the OpenStack domain associated with the tenant
+	TenantDomainName string `json:"tenantDomainName"`
+
+	// +kubebuilder:validation:Optional
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS OctaviaApiTLS `json:"tls,omitempty"`
