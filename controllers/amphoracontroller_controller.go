@@ -667,6 +667,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["TransportURL"] = transportURL
 	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["TenantName"] = spec.TenantName
+	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
