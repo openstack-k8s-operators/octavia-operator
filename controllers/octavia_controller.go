@@ -212,6 +212,11 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		instance.Status.Hash = map[string]string{}
 	}
 
+	// Default for env without an updated CRD
+	if instance.Spec.TenantDomainName == "" {
+		instance.Spec.TenantDomainName = "Default"
+	}
+
 	// Handle service delete
 	if !instance.DeletionTimestamp.IsZero() {
 		return r.reconcileDelete(ctx, instance, helper)
@@ -743,6 +748,11 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	instance.Status.Conditions.MarkTrue(octaviav1.OctaviaManagementNetworkReadyCondition, octaviav1.OctaviaManagementNetworkReadyCompleteMessage)
 	Log.Info(fmt.Sprintf("Using management network \"%s\"", networkInfo.TenantNetworkID))
+
+	err = octavia.EnsureUserRoles(ctx, instance, Log, helper)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
 	ampImageOwnerID, err := octavia.GetImageOwnerID(ctx, instance, helper)
 	if err != nil {
@@ -1427,6 +1437,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 	}
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["TenantName"] = instance.Spec.TenantName
+	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 
 	cms := []util.Template{
 		{
@@ -1505,6 +1516,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.PersistenceDatabaseAccount = instance.Spec.PersistenceDatabaseAccount
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.TenantName = instance.Spec.TenantName
+		deployment.Spec.TenantDomainName = instance.Spec.TenantDomainName
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
@@ -1575,6 +1587,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.PersistenceDatabaseAccount = instance.Spec.PersistenceDatabaseAccount
 		daemonset.Spec.ServiceUser = instance.Spec.ServiceUser
 		daemonset.Spec.TenantName = instance.Spec.TenantName
+		daemonset.Spec.TenantDomainName = instance.Spec.TenantDomainName
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()

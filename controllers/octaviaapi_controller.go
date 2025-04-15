@@ -188,6 +188,11 @@ func (r *OctaviaAPIReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		instance.Status.Hash = map[string]string{}
 	}
 
+	// Default for env without an updated CRD
+	if instance.Spec.TenantDomainName == "" {
+		instance.Spec.TenantDomainName = "Default"
+	}
+
 	// Init Topology condition if there's a reference
 	if instance.Spec.TopologyRef != nil {
 		c := condition.UnknownCondition(condition.TopologyReadyCondition, condition.InitReason, condition.TopologyReadyInitMessage)
@@ -1038,6 +1043,7 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["TenantName"] = instance.Spec.TenantName
+	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
