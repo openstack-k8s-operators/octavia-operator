@@ -114,17 +114,17 @@ func uploadKeypair(
 	pubKey string) error {
 	osClient, err := GetOpenstackClient(ctx, instance.Namespace, h)
 	if err != nil {
-		return fmt.Errorf("Error getting openstack client: %w", err)
+		return fmt.Errorf("error getting openstack client: %w", err)
 	}
 
 	computeClient, err := GetComputeClient(osClient)
 	if err != nil {
-		return fmt.Errorf("Error getting compute client: %w", err)
+		return fmt.Errorf("error getting compute client: %w", err)
 	}
 
 	octaviaUser, err := GetUser(osClient, instance.Spec.ServiceUser)
 	if err != nil {
-		return fmt.Errorf("Error getting user details from openstack client: %w", err)
+		return fmt.Errorf("error getting user details from openstack client: %w", err)
 	}
 
 	getOpts := keypairs.GetOpts{
@@ -139,7 +139,7 @@ func uploadKeypair(
 		}
 		err := keypairs.Delete(computeClient, NovaKeyPairName, deleteOpts).ExtractErr()
 		if err != nil {
-			return fmt.Errorf("Error deleting the existing SSH keypair for amphorae: %w", err)
+			return fmt.Errorf("error deleting the existing SSH keypair for amphorae: %w", err)
 		}
 	}
 
@@ -153,7 +153,7 @@ func uploadKeypair(
 		}
 		_, err = keypairs.Create(computeClient, createOpts).Extract()
 		if err != nil {
-			return fmt.Errorf("Error uploading public key for SSH authentication with amphora: %w", err)
+			return fmt.Errorf("error uploading public key for SSH authentication with amphora: %w", err)
 		}
 	}
 	return nil
@@ -170,9 +170,7 @@ func EnsureAmpSSHConfig(
 	if err == nil && cmap.Data != nil {
 		// Fail if config map has no data
 		if len(cmap.Data) == 0 || cmap.Data["key"] == "" {
-			return fmt.Errorf(
-				"ConfigMap %s exists but has no key data",
-				instance.Spec.LoadBalancerSSHPubKey)
+			return fmt.Errorf("%w: %s", ErrConfigMapMissingKeyData, instance.Spec.LoadBalancerSSHPubKey)
 		}
 
 		err = uploadKeypair(ctx, instance, h, cmap.Data["key"])
@@ -181,23 +179,23 @@ func EnsureAmpSSHConfig(
 		}
 	} else {
 		if err != nil && !k8serrors.IsNotFound(err) {
-			return fmt.Errorf("Error retrieving config map %s - %w", instance.Spec.LoadBalancerSSHPubKey, err)
+			return fmt.Errorf("error retrieving config map %s - %w", instance.Spec.LoadBalancerSSHPubKey, err)
 		}
 
 		pubKey, privKey, err := generateECDSAKeys()
 		if err != nil {
-			return fmt.Errorf("Error while generating SSH keys for amphorae: %w", err)
+			return fmt.Errorf("error while generating SSH keys for amphorae: %w", err)
 		}
 
 		err = storePrivateKeyAsSecret(ctx, instance, h, privKey)
 		if err != nil {
-			return fmt.Errorf("Error creating ssh key secret %s - %w",
+			return fmt.Errorf("error creating ssh key secret %s - %w",
 				instance.Spec.LoadBalancerSSHPrivKey, err)
 		}
 
 		err = storePublicKeyAsConfigMap(ctx, instance, h, pubKey)
 		if err != nil {
-			return fmt.Errorf("Error creating ssh key config map %s - %w",
+			return fmt.Errorf("error creating ssh key config map %s - %w",
 				instance.Spec.LoadBalancerSSHPubKey, err)
 		}
 		err = uploadKeypair(ctx, instance, h, pubKey)

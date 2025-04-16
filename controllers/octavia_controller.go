@@ -123,7 +123,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 
 	// Fetch the Octavia instance
 	instance := &octaviav1.Octavia{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -236,7 +236,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 // fields to index to reconcile when change
 const (
 	passwordSecretField     = ".spec.secret"
-	caBundleSecretNameField = ".spec.tls.caBundleSecretName"
+	caBundleSecretNameField = ".spec.tls.caBundleSecretName" // #nosec G101 -- Field path, not a credential
 	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
 	tlsOvnField             = ".spec.tls.ovn.secretName"
@@ -787,7 +787,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      octavia.HmConfigMap,
 			Namespace: instance.GetNamespace(),
-			Labels:    labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{}),
+			Labels:    labels.GetLabels(instance, labels.GetGroupLabel(instance.Name), map[string]string{}),
 		},
 		Data: make(map[string]string),
 	}
@@ -877,7 +877,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		updatedMap[portName] = hmPort
 	}
 
-	mapLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
+	mapLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.Name), map[string]string{})
 	_, err = controllerutil.CreateOrPatch(ctx, helper.GetClient(), nodeConfigMap, func() error {
 		nodeConfigMap.Labels = util.MergeStringMaps(nodeConfigMap.Labels, mapLabels)
 		nodeConfigMap.Data = updatedMap
@@ -920,7 +920,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.HealthManager),
+			"%s", amphoraControllerErrorMessage(octaviav1.HealthManager),
 		))
 	} else {
 		instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
@@ -956,7 +956,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Worker),
+			"%s", amphoraControllerErrorMessage(octaviav1.Worker),
 		))
 	} else {
 		instance.Status.OctaviaRsyslogReadyCount = octaviaRsyslog.Status.ReadyCount
@@ -985,7 +985,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Housekeeping),
+			"%s", amphoraControllerErrorMessage(octaviav1.Housekeeping),
 		))
 	} else {
 		instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
@@ -1014,7 +1014,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Worker),
+			"%s", amphoraControllerErrorMessage(octaviav1.Worker),
 		))
 	} else {
 		instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
@@ -1380,11 +1380,11 @@ func (r *OctaviaReconciler) getLocalImageURLs(
 	// Get the list of images and their hashes
 	listURL := fmt.Sprintf("%s/octavia-amphora-image.sha256sum", endpoint)
 
-	resp, err := http.Get(listURL)
+	resp, err := http.Get(listURL) // #nosec G107 -- URL is constructed from trusted configuration parameter
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	scanner := bufio.NewScanner(resp.Body)
 	ret := []octavia.AmphoraImage{}
 	for scanner.Scan() {
@@ -1421,7 +1421,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(octavia.ServiceName), map[string]string{})
 
 	var tlsCfg *tls.Service
-	if instance.Spec.OctaviaAPI.TLS.Ca.CaBundleSecretName != "" {
+	if instance.Spec.OctaviaAPI.TLS.CaBundleSecretName != "" {
 		tlsCfg = &tls.Service{}
 	}
 
@@ -1743,7 +1743,7 @@ func (r *OctaviaReconciler) checkOctaviaAPIGeneration(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
+	if err := r.List(context.Background(), api, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
 		return false, err
 	}
@@ -1765,7 +1765,7 @@ func (r *OctaviaReconciler) checkAmphoraGeneration(
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
-	if err := r.Client.List(context.Background(), amph, listOpts...); err != nil {
+	if err := r.List(context.Background(), amph, listOpts...); err != nil {
 		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
 		return false, err
 	}

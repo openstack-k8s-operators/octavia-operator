@@ -25,6 +25,7 @@ type NADConfig struct {
 	IPAM NADIpam `json:"ipam"`
 }
 
+// NADIpam represents the IPAM configuration for Network Attachment Definitions
 type NADIpam struct {
 	CIDR       netip.Prefix `json:"range"`
 	RangeStart netip.Addr   `json:"range_start"`
@@ -33,6 +34,7 @@ type NADIpam struct {
 	Routes []NADRoute `json:"routes"`
 }
 
+// NADRoute represents a network route configuration in Network Attachment Definitions
 type NADRoute struct {
 	Gateway     netip.Addr   `json:"gw"`
 	Destination netip.Prefix `json:"dst"`
@@ -69,7 +71,7 @@ func GetRangeFromCIDR(
 	// convert it to a [16]bytes table, set the remaining bits to 1
 	addrBytes := start.As16()
 	for b := bits; b < 128; b++ {
-		addrBytes[b/8] |= 1 << uint(7-(b%8))
+		addrBytes[b/8] |= 1 << uint(7-(b%8)) // #nosec G115 -- Controlled bit manipulation with small integer values
 	}
 	// convert the table to an ip address to get the last IP
 	// in case of IPv4, the address should be unmapped
@@ -108,7 +110,7 @@ func GetNetworkParametersFromNAD(
 	end := networkParameters.ProviderAllocationStart
 	for i := 0; i < LbProvSubnetPoolSize; i++ {
 		if !networkParameters.ProviderCIDR.Contains(end) {
-			return nil, fmt.Errorf("cannot allocate %d IP addresses in %s", LbProvSubnetPoolSize, networkParameters.ProviderCIDR)
+			return nil, fmt.Errorf("%w: %d in %s", ErrCannotAllocateIPAddresses, LbProvSubnetPoolSize, networkParameters.ProviderCIDR)
 		}
 		end = end.Next()
 	}
@@ -125,7 +127,7 @@ func GetNetworkParametersFromNAD(
 	} else if !instance.Spec.LbMgmtNetworks.ManageLbMgmtNetworks {
 		return networkParameters, nil
 	} else {
-		return nil, fmt.Errorf("cannot find gateway information in network attachment")
+		return nil, ErrCannotFindGatewayInfo
 	}
 
 	// Tenant subnet parameters - parameters for lb-mgmt-net/subnet

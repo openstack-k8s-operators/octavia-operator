@@ -26,6 +26,7 @@ import (
 	"k8s.io/utils/ptr"
 )
 
+// ImageUploadDetails contains the configuration details for image upload operations
 type ImageUploadDetails struct {
 	ContainerImage string
 	VolumeMounts   []corev1.VolumeMount
@@ -83,7 +84,7 @@ func getVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-// Deployment func
+// ImageUploadDeployment creates a deployment for uploading Octavia amphora images
 func ImageUploadDeployment(
 	instance *octaviav1.Octavia,
 	labels map[string]string,

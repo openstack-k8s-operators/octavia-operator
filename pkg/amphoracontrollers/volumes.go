@@ -30,6 +30,7 @@ var (
 	configMode int32 = 0644
 )
 
+// GetVolumes returns the volumes required for amphora controller pods
 func GetVolumes(name string) []corev1.Volume {
 	var config0640AccessMode int32 = 0640
 	return append(
@@ -48,6 +49,7 @@ func GetVolumes(name string) []corev1.Volume {
 	)
 }
 
+// GetInitVolumeMounts returns the volume mounts for init containers in amphora controller pods
 func GetInitVolumeMounts() []corev1.VolumeMount {
 	return append(
 		octavia.GetInitVolumeMounts(),
