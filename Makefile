@@ -68,7 +68,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-GOTOOLCHAIN_VERSION ?= go1.21.0
+GOTOOLCHAIN_VERSION ?= go1.24.0
 
 .PHONY: all
 all: build
@@ -115,9 +115,10 @@ tidy: ## Run go mod tidy on every mod file in the repo
 	go mod tidy
 	cd ./api && go mod tidy
 
+GOLANGCI_LINT_VERSION ?= v2.4.0
 .PHONY: golangci-lint
 golangci-lint: vet
-	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.59.1
+	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 	$(LOCALBIN)/golangci-lint run --fix
 
 .PHONY: test
