@@ -39,12 +39,12 @@ import (
 
 const (
 	SecretName         = "test-secret"
-	KeystoneSecretName = "%s-keystone-secret"
+	KeystoneSecretName = "%s-keystone-secret" // #nosec G101 -- Test constant, not a credential
 	RabbitmqSecretName = "rabbitmq-secret"
 
-	PublicCertSecretName   = "public-tls-certs"
-	InternalCertSecretName = "internal-tls-certs"
-	CABundleSecretName     = "combined-ca-bundle"
+	PublicCertSecretName   = "public-tls-certs"   // #nosec G101 -- Test constant, not a credential
+	InternalCertSecretName = "internal-tls-certs" // #nosec G101 -- Test constant, not a credential
+	CABundleSecretName     = "combined-ca-bundle" // #nosec G101 -- Test constant, not a credential
 
 	OVNNBDBEndpoint = "ovnnbdbendpoint:1234"
 	OVNSBDBEndpoint = "ovnsbdbendpoint:1234"

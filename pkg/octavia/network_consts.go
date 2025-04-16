@@ -81,36 +81,35 @@ const (
 
 	// IPv4 consts
 
+	// LbRouterName is the name of the octavia link router
 	// TODO(beagles): support IPv6 for the provider network.
-	// LbRouterName -
 	LbRouterName = "octavia-link-router"
 
 	// LbProvPhysicalNet -
 	LbProvPhysicalNet = "octavia"
 
-	// LbMgmtRouterPortName
+	// LbMgmtRouterPortName is the name of the load balancer management router port
 	LbMgmtRouterPortName = "lb-mgmt-router-port"
 
-	// LbMgmtRouterPortNameAZ
+	// LbMgmtRouterPortNameAZ is the availability zone specific router port name template
 	LbMgmtRouterPortNameAZ = "lb-mgmt-%s-router-port"
 
-	// Network attachment details
-	// LbNetworkAttachmentName
+	// LbNetworkAttachmentName is the name for octavia network attachment details
 	LbNetworkAttachmentName = "octavia"
 
 	//
 	// Security group constants.
 	//
 
-	// LbMgmtNetworkSecurityGroup
+	// LbMgmtNetworkSecurityGroupName is the name of the load balancer management network security group
 	LbMgmtNetworkSecurityGroupName = "lb-mgmt-sec-grp"
 
-	// LbMgmtHealthManagerSecurityGroup
+	// LbMgmtHealthManagerSecurityGroupName is the name of the load balancer management health manager security group
 	LbMgmtHealthManagerSecurityGroupName = "lb-health-mgr-sec-grp"
 
-	// LbMgmtNetworkSecurityGroup
+	// LbProvNetworkSecurityGroupName is the name of the load balancer provider network security group
 	LbProvNetworkSecurityGroupName = "lb-prov-sec-grp"
 
-	// LbMgmtHealthManagerSecurityGroup
+	// LbProvHealthManagerSecurityGroupName is the name of the load balancer provider health manager security group
 	LbProvHealthManagerSecurityGroupName = "lb-health-prov-sec-grp"
 )

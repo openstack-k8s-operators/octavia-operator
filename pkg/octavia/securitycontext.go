@@ -21,10 +21,13 @@ import (
 )
 
 const (
+	// OctaviaUID is the user ID for running Octavia services
 	OctaviaUID int64 = 42437
+	// OctaviaGID is the group ID for running Octavia services
 	OctaviaGID int64 = 42437
 )
 
+// GetOctaviaSecurityContext returns the security context for octavia containers
 func GetOctaviaSecurityContext() *corev1.SecurityContext {
 	return &corev1.SecurityContext{
 		RunAsUser:    ptr.To(OctaviaUID),
