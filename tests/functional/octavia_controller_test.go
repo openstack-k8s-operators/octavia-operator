@@ -1107,4 +1107,67 @@ var _ = Describe("Octavia controller", func() {
 		}),
 	)
 	// Amphora Image
+
+	When("custom tenantName and tenantDomainName are passed", func() {
+		var apiFixtures APIFixtures
+
+		BeforeEach(func() {
+			apiFixtures = createAndSimulateKeystone(octaviaName)
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			createAndSimulateDB(spec)
+
+			createAndSimulateOctaviaAPI(octaviaName)
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateNAD(types.NamespacedName{
+				Name:      spec["octaviaNetworkAttachment"].(string),
+				Namespace: namespace,
+			}))
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateNode(types.NamespacedName{
+				Namespace: namespace,
+				Name:      "node1",
+			}))
+
+			spec["tenantName"] = "project1234"
+			spec["tenantDomainName"] = "domain2"
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			th.SimulateJobSuccess(octaviaDBSyncName)
+		})
+
+		It("should generate OpenStack resources for this tenant", func() {
+			project := GetProject(spec["tenantName"].(string))
+
+			mgmtNetwork := &Network{}
+			for _, network := range apiFixtures.Neutron.Networks {
+				if network.Name == "lb-mgmt-net" {
+					mgmtNetwork = &network
+					break
+				}
+			}
+			Expect(mgmtNetwork.Name).ShouldNot(Equal(""))
+			Expect(mgmtNetwork.TenantID).To(Equal(project.ID))
+			Expect(apiFixtures.Neutron.Quotas).To(HaveKey(project.ID))
+			Expect(apiFixtures.Nova.QuotaSets).To(HaveKey(project.ID))
+		})
+
+		It("should use these parameters in the service configuration file", func() {
+			configData := th.GetSecret(
+				types.NamespacedName{
+					Namespace: octaviaName.Namespace,
+					Name:      fmt.Sprintf("%s-config-data", octaviaName.Name)})
+			Expect(configData).ShouldNot(BeNil())
+			conf := string(configData.Data["octavia.conf"])
+			Expect(conf).Should(
+				ContainSubstring(fmt.Sprintf(
+					"project_name=%s\n", spec["tenantName"])))
+			Expect(conf).Should(
+				ContainSubstring(fmt.Sprintf(
+					"project_domain_name=%s\n", spec["tenantDomainName"])))
+		})
+	})
+
 })
