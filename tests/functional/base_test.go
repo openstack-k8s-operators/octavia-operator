@@ -163,16 +163,20 @@ func CreateOctaviaSecret(namespace string) *corev1.Secret {
 	return secret
 }
 
-func CreateOctaviaCaPassphraseSecret(namespace string, name string) *corev1.Secret {
+func CreateOctaviaCaPassphraseSecretCustom(namespace string, name string, passphrase string) *corev1.Secret {
 	return th.CreateSecret(
 		types.NamespacedName{
 			Namespace: namespace,
 			Name:      fmt.Sprintf("%s-ca-passphrase", name),
 		},
 		map[string][]byte{
-			"server-ca-passphrase": []byte("12345678"),
+			"server-ca-passphrase": []byte(passphrase),
 		},
 	)
+}
+
+func CreateOctaviaCaPassphraseSecret(namespace string, name string) *corev1.Secret {
+	return CreateOctaviaCaPassphraseSecretCustom(namespace, name, "12345678")
 }
 
 func SimulateOctaviaCertsSecret(namespace string, name string) *corev1.Secret {

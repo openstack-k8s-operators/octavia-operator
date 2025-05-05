@@ -57,6 +57,11 @@ func createAndSimulateOctaviaSecrets(
 ) {
 	DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(octaviaName.Namespace))
 	DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaCaPassphraseSecret(octaviaName.Namespace, octaviaName.Name))
+}
+
+func createAndSimulateOctaviaCertsSecrets(
+	octaviaName types.NamespacedName,
+) {
 	SimulateOctaviaCertsSecret(octaviaName.Namespace, octaviaName.Name)
 }
 
@@ -278,6 +283,29 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+	When("An invalid passphrased is passed", func() {
+		BeforeEach(func() {
+			createAndSimulateKeystone(octaviaName)
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(octaviaName.Namespace))
+			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaCaPassphraseSecretCustom(octaviaName.Namespace, octaviaName.Name, "12345678\n"))
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+		})
+
+		It("reports an error", func() {
+			Eventually(func(g Gomega) {
+				getter := ConditionGetterFunc(OctaviaConditionGetter)
+				conditions := getter.GetConditions(octaviaName)
+				g.Expect(conditions).NotTo(BeNil(), "Conditions in nil")
+				certsCondition := conditions.Get(octaviav1.OctaviaAmphoraCertsReadyCondition)
+				g.Expect(certsCondition.Message).Should(
+					ContainSubstring("CA Passphrase contains invalid characters"))
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	// Quotas
 	When("Quotas are created", func() {
 		var apiFixtures APIFixtures
@@ -286,6 +314,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures = createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
@@ -324,6 +353,7 @@ var _ = Describe("Octavia controller", func() {
 			createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
@@ -371,6 +401,7 @@ var _ = Describe("Octavia controller", func() {
 			createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -457,6 +488,7 @@ var _ = Describe("Octavia controller", func() {
 			createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -489,6 +521,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures = createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -655,6 +688,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures = createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -859,6 +893,7 @@ var _ = Describe("Octavia controller", func() {
 			createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -953,6 +988,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures = createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -1012,6 +1048,7 @@ var _ = Describe("Octavia controller", func() {
 				}}
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
@@ -1115,6 +1152,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures = createAndSimulateKeystone(octaviaName)
 
 			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
 			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
 
 			createAndSimulateDB(spec)
