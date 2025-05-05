@@ -10,3 +10,5 @@ commands:
           availability-zones:
           - zone-1
       '
+  - script: |
+      oc kustomize ../../../../config/samples/openstackclient | oc apply -n $NAMESPACE -f -
