@@ -25,6 +25,7 @@ import (
 	"fmt"
 	"math/big"
 	"time"
+	"unicode"
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
@@ -139,6 +140,15 @@ func generateClientCert(caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKe
 	return certPEM.Bytes(), nil
 }
 
+func validatePassphrase(passphrase []byte) error {
+	for _, c := range string(passphrase) {
+		if !unicode.IsPrint(c) {
+			return fmt.Errorf("Error: CA Passphrase contains invalid characters")
+		}
+	}
+	return nil
+}
+
 // EnsureAmphoraCerts ensures Amphora certificates exist in the secret store
 func EnsureAmphoraCerts(
 	ctx context.Context,
@@ -161,6 +171,10 @@ func EnsureAmphoraCerts(
 			return fmt.Errorf("Error retrieving secret %s needed to encrypt the generated key - %w", serverCAPassSecretName, err)
 		}
 		serverCAPass = cAPassSecret.Data["server-ca-passphrase"]
+
+		if err = validatePassphrase(serverCAPass); err != nil {
+			return err
+		}
 
 		serverCAKey, serverCAKeyPEM, err := generateKey(serverCAPass)
 		if err != nil {
