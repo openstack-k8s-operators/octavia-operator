@@ -896,7 +896,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.HealthManager),
+			"%s", amphoraControllerErrorMessage(octaviav1.HealthManager),
 		))
 	} else {
 		instance.Status.OctaviaHealthManagerReadyCount = octaviaHealthManager.Status.ReadyCount
@@ -932,7 +932,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Worker),
+			"%s", amphoraControllerErrorMessage(octaviav1.Worker),
 		))
 	} else {
 		instance.Status.OctaviaRsyslogReadyCount = octaviaRsyslog.Status.ReadyCount
@@ -961,7 +961,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Housekeeping),
+			"%s", amphoraControllerErrorMessage(octaviav1.Housekeeping),
 		))
 	} else {
 		instance.Status.OctaviaHousekeepingReadyCount = octaviaHousekeeping.Status.ReadyCount
@@ -990,7 +990,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.InitReason,
-			amphoraControllerErrorMessage(octaviav1.Worker),
+			"%s", amphoraControllerErrorMessage(octaviav1.Worker),
 		))
 	} else {
 		instance.Status.OctaviaWorkerReadyCount = octaviaWorker.Status.ReadyCount
