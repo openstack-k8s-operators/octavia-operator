@@ -335,6 +335,17 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 			secretsVars[tls.CABundleKey] = env.SetValue(hash)
 		}
 	}
+
+	// Check if secret has changed
+	// TODO(gthiemon) the amphora controller reconcile function is not triggered
+	// when the secret is updated by the octavia controller
+	certsSecretName := fmt.Sprintf("%s-certs-secret", octavia.GetOwningOctaviaControllerName(instance))
+	_, certsSecretHash, err := oko_secret.GetSecret(ctx, helper, certsSecretName, instance.Namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	secretsVars[certsSecretName] = env.SetValue(certsSecretHash)
+
 	// all cert input checks out so report InputReady
 	instance.Status.Conditions.MarkTrue(condition.TLSInputReadyCondition, condition.InputReadyMessage)
 
@@ -779,12 +790,38 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		return err
 	}
 
+	svcSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
+		secret := o.(*corev1.Secret)
+		secretName := secret.GetName()
+		octaviaName := octavia.GetOwningOctaviaControllerName(o)
+		if octaviaName != "" && fmt.Sprintf("%s-certs-secret", octaviaName) == secretName {
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      fmt.Sprintf("%s-worker", octaviaName),
+					Namespace: secret.GetNamespace(),
+				}},
+				{NamespacedName: types.NamespacedName{
+					Name:      fmt.Sprintf("%s-healthmanager", octaviaName),
+					Namespace: secret.GetNamespace(),
+				}},
+				{NamespacedName: types.NamespacedName{
+					Name:      fmt.Sprintf("%s-housekeeping", octaviaName),
+					Namespace: secret.GetNamespace(),
+				}},
+			}
+		}
+		return nil
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAmphoraController{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.DaemonSet{}).
+		// watch the secrets we don't own
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),

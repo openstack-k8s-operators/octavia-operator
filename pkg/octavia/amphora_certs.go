@@ -46,6 +46,10 @@ var (
 	}
 )
 
+const (
+	OctaviaCertSecretVersion int = 2
+)
+
 // generateKey generates a PEM encoded private RSA key and applies PEM
 // encryption if given passphrase is not an empty string.
 func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
@@ -84,7 +88,7 @@ func generateCACert(caPrivKey *rsa.PrivateKey, commonName string) ([]byte, *x509
 		SerialNumber:          big.NewInt(2019),
 		Subject:               subjectDefault,
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(10, 0, 0),
+		NotAfter:              time.Now().AddDate(10 /* years */, 0, 0),
 		IsCA:                  true,
 		BasicConstraintsValid: true,
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageCRLSign | x509.KeyUsageCertSign,
@@ -114,7 +118,7 @@ func generateClientCert(caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKe
 		SerialNumber:          big.NewInt(2019),
 		Subject:               subjectDefault,
 		NotBefore:             time.Now(),
-		NotAfter:              time.Now().AddDate(0, 1, 0),
+		NotAfter:              time.Now().AddDate(10 /* years */, 0, 0),
 		IsCA:                  false,
 		BasicConstraintsValid: false,
 		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
@@ -185,7 +189,7 @@ func EnsureAmphoraCerts(
 			return fmt.Errorf("Error while generating server CA certificate: %w", err)
 		}
 
-		clientCAKey, _, err := generateKey(nil)
+		clientCAKey, clientCAKeyPEM, err := generateKey(nil)
 		if err != nil {
 			return fmt.Errorf("Error while generating client CA key: %w", err)
 		}
@@ -215,9 +219,11 @@ func EnsureAmphoraCerts(
 			Data: map[string][]byte{
 				"server_ca.key.pem":  serverCAKeyPEM,
 				"server_ca.cert.pem": serverCACert,
+				"client_ca.key.pem":  clientCAKeyPEM,
 				"client_ca.cert.pem": clientCACert,
 				// Unencrypted client key and cert
 				"client.cert-and-key.pem": clientKeyAndCert,
+				"version":                 []byte(fmt.Sprintf("%d", OctaviaCertSecretVersion)),
 			},
 		}
 
