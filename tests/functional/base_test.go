@@ -308,6 +308,6 @@ func CreateSSHPubKey() client.Object {
 		Name:      "octavia-ssh-pubkey",
 		Namespace: namespace,
 	}, map[string]interface{}{
-		"key": []byte("public key"),
+		"key": "public key",
 	})
 }

@@ -127,28 +127,13 @@ func uploadKeypair(
 		return fmt.Errorf("Error getting user details from openstack client: %w", err)
 	}
 
-	listOpts := keypairs.ListOpts{
+	getOpts := keypairs.GetOpts{
 		UserID: octaviaUser.ID,
 	}
-	allPages, err := keypairs.List(computeClient, listOpts).AllPages()
-	if err != nil {
-		return fmt.Errorf("Could not list keypairs: %w", err)
-	}
+	keypair, _ := keypairs.Get(computeClient, NovaKeyPairName, getOpts).Extract()
 
-	allKeyPairs, err := keypairs.ExtractKeyPairs(allPages)
-	if err != nil {
-		return fmt.Errorf("Could not extract keypairs: %w", err)
-	}
-
-	var keypairExists = false
-	for _, kp := range allKeyPairs {
-		if kp.Name == NovaKeyPairName {
-			keypairExists = true
-			break
-		}
-	}
-
-	if keypairExists {
+	// keypair exists with a different pubkey, delete keypair
+	if keypair != nil && keypair.PublicKey != pubKey {
 		deleteOpts := keypairs.DeleteOpts{
 			UserID: octaviaUser.ID,
 		}
@@ -158,15 +143,18 @@ func uploadKeypair(
 		}
 	}
 
-	createOpts := keypairs.CreateOpts{
-		Name:      NovaKeyPairName,
-		Type:      "ssh",
-		PublicKey: pubKey,
-		UserID:    octaviaUser.ID,
-	}
-	_, err = keypairs.Create(computeClient, createOpts).Extract()
-	if err != nil {
-		return fmt.Errorf("Error uploading public key for SSH authentication with amphora: %w", err)
+	// keypair doesn't exist or pubkey has changed, update keypair
+	if keypair == nil || keypair.PublicKey != pubKey {
+		createOpts := keypairs.CreateOpts{
+			Name:      NovaKeyPairName,
+			Type:      "ssh",
+			PublicKey: pubKey,
+			UserID:    octaviaUser.ID,
+		}
+		_, err = keypairs.Create(computeClient, createOpts).Extract()
+		if err != nil {
+			return fmt.Errorf("Error uploading public key for SSH authentication with amphora: %w", err)
+		}
 	}
 	return nil
 }
