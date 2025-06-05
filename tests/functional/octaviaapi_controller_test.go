@@ -134,13 +134,14 @@ var _ = Describe("OctaviaAPI controller", func() {
 	When("config files are created", func() {
 		var keystoneInternalEndpoint string
 		var keystonePublicEndpoint string
+		var keystoneAPIName types.NamespacedName
 
 		BeforeEach(func() {
-			keystoneName := keystone.CreateKeystoneAPI(namespace)
-			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneName)
+			keystoneAPIName = keystone.CreateKeystoneAPI(namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
 			keystoneInternalEndpoint = fmt.Sprintf("http://keystone-for-%s-internal", octaviaAPIName.Name)
 			keystonePublicEndpoint = fmt.Sprintf("http://keystone-for-%s-public", octaviaAPIName.Name)
-			SimulateKeystoneReady(keystoneName, keystonePublicEndpoint, keystoneInternalEndpoint)
+			SimulateKeystoneReady(keystoneAPIName, keystonePublicEndpoint, keystoneInternalEndpoint)
 
 			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(namespace))
 			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
@@ -301,6 +302,26 @@ var _ = Describe("OctaviaAPI controller", func() {
 			conf := string(configData.Data["custom.conf"])
 			Expect(conf).Should(
 				ContainSubstring("[DEFAULT]\ndebug=True\n"))
+		})
+
+		It("updates the KeystoneAuthURL if keystone internal endpoint changes", func() {
+			newInternalEndpoint := "https://keystone-internal"
+
+			keystone.UpdateKeystoneAPIEndpoint(keystoneAPIName, "internal", newInternalEndpoint)
+			logger.Info("Reconfigured")
+
+			secret := types.NamespacedName{
+				Namespace: octaviaAPIName.Namespace,
+				Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)}
+
+			Eventually(func(g Gomega) {
+				confSecret := th.GetSecret(secret)
+				g.Expect(confSecret).ShouldNot(BeNil())
+
+				conf := string(confSecret.Data["octavia.conf"])
+				g.Expect(string(conf)).Should(
+					ContainSubstring("auth_url=%s", newInternalEndpoint))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
