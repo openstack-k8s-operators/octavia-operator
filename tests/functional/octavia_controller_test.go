@@ -1043,7 +1043,7 @@ var _ = Describe("Octavia controller", func() {
 			apiFixtures.Nova.KeyPairs = map[string]keypairs.KeyPair{
 				"octavia-ssh-keypair": {
 					Name:      "octavia-ssh-keypair",
-					PublicKey: "foobar",
+					PublicKey: "public key",
 					UserID:    apiFixtures.Keystone.Users["octavia"].ID,
 				}}
 
@@ -1072,10 +1072,9 @@ var _ = Describe("Octavia controller", func() {
 			th.SimulateJobSuccess(octaviaDBSyncName)
 		})
 
-		// PENDING https://issues.redhat.com/browse/OSPRH-10543
-		PIt("should not update the keypair", func() {
+		It("should not update the keypair", func() {
 			keyPairs := apiFixtures.Nova.KeyPairs
-			Expect(keyPairs["octavia-ssh-keypair"].PublicKey).Should(Equal("foobar"))
+			Expect(keyPairs["octavia-ssh-keypair"].PublicKey).Should(Equal("public key"))
 		})
 	})
 

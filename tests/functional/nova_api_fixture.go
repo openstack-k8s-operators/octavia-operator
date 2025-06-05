@@ -65,7 +65,29 @@ func (f *NovaAPIFixture) keyPairHandler(w http.ResponseWriter, r *http.Request) 
 
 func (f *NovaAPIFixture) getKeyPair(w http.ResponseWriter, r *http.Request) {
 	items := strings.Split(r.URL.Path, "/")
-	if len(items) == 3 {
+	if len(items) == 4 {
+		var k struct {
+			KeyPair keypairs.KeyPair `json:"keypair"`
+		}
+		k.KeyPair = keypairs.KeyPair{}
+		query := r.URL.Query()
+		userID := query["user_id"]
+		keyName := items[3]
+		for _, keypair := range f.KeyPairs {
+			if userID[0] == keypair.UserID && keyName == keypair.Name {
+				k.KeyPair = keypair
+			}
+		}
+		bytes, err := json.Marshal(&k)
+		if err != nil {
+			f.InternalError(err, "Error during marshalling response", w, r)
+			return
+		}
+
+		w.Header().Add("Content-Type", "application/json")
+		w.WriteHeader(200)
+		fmt.Fprint(w, string(bytes))
+	} else if len(items) == 3 {
 		type pair struct {
 			KeyPair keypairs.KeyPair `json:"keypair"`
 		}
