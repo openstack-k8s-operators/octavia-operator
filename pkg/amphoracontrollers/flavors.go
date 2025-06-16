@@ -44,8 +44,8 @@ type OctaviaFlavors struct {
 
 // FlavorProfileData -
 type FlavorProfileData struct {
-	ComputeFlavorID string `json:"compute_flavor"`
-	AmpImageTag     string `json:"amp_image_tag"`
+	ComputeFlavorID string `json:"compute_flavor,omitempty"`
+	AmpImageTag     string `json:"amp_image_tag,omitempty"`
 }
 
 var (
@@ -207,6 +207,32 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 	flavorMap, err := getOctaviaFlavors(lbClient)
 	if err != nil {
 		return "", fmt.Errorf("error getting flavors: %w", err)
+	}
+
+	// Update path for OSPRH-17186
+	// if the amp_image_tag is an empty string, it's a bug:
+	// - delete the associated flavors and flavorprofiles
+	// - remove them from the maps so they can be recreated with the correct JSON data
+	for _, flavorProfile := range flavorProfileMap {
+		if strings.Contains(flavorProfile.FlavorData, "\"amp_image_tag\":\"\"") {
+			flavorName := flavorProfile.Name
+
+			if flavor, ok := flavorMap[flavorName]; ok {
+				err := flavors.Delete(lbClient, flavor.ID).ExtractErr()
+				if err != nil {
+					log.Info("Cannot delete flavor %s (%s), skipping.", flavorName, flavor.ID)
+					continue
+				}
+				delete(flavorMap, flavorName)
+			}
+
+			err = flavorprofiles.Delete(lbClient, flavorProfile.ID).ExtractErr()
+			if err != nil {
+				log.Info("Cannot delete flavorprofile %s (%s), skipping.", flavorName, flavorProfile.ID)
+				continue
+			}
+			delete(flavorProfileMap, flavorName)
+		}
 	}
 
 	flavorSuccess := false
