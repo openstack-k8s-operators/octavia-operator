@@ -3,7 +3,7 @@ module github.com/openstack-k8s-operators/octavia-operator
 go 1.21
 
 require (
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/gophercloud/gophercloud v1.14.1
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.6
 	github.com/onsi/ginkgo/v2 v2.20.1
