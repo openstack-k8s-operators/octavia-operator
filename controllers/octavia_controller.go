@@ -66,7 +66,6 @@ import (
 type OctaviaReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
@@ -571,7 +570,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		octaviav1.OctaviaAmphoraCertsReadyCondition,
 		octaviav1.OctaviaAmphoraCertsReadyCompleteMessage)
 
-	if err = octavia.EnsureQuotas(ctx, instance, &r.Log, helper); err != nil {
+	if err = octavia.EnsureQuotas(ctx, instance, &Log, helper); err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			octaviav1.OctaviaQuotasReadyCondition,
 			condition.ErrorReason,
@@ -667,7 +666,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	// Check the underlying OctaviaAPI condition according to the
 	// ObservedGeneration
-	apiObsGen, err := r.checkOctaviaAPIGeneration(instance)
+	apiObsGen, err := r.checkOctaviaAPIGeneration(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			octaviav1.OctaviaAPIReadyCondition,
@@ -887,7 +886,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 	// Even if we trigger three deployments, the Amphora subCR is only one, no
 	// need to call this functions three times in the same reconciliation loop
-	ampObsGen, err := r.checkAmphoraGeneration(instance)
+	ampObsGen, err := r.checkAmphoraGeneration(ctx, instance)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
@@ -1328,7 +1327,7 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 		return ctrl.Result{}, err
 	}
 
-	ok, err := octavia.EnsureAmphoraImages(ctx, instance, &r.Log, helper, urlMap)
+	ok, err := octavia.EnsureAmphoraImages(ctx, instance, &Log, helper, urlMap)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -1693,14 +1692,16 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 
 // checkOctaviaAPIGeneration -
 func (r *OctaviaReconciler) checkOctaviaAPIGeneration(
+	ctx context.Context,
 	instance *octaviav1.Octavia,
 ) (bool, error) {
+	Log := r.GetLogger(ctx)
 	api := &octaviav1.OctaviaAPIList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), api, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve OctaviaAPI %w")
+		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
 		return false, err
 	}
 	for _, item := range api.Items {
@@ -1713,14 +1714,16 @@ func (r *OctaviaReconciler) checkOctaviaAPIGeneration(
 
 // checkAmphoraGeneration -
 func (r *OctaviaReconciler) checkAmphoraGeneration(
+	ctx context.Context,
 	instance *octaviav1.Octavia,
 ) (bool, error) {
+	Log := r.GetLogger(ctx)
 	amph := &octaviav1.OctaviaAmphoraControllerList{}
 	listOpts := []client.ListOption{
 		client.InNamespace(instance.Namespace),
 	}
 	if err := r.Client.List(context.Background(), amph, listOpts...); err != nil {
-		r.Log.Error(err, "Unable to retrieve OctaviaAPI %w")
+		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
 		return false, err
 	}
 	for _, item := range amph.Items {

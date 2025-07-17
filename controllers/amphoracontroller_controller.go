@@ -64,7 +64,6 @@ import (
 type OctaviaAmphoraControllerReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
@@ -296,12 +295,12 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// Handle secrets
 	secretsVars := make(map[string]env.Setter)
 
-	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &r.Log, helper)
+	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &Log, helper)
 	if err != nil {
-		r.Log.Info(fmt.Sprintf("Cannot define flavors: %s", err))
+		Log.Info(fmt.Sprintf("Cannot define flavors: %s", err))
 		return ctrl.Result{RequeueAfter: time.Duration(60) * time.Second}, nil
 	}
-	r.Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
+	Log.Info(fmt.Sprintf("Using default flavor \"%s\"", defaultFlavorID))
 
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
@@ -375,7 +374,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(instance, secretsVars)
+	inputHash, err := r.createHashOfInputHashes(ctx, instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -511,13 +510,14 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	envVars *map[string]env.Setter,
 	templateVars OctaviaTemplateVars,
 ) error {
-	r.Log.Info(fmt.Sprintf("generating service secret for %s (%s)", instance.Name, instance.Kind))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("generating service secret for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
 
 	ospSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
-			r.Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
+			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
 				condition.RequestedReason,
@@ -538,7 +538,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	transportURLSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.TransportURLSecret, instance.Namespace)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
-			r.Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
+			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Spec.TransportURLSecret))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
 				condition.RequestedReason,
@@ -731,19 +731,21 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 
 	err = oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
 	if err != nil {
-		r.Log.Error(err, "unable to process secrets")
+		Log.Error(err, "unable to process secrets")
 		return err
 	}
 
-	r.Log.Info("Service secrets generated")
+	Log.Info("Service secrets generated")
 
 	return nil
 }
 
 func (r *OctaviaAmphoraControllerReconciler) createHashOfInputHashes(
+	ctx context.Context,
 	instance *octaviav1.OctaviaAmphoraController,
 	envVars map[string]env.Setter,
 ) (string, error) {
+	Log := r.GetLogger(ctx)
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
 	hash, err := util.ObjectHash(mergedMapVars)
 	if err != nil {
@@ -752,7 +754,7 @@ func (r *OctaviaAmphoraControllerReconciler) createHashOfInputHashes(
 
 	if hashMap, changed := util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, nil
 }
@@ -844,7 +846,7 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(ctx).WithName("Controllers").WithName("Amphora")
+	Log := r.GetLogger(ctx)
 
 	allWatchFields := []string{
 		passwordSecretField,
@@ -859,12 +861,12 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 		}
 		err := r.Client.List(ctx, crList, listOps)
 		if err != nil {
-			l.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
+			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
 			return requests
 		}
 
 		for _, item := range crList.Items {
-			l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+			Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
 
 			requests = append(requests,
 				reconcile.Request{
@@ -883,7 +885,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 func (r *OctaviaAmphoraControllerReconciler) findObjectForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(ctx).WithName("Controllers").WithName("Amphora")
+	Log := r.GetLogger(ctx)
 
 	crList := &octaviav1.OctaviaAmphoraControllerList{}
 	listOps := &client.ListOptions{
@@ -891,12 +893,12 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectForSrc(ctx context.Contex
 	}
 	err := r.Client.List(ctx, crList, listOps)
 	if err != nil {
-		l.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
+		Log.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
 		return requests
 	}
 
 	for _, item := range crList.Items {
-		l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+		Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
 
 		requests = append(requests,
 			reconcile.Request{
