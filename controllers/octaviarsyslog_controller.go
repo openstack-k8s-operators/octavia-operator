@@ -57,7 +57,6 @@ import (
 type OctaviaRsyslogReconciler struct {
 	client.Client
 	Kclient kubernetes.Interface
-	Log     logr.Logger
 	Scheme  *runtime.Scheme
 }
 
@@ -290,7 +289,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	// create hash over all the different input resources to identify if any those changed
 	// and a restart/recreate is required.
 	//
-	inputHash, err := r.createHashOfInputHashes(instance, secretsVars)
+	inputHash, err := r.createHashOfInputHashes(ctx, instance, secretsVars)
 	if err != nil {
 		return ctrl.Result{}, err
 	}
@@ -423,7 +422,8 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 	helper *helper.Helper,
 	envVars *map[string]env.Setter,
 ) error {
-	r.Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
+	Log := r.GetLogger(ctx)
+	Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
 
 	customData := map[string]string{}
@@ -462,19 +462,21 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 
 	err := oko_secret.EnsureSecrets(ctx, helper, instance, cms, envVars)
 	if err != nil {
-		r.Log.Error(err, "unable to process config map")
+		Log.Error(err, "unable to process config map")
 		return err
 	}
 
-	r.Log.Info("Service config map generated")
+	Log.Info("Service config map generated")
 
 	return nil
 }
 
 func (r *OctaviaRsyslogReconciler) createHashOfInputHashes(
+	ctx context.Context,
 	instance *octaviav1.OctaviaRsyslog,
 	envVars map[string]env.Setter,
 ) (string, error) {
+	Log := r.GetLogger(ctx)
 	mergedMapVars := env.MergeEnvs([]corev1.EnvVar{}, envVars)
 	hash, err := util.ObjectHash(mergedMapVars)
 	if err != nil {
@@ -483,7 +485,7 @@ func (r *OctaviaRsyslogReconciler) createHashOfInputHashes(
 
 	if hashMap, changed := util.SetHash(instance.Status.Hash, common.InputHashName, hash); changed {
 		instance.Status.Hash = hashMap
-		r.Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
+		Log.Info(fmt.Sprintf("Input maps hash %s - %s", common.InputHashName, hash))
 	}
 	return hash, nil
 }
@@ -517,7 +519,7 @@ func (r *OctaviaRsyslogReconciler) SetupWithManager(mgr ctrl.Manager) error {
 func (r *OctaviaRsyslogReconciler) findObjectsForSrc(ctx context.Context, src client.Object) []reconcile.Request {
 	requests := []reconcile.Request{}
 
-	l := log.FromContext(ctx).WithName("Controllers").WithName("OctaviaRsyslog")
+	Log := r.GetLogger(ctx)
 
 	for _, field := range rsyslogWatchFields {
 		crList := &octaviav1.OctaviaAPIList{}
@@ -527,12 +529,12 @@ func (r *OctaviaRsyslogReconciler) findObjectsForSrc(ctx context.Context, src cl
 		}
 		err := r.Client.List(ctx, crList, listOps)
 		if err != nil {
-			l.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
+			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
 			return requests
 		}
 
 		for _, item := range crList.Items {
-			l.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
+			Log.Info(fmt.Sprintf("input source %s changed, reconcile: %s - %s", src.GetName(), item.GetName(), item.GetNamespace()))
 
 			requests = append(requests,
 				reconcile.Request{
