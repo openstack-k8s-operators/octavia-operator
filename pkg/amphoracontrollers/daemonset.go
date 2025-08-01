@@ -118,7 +118,7 @@ func DaemonSet(
 		fmt.Sprintf(InitContainerCommand, instance.Name),
 	}
 
-	// Because we don't use jobboard, we need to ensure that the octavia
+	// When we don't use jobboard, we need to ensure that the octavia
 	// controllers are gracefully shutdown, so after they receive the signal,
 	// they need to complete the jobs that are being executed (creating a LB,
 	// updating a listener)
@@ -126,9 +126,12 @@ func DaemonSet(
 	// max duration of a flow in a worst case scenario (updating an amphora that
 	// is not reachable).
 	// The octavia [DEFAULT].graceful_shutdown_timeout is set accordingly
-	// TODO(gthiemonge) This setting must be updated/removed when Jobboard is
-	// re-enabled
-	terminationGracePeriodSeconds := int64(600)
+	var terminationGracePeriodSeconds int64
+	if len(instance.Spec.RedisHosts) > 0 {
+		terminationGracePeriodSeconds = int64(30)
+	} else {
+		terminationGracePeriodSeconds = int64(600)
+	}
 
 	capabilities := []corev1.Capability{"NET_ADMIN", "SYS_ADMIN", "SYS_NICE"}
 	if instance.Spec.Role == octaviav1.HealthManager {

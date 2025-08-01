@@ -21,12 +21,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
+	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
@@ -96,6 +98,7 @@ func (r *OctaviaReconciler) GetLogger(ctx context.Context) logr.Logger {
 // +kubebuilder:rbac:groups=keystone.openstack.org,resources=keystoneendpoints,verbs=get;list;watch;create;update;patch;delete;
 // +kubebuilder:rbac:groups=rabbitmq.openstack.org,resources=transporturls,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
+// +kubebuilder:rbac:groups=redis.openstack.org,resources=redises,verbs=get;list;watch;create;update;patch;delete
 
 // service account, role, rolebinding
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update;patch
@@ -271,6 +274,7 @@ func (r *OctaviaReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&rbacv1.RoleBinding{}).
 		Owns(&corev1.Service{}).
 		Owns(&rabbitmqv1.TransportURL{}).
+		Owns(&redisv1.Redis{}).
 		Complete(r)
 }
 
@@ -474,6 +478,22 @@ func (r *OctaviaReconciler) reconcileInit(
 	instance.Status.Conditions.MarkTrue(condition.DBSyncReadyCondition, condition.DBSyncReadyMessage)
 
 	// run octavia db sync - end
+
+	if len(instance.Spec.RedisServiceName) > 0 {
+		hostIPs, err := getRedisHosts(ctx, instance, helper, instance.Spec.RedisServiceName)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+
+		if len(hostIPs) == 0 {
+			Log.Info(fmt.Sprintf("RedisServiceName configured with '%s' but no Redis hosts available, jobboard will be disabled", instance.Spec.RedisServiceName))
+		}
+
+		sort.Strings(hostIPs)
+		instance.Status.RedisHosts = hostIPs
+	} else {
+		instance.Status.RedisHosts = []string{}
+	}
 
 	Log.Info("Reconciled Service init successfully")
 	return ctrl.Result{}, nil
@@ -1556,6 +1576,28 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 	return transportURL, op, err
 }
 
+func getRedisHosts(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	helper *helper.Helper,
+	redisName string,
+) ([]string, error) {
+	listOptions := metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("redis/name=%s", redisName),
+	}
+	pods, err := helper.GetKClient().CoreV1().Pods(instance.Namespace).List(ctx, listOptions)
+	if err != nil {
+		return []string{}, err
+	}
+	hosts := []string{}
+	for _, pod := range pods.Items {
+		// The name of the headless service is redis.Name + "-redis"
+		hostname := fmt.Sprintf("%s.%s-redis.%s.svc", pod.Name, redisName, pod.Namespace)
+		hosts = append(hosts, hostname)
+	}
+	return hosts, nil
+}
+
 func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	instance *octaviav1.Octavia,
 	networkInfo octavia.NetworkProvisioningSummary,
@@ -1598,6 +1640,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.LbMgmtNetworkID = networkInfo.TenantNetworkID
 		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
+		daemonset.Spec.RedisHosts = instance.Status.RedisHosts
 		daemonset.Spec.TLS = instance.Spec.OctaviaAPI.TLS.Ca
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway

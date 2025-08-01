@@ -227,6 +227,11 @@ type OctaviaSpecBase struct {
 	// TopologyRef to apply the Topology defined by the associated CR referenced
 	// by name
 	TopologyRef *topologyv1.TopoRef `json:"topologyRef,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=octavia-redis
+	// Name of the Redis database for Jobboard
+	RedisServiceName string `json:"redisServiceName"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
@@ -321,6 +326,10 @@ type OctaviaStatus struct {
 
 	// ReadyCount of octavia Rsyslog instances
 	OctaviaRsyslogReadyCount int32 `json:"rsyslogreadyCount,omitempty"`
+
+	// List of Redis Hosts
+	// +listType:=atomic
+	RedisHosts []string `json:"redisHosts,omitempty"`
 
 	// ObservedGeneration - the most recent generation observed for this
 	// service. If the observed generation is less than the spec generation,

@@ -708,6 +708,21 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	}
 	templateParameters["HeartbeatKey"] = string(ospSecret.Data["OctaviaHeartbeatKey"])
 
+	if len(spec.RedisHosts) > 0 {
+		templateParameters["JobboardEnable"] = true
+		templateParameters["JobboardBackendHosts"] = strings.Join(spec.RedisHosts[:], ",")
+		templateParameters["GracefulShutdownTimeout"] = 25
+	} else {
+		templateParameters["JobboardEnable"] = false
+		templateParameters["JobboardBackendHosts"] = ""
+		templateParameters["GracefulShutdownTimeout"] = 600
+	}
+	if tlsCfg != nil {
+		templateParameters["JobboardBackendSSLOptions"] = "ssl:true"
+	} else {
+		templateParameters["JobboardBackendSSLOptions"] = ""
+	}
+
 	// TODO(beagles): populate the template parameters
 	cms := []util.Template{
 		{

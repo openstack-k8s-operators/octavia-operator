@@ -5,6 +5,7 @@ metadata:
 spec:
   databaseInstance: openstack
   databaseAccount: octavia
+  redisServiceName: octavia-redis
   persistenceDatabaseAccount: octavia-persistence
   serviceUser: octavia
   rabbitMqClusterName: rabbitmq
