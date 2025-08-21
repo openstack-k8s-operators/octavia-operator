@@ -241,6 +241,7 @@ const (
 	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
 	tlsOvnField             = ".spec.tls.ovn.secretName"
 	topologyField           = ".spec.topologyRef.Name"
+	transportURLSecretField = ".spec.transportURLSecret"
 )
 
 var (
@@ -251,6 +252,7 @@ var (
 		tlsAPIPublicField,
 		tlsOvnField,
 		topologyField,
+		transportURLSecretField,
 	}
 	rsyslogWatchFields = []string{
 		topologyField,

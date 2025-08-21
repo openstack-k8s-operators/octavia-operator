@@ -687,6 +687,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 
 	spec := instance.Spec
 	templateParameters["TransportURL"] = transportURL
+	templateParameters["QuorumQueues"] = string(transportURLSecret.Data["quorumqueues"]) == "true"
 	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["TenantName"] = spec.TenantName
 	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
@@ -812,6 +813,17 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		return err
 	}
 
+	// index transportURLSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAmphoraController{}, transportURLSecretField, func(rawObj client.Object) []string {
+		cr := rawObj.(*octaviav1.OctaviaAmphoraController)
+		if cr.Spec.TransportURLSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.TransportURLSecret}
+	}); err != nil {
+		return err
+	}
+
 	svcSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		secret := o.(*corev1.Secret)
 		secretName := secret.GetName()
@@ -866,6 +878,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 	allWatchFields := []string{
 		passwordSecretField,
 		caBundleSecretNameField,
+		transportURLSecretField,
 	}
 
 	for _, field := range allWatchFields {
