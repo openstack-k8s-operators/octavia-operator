@@ -39,6 +39,7 @@ import (
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octaviarsyslog"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -82,7 +83,7 @@ func (r *OctaviaRsyslogReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	Log := r.GetLogger(ctx)
 
 	instance := &octaviav1.OctaviaRsyslog{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -221,7 +222,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	// Prepare NetworkAttachments first, it must be done before generating the
 	// configuration as the config uses IP addresses of the attachments.
 	if len(instance.Spec.NetworkAttachments) == 0 {
-		err := fmt.Errorf("NetworkAttachments list is empty")
+		err := octavia.ErrNetworkAttachmentsEmpty
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.NetworkAttachmentsReadyCondition,
 			condition.ErrorReason,
@@ -266,7 +267,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	}
 
 	serviceLabels := map[string]string{
-		common.AppSelector: instance.ObjectMeta.Name,
+		common.AppSelector: instance.Name,
 	}
 
 	// Handle secrets
@@ -388,7 +389,7 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 		if networkReady {
 			instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 		} else {
-			err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+			err := fmt.Errorf("%w: %s", octavia.ErrNetworkAttachmentConfig, instance.Spec.NetworkAttachments)
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
 				condition.ErrorReason,
@@ -424,7 +425,7 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 ) error {
 	Log := r.GetLogger(ctx)
 	Log.Info(fmt.Sprintf("generating service config map for %s (%s)", instance.Name, instance.Kind))
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.Name), map[string]string{})
 
 	customData := map[string]string{}
 	for key, data := range instance.Spec.DefaultConfigOverwrite {
@@ -527,7 +528,7 @@ func (r *OctaviaRsyslogReconciler) findObjectsForSrc(ctx context.Context, src cl
 			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
 			Namespace:     src.GetNamespace(),
 		}
-		err := r.Client.List(ctx, crList, listOps)
+		err := r.List(ctx, crList, listOps)
 		if err != nil {
 			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
 			return requests

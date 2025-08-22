@@ -508,7 +508,7 @@ func ensureLbMgmtNetwork(
 	}
 
 	if networkDetails == nil && mgmtNetwork == nil {
-		return nil, fmt.Errorf("Cannot find network \"%s\"", networkName)
+		return nil, fmt.Errorf("%w: \"%s\"", ErrCannotFindNetwork, networkName)
 	}
 
 	asu := true
@@ -561,7 +561,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 	log *logr.Logger) (*routers.Router, error) {
 
 	if !router.AdminStateUp {
-		return router, fmt.Errorf("Router %s is not up", router.Name)
+		return router, fmt.Errorf("%w: %s", ErrRouterNotUp, router.Name)
 	}
 
 	// TODO(beagles) check the status string.
@@ -851,6 +851,7 @@ func ensureSecurityGroup(
 	return secGroup.ID, nil
 }
 
+// HandleUnmanagedAmphoraManagementNetwork manages unmanaged amphora management network configurations
 func HandleUnmanagedAmphoraManagementNetwork(
 	ctx context.Context,
 	ns string,
@@ -1124,7 +1125,7 @@ func GetPredictableIPAM(networkParameters *NetworkParameters) (*NADIpam, error) 
 	endRange := predParams.RangeStart
 	for i := 0; i < LbProvPredictablePoolSize; i++ {
 		if !predParams.CIDR.Contains(endRange) {
-			return nil, fmt.Errorf("predictable IPs: cannot allocate %d IP addresses in %s", LbProvPredictablePoolSize, predParams.CIDR)
+			return nil, fmt.Errorf("%w: %d in %s", ErrPredictableIPAllocation, LbProvPredictablePoolSize, predParams.CIDR)
 		}
 		endRange = endRange.Next()
 	}
@@ -1140,7 +1141,7 @@ func GetNextIP(predParams *NADIpam, currentValues map[string]bool) (string, erro
 
 		if _, ok := currentValues[candidateAddress.String()]; ok {
 			if candidateAddress == predParams.RangeEnd {
-				return "", fmt.Errorf("predictable IPs: out of available addresses")
+				return "", ErrPredictableIPOutOfAddresses
 			}
 			candidateAddress = candidateAddress.Next()
 		} else {

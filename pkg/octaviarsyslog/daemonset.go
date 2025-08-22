@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package octaviarsyslog contains functionality for managing Octavia rsyslog daemon sets
 package octaviarsyslog
 
 import (

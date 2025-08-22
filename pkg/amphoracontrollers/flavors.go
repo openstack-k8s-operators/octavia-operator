@@ -290,7 +290,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 		flavorSuccess = true
 	}
 	if !flavorSuccess {
-		return "", fmt.Errorf("none of the Octavia flavors could be configured")
+		return "", octavia.ErrOctaviaFlavorsConfig
 	}
 	return defaultFlavorID, nil
 }

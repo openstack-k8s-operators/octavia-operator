@@ -31,6 +31,7 @@ import (
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
 )
 
+// NovaAPIFixture provides a test fixture for mocking Nova API responses
 type NovaAPIFixture struct {
 	api.APIFixture
 	QuotaSets       map[string]quotasets.QuotaSet
@@ -42,6 +43,7 @@ func (f *NovaAPIFixture) registerHandler(handler api.Handler) {
 	f.Server.AddHandler(f.URLBase+handler.Pattern, handler.Func)
 }
 
+// Setup initializes the NovaAPIFixture with API handlers and test data
 func (f *NovaAPIFixture) Setup() {
 	f.registerHandler(api.Handler{Pattern: "/os-keypairs", Func: f.keyPairHandler})
 	f.registerHandler(api.Handler{Pattern: "/os-keypairs/", Func: f.keyPairHandler})
@@ -86,7 +88,7 @@ func (f *NovaAPIFixture) getKeyPair(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	} else if len(items) == 3 {
 		type pair struct {
 			KeyPair keypairs.KeyPair `json:"keypair"`
@@ -111,7 +113,7 @@ func (f *NovaAPIFixture) getKeyPair(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -142,7 +144,7 @@ func (f *NovaAPIFixture) postKeyPair(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NovaAPIFixture) deleteKeyPair(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +190,7 @@ func (f *NovaAPIFixture) getQuotaSets(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NovaAPIFixture) putQuotaSets(w http.ResponseWriter, r *http.Request) {
@@ -212,9 +214,10 @@ func (f *NovaAPIFixture) putQuotaSets(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
+// NewNovaAPIFixtureWithServer creates a new NovaAPIFixture with its own test server
 func NewNovaAPIFixtureWithServer(log logr.Logger) *NovaAPIFixture {
 	server := &api.FakeAPIServer{}
 	server.Setup(log)
@@ -223,6 +226,7 @@ func NewNovaAPIFixtureWithServer(log logr.Logger) *NovaAPIFixture {
 	return fixture
 }
 
+// AddNovaAPIFixture adds a NovaAPIFixture to an existing test server
 func AddNovaAPIFixture(log logr.Logger, server *api.FakeAPIServer) *NovaAPIFixture {
 	fixture := &NovaAPIFixture{
 		APIFixture: api.APIFixture{

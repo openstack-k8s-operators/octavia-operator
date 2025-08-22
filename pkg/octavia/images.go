@@ -28,10 +28,13 @@ import (
 )
 
 const (
-	AmphoraImageTag     = "amphora-image"
+	// AmphoraImageTag is the tag used for Octavia amphora images
+	AmphoraImageTag = "amphora-image"
+	// AmphoraImageVertTag is the tag used for Octavia amphora vertical images
 	AmphoraImageVertTag = "amphora-image-vert"
 )
 
+// AmphoraImage represents an Octavia amphora image with its metadata
 type AmphoraImage struct {
 	ID       string
 	URL      string
@@ -172,6 +175,7 @@ func amphoraImageList(
 	return amphoraImages, nil
 }
 
+// EnsureAmphoraImages ensures that required Octavia amphora images are available in OpenStack
 func EnsureAmphoraImages(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
@@ -220,6 +224,7 @@ func EnsureAmphoraImages(
 	return true, nil
 }
 
+// GetImageOwnerID retrieves the owner ID for images in the OpenStack service
 func GetImageOwnerID(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
