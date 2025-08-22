@@ -7,14 +7,10 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - nodes
-  verbs:
-  - get
-  - list
-- apiGroups:
-  - ""
-  resources:
+  - configmaps
   - pods
+  - secrets
+  - services
   verbs:
   - create
   - delete
@@ -23,6 +19,13 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - get
+  - list
 - apiGroups:
   - ""
   resources:
@@ -38,17 +41,6 @@ rules:
   - apps
   resources:
   - daemonsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps
-  resources:
   - deployments
   verbs:
   - create
@@ -62,42 +54,6 @@ rules:
   - batch
   resources:
   - jobs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - secrets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - services
   verbs:
   - create
   - delete
@@ -126,17 +82,6 @@ rules:
   - keystone.openstack.org
   resources:
   - keystoneendpoints
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - keystone.openstack.org
-  resources:
   - keystoneservices
   verbs:
   - create
@@ -150,24 +95,6 @@ rules:
   - mariadb.openstack.org
   resources:
   - mariadbaccounts
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - mariadb.openstack.org
-  resources:
-  - mariadbaccounts/finalizers
-  verbs:
-  - patch
-  - update
-- apiGroups:
-  - mariadb.openstack.org
-  resources:
   - mariadbdatabases
   verbs:
   - create
@@ -180,6 +107,7 @@ rules:
 - apiGroups:
   - mariadb.openstack.org
   resources:
+  - mariadbaccounts/finalizers
   - mariadbdatabases/finalizers
   verbs:
   - patch
@@ -188,85 +116,8 @@ rules:
   - octavia.openstack.org
   resources:
   - octaviaamphoracontrollers
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviaamphoracontrollers/finalizers
-  verbs:
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviaamphoracontrollers/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
   - octaviaapis
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviaapis/finalizers
-  verbs:
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviaapis/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
   - octaviarsyslogs
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviarsyslogs/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
-  - octaviarsyslogs/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - octavia.openstack.org
-  resources:
   - octavias
   verbs:
   - create
@@ -279,6 +130,8 @@ rules:
 - apiGroups:
   - octavia.openstack.org
   resources:
+  - octaviaamphoracontrollers/finalizers
+  - octaviaapis/finalizers
   - octavias/finalizers
   verbs:
   - patch
@@ -286,10 +139,19 @@ rules:
 - apiGroups:
   - octavia.openstack.org
   resources:
+  - octaviaamphoracontrollers/status
+  - octaviaapis/status
+  - octaviarsyslogs/status
   - octavias/status
   verbs:
   - get
   - patch
+  - update
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs/finalizers
+  verbs:
   - update
 - apiGroups:
   - ovn.openstack.org
@@ -315,16 +177,6 @@ rules:
   - rbac.authorization.k8s.io
   resources:
   - rolebindings
-  verbs:
-  - create
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - rbac.authorization.k8s.io
-  resources:
   - roles
   verbs:
   - create

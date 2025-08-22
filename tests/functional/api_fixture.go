@@ -34,22 +34,20 @@ import (
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
 )
 
-var (
-	keystoneProjects = []projects.Project{
-		{
-			Name: "admin",
-			ID:   uuid.New().String(),
-		},
-		{
-			Name: "service",
-			ID:   uuid.New().String(),
-		},
-		{
-			Name: "project1234",
-			ID:   uuid.New().String(),
-		},
-	}
-)
+var keystoneProjects = []projects.Project{
+	{
+		Name: "admin",
+		ID:   uuid.New().String(),
+	},
+	{
+		Name: "service",
+		ID:   uuid.New().String(),
+	},
+	{
+		Name: "project1234",
+		ID:   uuid.New().String(),
+	},
+}
 
 // ResponseHandleToken responds with a valid keystone token and the computeURL in the catalog
 func ResponseHandleToken(
