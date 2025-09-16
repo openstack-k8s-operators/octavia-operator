@@ -289,6 +289,17 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
+	// index transportURLSecretField
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, transportURLSecretField, func(rawObj client.Object) []string {
+		cr := rawObj.(*octaviav1.OctaviaAPI)
+		if cr.Spec.TransportURLSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.TransportURLSecret}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -1079,6 +1090,7 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 
 	templateParameters["Password"] = servicePassword
 	templateParameters["TransportURL"] = transportURL
+	templateParameters["QuorumQueues"] = string(transportURLSecret.Data["quorumqueues"]) == "true"
 
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
 	templateParameters["TenantName"] = instance.Spec.TenantName
