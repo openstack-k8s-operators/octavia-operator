@@ -47,6 +47,7 @@ var (
 )
 
 const (
+	// OctaviaCertSecretVersion defines the version of the certificate secret format
 	OctaviaCertSecretVersion int = 2
 )
 
@@ -59,7 +60,7 @@ func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
 	}
 	pkcs8Key, err := x509.MarshalPKCS8PrivateKey(priv)
 	if err != nil {
-		err = fmt.Errorf("Error private key to PKCS #8 form: %w", err)
+		err = fmt.Errorf("error private key to PKCS #8 form: %w", err)
 		return priv, nil, err
 	}
 
@@ -67,7 +68,7 @@ func generateKey(passphrase []byte) (*rsa.PrivateKey, []byte, error) {
 	if passphrase != nil {
 		pemBlock, err = EncryptPrivateKey(pkcs8Key, passphrase)
 		if err != nil {
-			err = fmt.Errorf("Error encrypting private key: %w", err)
+			err = fmt.Errorf("error encrypting private key: %w", err)
 			return priv, nil, err
 		}
 	} else {
@@ -147,7 +148,7 @@ func generateClientCert(caTemplate *x509.Certificate, certPrivKey *rsa.PrivateKe
 func validatePassphrase(passphrase []byte) error {
 	for _, c := range string(passphrase) {
 		if !unicode.IsPrint(c) {
-			return fmt.Errorf("Error: CA Passphrase contains invalid characters")
+			return ErrCAPassphraseInvalidChars
 		}
 	}
 	return nil
@@ -165,14 +166,14 @@ func EnsureAmphoraCerts(
 	_, _, err := secret.GetSecret(ctx, h, certsSecretName, instance.Namespace)
 	if err != nil {
 		if !k8serrors.IsNotFound(err) {
-			return fmt.Errorf("Error retrieving secret %s - %w", certsSecretName, err)
+			return fmt.Errorf("error retrieving secret %s - %w", certsSecretName, err)
 		}
 
 		serverCAPassSecretName := fmt.Sprintf("%s-ca-passphrase", instance.Name)
 		cAPassSecret, _, err := secret.GetSecret(
 			ctx, h, serverCAPassSecretName, instance.Namespace)
 		if err != nil {
-			return fmt.Errorf("Error retrieving secret %s needed to encrypt the generated key - %w", serverCAPassSecretName, err)
+			return fmt.Errorf("error retrieving secret %s needed to encrypt the generated key - %w", serverCAPassSecretName, err)
 		}
 		serverCAPass = cAPassSecret.Data["server-ca-passphrase"]
 
@@ -182,29 +183,29 @@ func EnsureAmphoraCerts(
 
 		serverCAKey, serverCAKeyPEM, err := generateKey(serverCAPass)
 		if err != nil {
-			return fmt.Errorf("Error while generating server CA key: %w", err)
+			return fmt.Errorf("error while generating server CA key: %w", err)
 		}
 		serverCACert, _, err := generateCACert(serverCAKey, "Octavia server CA")
 		if err != nil {
-			return fmt.Errorf("Error while generating server CA certificate: %w", err)
+			return fmt.Errorf("error while generating server CA certificate: %w", err)
 		}
 
 		clientCAKey, clientCAKeyPEM, err := generateKey(nil)
 		if err != nil {
-			return fmt.Errorf("Error while generating client CA key: %w", err)
+			return fmt.Errorf("error while generating client CA key: %w", err)
 		}
 		clientCACert, clientCATemplate, err := generateCACert(clientCAKey, "Octavia client CA")
 		if err != nil {
-			return fmt.Errorf("Error while generating amphora client CA certificate: %w", err)
+			return fmt.Errorf("error while generating amphora client CA certificate: %w", err)
 		}
 
 		clientKey, clientKeyPEM, err := generateKey(nil)
 		if err != nil {
-			return fmt.Errorf("Error while generating amphora client key: %w", err)
+			return fmt.Errorf("error while generating amphora client key: %w", err)
 		}
 		clientCert, err := generateClientCert(clientCATemplate, clientKey, clientCAKey, "Octavia controller")
 		if err != nil {
-			return fmt.Errorf("Error while generating amphora client certificate: %w", err)
+			return fmt.Errorf("error while generating amphora client certificate: %w", err)
 		}
 		clientKeyAndCert := append(clientKeyPEM, clientCert...)
 
@@ -229,7 +230,7 @@ func EnsureAmphoraCerts(
 
 		_, _, err = secret.CreateOrPatchSecret(ctx, h, instance, oAmpSecret)
 		if err != nil {
-			return fmt.Errorf("Error creating certs secret %s - %w",
+			return fmt.Errorf("error creating certs secret %s - %w",
 				certsSecretName, err)
 		}
 	}

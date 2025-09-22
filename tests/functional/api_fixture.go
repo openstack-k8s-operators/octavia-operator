@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package functional_test provides functional testing utilities and fixtures for Octavia operator
 package functional_test
 
 import (
@@ -24,7 +25,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 
-	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
+	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck,revive // ST1001,dot-imports: dot imports are standard practice for Ginkgo tests
 
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
 	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
@@ -33,22 +34,20 @@ import (
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
 )
 
-var (
-	keystoneProjects = []projects.Project{
-		{
-			Name: "admin",
-			ID:   uuid.New().String(),
-		},
-		{
-			Name: "service",
-			ID:   uuid.New().String(),
-		},
-		{
-			Name: "project1234",
-			ID:   uuid.New().String(),
-		},
-	}
-)
+var keystoneProjects = []projects.Project{
+	{
+		Name: "admin",
+		ID:   uuid.New().String(),
+	},
+	{
+		Name: "service",
+		ID:   uuid.New().String(),
+	},
+	{
+		Name: "project1234",
+		ID:   uuid.New().String(),
+	},
+}
 
 // ResponseHandleToken responds with a valid keystone token and the computeURL in the catalog
 func ResponseHandleToken(
@@ -145,6 +144,7 @@ func keystoneHandleProjects(
 	}
 }
 
+// GetProject returns a project by name from the keystoneProjects list
 func GetProject(name string) *projects.Project {
 	for _, p := range keystoneProjects {
 		if p.Name == name {
@@ -173,16 +173,18 @@ func keystoneGetProject(
 	}
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
-	f.APIFixture.Log.Info(fmt.Sprintf("GetProject returns %s", string(bytes)))
+	_, _ = fmt.Fprint(w, string(bytes))
+	f.Log.Info(fmt.Sprintf("GetProject returns %s", string(bytes)))
 }
 
+// APIFixtures aggregates all API test fixtures for functional testing
 type APIFixtures struct {
 	Keystone *keystone_helpers.KeystoneAPIFixture
 	Nova     *NovaAPIFixture
 	Neutron  *NeutronAPIFixture
 }
 
+// SetupAPIFixtures initializes and configures all API fixtures for testing
 func SetupAPIFixtures(logger logr.Logger) APIFixtures {
 	nova := NewNovaAPIFixtureWithServer(logger)
 	nova.Setup()
@@ -214,7 +216,7 @@ func SetupAPIFixtures(logger logr.Logger) APIFixtures {
 				w.Header().Add("Content-Type", "application/json")
 				w.WriteHeader(202)
 				// ensure keystone returns the simulator endpoints in its catalog
-				fmt.Fprint(w, ResponseHandleToken(keystone.Endpoint(), novaURL, neutronURL))
+				_, _ = fmt.Fprint(w, ResponseHandleToken(keystone.Endpoint(), novaURL, neutronURL))
 			}
 		}})
 	DeferCleanup(keystone.Cleanup)

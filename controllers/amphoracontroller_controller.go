@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package controllers contains the Kubernetes controllers for managing Octavia operator resources
 package controllers
 
 import (
@@ -99,7 +100,7 @@ func (r *OctaviaAmphoraControllerReconciler) Reconcile(ctx context.Context, req 
 	Log := r.GetLogger(ctx)
 
 	instance := &octaviav1.OctaviaAmphoraController{}
-	err := r.Client.Get(ctx, req.NamespacedName, instance)
+	err := r.Get(ctx, req.NamespacedName, instance)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
 			// Request object not found, could have been deleted after reconcile request.
@@ -244,7 +245,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// Prepare NetworkAttachments first, it must be done before generating the
 	// configuration as the config uses IP addresses of the attachments.
 	if len(instance.Spec.NetworkAttachments) == 0 {
-		err := fmt.Errorf("NetworkAttachments list is empty")
+		err := octavia.ErrNetworkAttachmentsEmpty
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.NetworkAttachmentsReadyCondition,
 			condition.ErrorReason,
@@ -289,7 +290,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 
 	serviceLabels := map[string]string{
-		common.AppSelector: instance.ObjectMeta.Name,
+		common.AppSelector: instance.Name,
 	}
 
 	// Handle secrets
@@ -323,7 +324,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 					condition.TLSInputReadyCondition,
 					condition.RequestedReason,
 					condition.SeverityInfo,
-					fmt.Sprintf(condition.TLSInputReadyWaitingMessage, instance.Spec.TLS.CaBundleSecretName)))
+					condition.TLSInputReadyWaitingMessage, instance.Spec.TLS.CaBundleSecretName))
 				return ctrl.Result{}, nil
 			}
 			instance.Status.Conditions.Set(condition.FalseCondition(
@@ -407,7 +408,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		instance.Name, // finalizer
 		&instance.Status.Conditions,
 		labels.GetAppLabelSelector(
-			instance.ObjectMeta.Name,
+			instance.Name,
 		),
 	)
 	if err != nil {
@@ -475,7 +476,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		if networkReady {
 			instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 		} else {
-			err := fmt.Errorf("not all pods have interfaces with ips as configured in NetworkAttachments: %s", instance.Spec.NetworkAttachments)
+			err := fmt.Errorf("%w: %s", octavia.ErrNetworkAttachmentConfig, instance.Spec.NetworkAttachments)
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.NetworkAttachmentsReadyCondition,
 				condition.ErrorReason,
@@ -512,7 +513,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 ) error {
 	Log := r.GetLogger(ctx)
 	Log.Info(fmt.Sprintf("generating service secret for %s (%s)", instance.Name, instance.Kind))
-	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.ObjectMeta.Name), map[string]string{})
+	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.Name), map[string]string{})
 
 	ospSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Secret, instance.Namespace)
 	if err != nil {
@@ -647,8 +648,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 				condition.RequestedReason,
 				condition.SeverityInfo,
 				condition.InputReadyWaitingMessage))
-			return fmt.Errorf("OpenStack server CA passphrase secret %s not found",
-				serverCAPassSecretName)
+			return fmt.Errorf("%w: %s", octavia.ErrOpenstackServerCAPassphraseNotFound, serverCAPassSecretName)
 		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -887,7 +887,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 			FieldSelector: fields.OneTermEqualSelector(field, src.GetName()),
 			Namespace:     src.GetNamespace(),
 		}
-		err := r.Client.List(ctx, crList, listOps)
+		err := r.List(ctx, crList, listOps)
 		if err != nil {
 			Log.Error(err, fmt.Sprintf("listing %s for field: %s - %s", crList.GroupVersionKind().Kind, field, src.GetNamespace()))
 			return requests
@@ -919,7 +919,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectForSrc(ctx context.Contex
 	listOps := &client.ListOptions{
 		Namespace: src.GetNamespace(),
 	}
-	err := r.Client.List(ctx, crList, listOps)
+	err := r.List(ctx, crList, listOps)
 	if err != nil {
 		Log.Error(err, fmt.Sprintf("listing %s for namespace: %s", crList.GroupVersionKind().Kind, src.GetNamespace()))
 		return requests

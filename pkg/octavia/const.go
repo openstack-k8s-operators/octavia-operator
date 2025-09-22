@@ -47,7 +47,7 @@ const (
 	// ApacheInternalPort -
 	ApacheInternalPort int32 = 80
 
-	// AdminTenantName
+	// AdminTenant is the default admin tenant name for OpenStack
 	AdminTenant = "admin"
 
 	// HmConfigMap ...

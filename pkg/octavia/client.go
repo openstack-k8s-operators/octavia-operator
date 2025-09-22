@@ -36,13 +36,17 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+// ClientType defines the type of OpenStack client configuration
 type ClientType int
 
 const (
-	AdminClient   ClientType = iota
+	// AdminClient represents an administrative OpenStack client configuration
+	AdminClient ClientType = iota
+	// ServiceClient represents a service-level OpenStack client configuration
 	ServiceClient ClientType = iota
 )
 
+// ClientConfig holds the configuration parameters for OpenStack client connections
 type ClientConfig struct {
 	User             string
 	TenantName       string
@@ -69,7 +73,7 @@ func getClientConfig(
 		}, nil
 	case ServiceClient:
 		if octavia == nil {
-			return ClientConfig{}, fmt.Errorf("cannot get service client config with nil instance")
+			return ClientConfig{}, ErrServiceClientConfigNilInstance
 		}
 		return ClientConfig{
 			User:             octavia.Spec.ServiceUser,
@@ -81,7 +85,7 @@ func getClientConfig(
 		}, nil
 	}
 
-	return ClientConfig{}, fmt.Errorf("invalid client type %+v", clientType)
+	return ClientConfig{}, fmt.Errorf("%w: %+v", ErrInvalidClientType, clientType)
 }
 
 func getClient(
@@ -113,7 +117,7 @@ func getClient(
 			return nil, ctrl.Result{}, err
 		}
 		if (ctrlResult != ctrl.Result{}) {
-			return nil, ctrl.Result{}, fmt.Errorf("the CABundleSecret %s not found", keystoneAPI.Spec.TLS.CaBundleSecretName)
+			return nil, ctrl.Result{}, fmt.Errorf("%w: %s", ErrCABundleSecretNotFound, keystoneAPI.Spec.TLS.CaBundleSecretName)
 		}
 
 		tlsConfig = &openstack.TLSConfig{
@@ -224,7 +228,7 @@ func getDomain(
 		return nil, err
 	}
 	if len(allDomains) == 0 {
-		return nil, fmt.Errorf("cannot find \"%s\"", domainName)
+		return nil, fmt.Errorf("%w: \"%s\"", ErrCannotFindDomain, domainName)
 	}
 	return &allDomains[0], nil
 
@@ -253,7 +257,7 @@ func getProjectWithDomain(
 		return nil, err
 	}
 	if len(allProjects) == 0 {
-		return nil, fmt.Errorf("cannot find project \"%s\" in domain \"%s\"", projectName, domainName)
+		return nil, fmt.Errorf("%w: \"%s\" in domain \"%s\"", ErrCannotFindProjectInDomain, projectName, domainName)
 	}
 	return &allProjects[0], nil
 }
@@ -269,7 +273,7 @@ func GetProject(openstack *openstack.OpenStack, projectName string) (*projects.P
 		return nil, err
 	}
 	if len(allProjects) == 0 {
-		return nil, fmt.Errorf("Cannot find project \"%s\"", projectName)
+		return nil, fmt.Errorf("%w: \"%s\"", ErrCannotFindProject, projectName)
 	}
 	return &allProjects[0], nil
 }
@@ -285,7 +289,7 @@ func GetUser(openstack *openstack.OpenStack, userName string) (*users.User, erro
 		return nil, err
 	}
 	if len(allUsers) == 0 {
-		return nil, fmt.Errorf("Cannot find user \"%s\"", userName)
+		return nil, fmt.Errorf("%w: \"%s\"", ErrCannotFindUser, userName)
 	}
 	return &allUsers[0], nil
 }
@@ -332,6 +336,7 @@ func GetImageClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error) 
 	return gophercloudopenstack.NewImageServiceV2(o.GetOSClient().ProviderClient, endpointOpts)
 }
 
+// EnsureUserRoles ensures that the service user has the required roles assigned in the project
 func EnsureUserRoles(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
@@ -346,30 +351,30 @@ func EnsureUserRoles(
 
 	osclient, err := GetOpenstackClient(ctx, instance.Namespace, helper)
 	if err != nil {
-		return fmt.Errorf("error while getting a client for setting user roles")
+		return ErrGettingClientForUserRoles
 	}
 
 	project, err := getProjectWithDomain(osclient, instance.Spec.TenantName, instance.Spec.TenantDomainName)
 	if err != nil {
-		return fmt.Errorf("error while getting project \"%s\" in domain \"%s\"", instance.Spec.TenantName, instance.Spec.TenantDomainName)
+		return fmt.Errorf("%w: \"%s\" in domain \"%s\"", ErrGettingProjectInDomain, instance.Spec.TenantName, instance.Spec.TenantDomainName)
 	}
 
 	userDomain := "Default"
 	domain, err := getDomain(osclient, userDomain)
 	if err != nil {
-		return fmt.Errorf("error while getting domain \"%s\"", userDomain)
+		return fmt.Errorf("%w: \"%s\"", ErrGettingDomain, userDomain)
 	}
 
 	user, err := osclient.GetUser(log, instance.Spec.ServiceUser, domain.ID)
 	if err != nil {
-		return fmt.Errorf("error while getting user \"%s\" in domain \"%s\"", instance.Spec.ServiceUser, userDomain)
+		return fmt.Errorf("%w: \"%s\" in domain \"%s\"", ErrGettingUserInDomain, instance.Spec.ServiceUser, userDomain)
 	}
 
 	roles := []string{"admin", "service"}
 	for _, role := range roles {
 		err = osclient.AssignUserRole(log, role, user.ID, project.ID)
 		if err != nil {
-			return fmt.Errorf("error when setting role \"%s\" to user \"%s\" in project \"%s\"", role, user.Name, project.Name)
+			return fmt.Errorf("%w: \"%s\" to user \"%s\" in project \"%s\"", ErrSettingUserRole, role, user.Name, project.Name)
 		}
 	}
 

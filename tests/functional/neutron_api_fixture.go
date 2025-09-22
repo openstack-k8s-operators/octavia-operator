@@ -38,11 +38,13 @@ import (
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
 )
 
+// Network represents a neutron network with external extension for testing
 type Network struct {
 	networks.Network
 	external.NetworkExternalExt
 }
 
+// NeutronAPIFixture provides a test fixture for mocking Neutron API responses
 type NeutronAPIFixture struct {
 	api.APIFixture
 	Quotas         map[string]quotas.Quota
@@ -60,6 +62,7 @@ func (f *NeutronAPIFixture) registerHandler(handler api.Handler) {
 	f.Server.AddHandler(f.URLBase+handler.Pattern, handler.Func)
 }
 
+// Setup initializes the NeutronAPIFixture with API handlers and test data
 func (f *NeutronAPIFixture) Setup() {
 	f.registerHandler(api.Handler{Pattern: "/v2.0/networks/", Func: f.networkHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/networks", Func: f.networkHandler})
@@ -117,7 +120,7 @@ func (f *NeutronAPIFixture) getNetwork(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -163,7 +166,7 @@ func (f *NeutronAPIFixture) postNetwork(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 // Subnet
@@ -217,7 +220,7 @@ func (f *NeutronAPIFixture) getSubnet(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -255,7 +258,7 @@ func (f *NeutronAPIFixture) postSubnet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NeutronAPIFixture) putSubnet(w http.ResponseWriter, r *http.Request) {
@@ -292,7 +295,7 @@ func (f *NeutronAPIFixture) putSubnet(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 // SecGroup
@@ -336,7 +339,7 @@ func (f *NeutronAPIFixture) getSecurityGroup(w http.ResponseWriter, r *http.Requ
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -369,7 +372,7 @@ func (f *NeutronAPIFixture) postSecurityGroup(w http.ResponseWriter, r *http.Req
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 // Port
@@ -417,7 +420,7 @@ func (f *NeutronAPIFixture) getPort(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -458,7 +461,7 @@ func (f *NeutronAPIFixture) postPort(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 // Router
@@ -504,7 +507,7 @@ func (f *NeutronAPIFixture) getRouter(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -537,7 +540,7 @@ func (f *NeutronAPIFixture) postRouter(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(201)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NeutronAPIFixture) putRouter(w http.ResponseWriter, r *http.Request) {
@@ -582,7 +585,7 @@ func (f *NeutronAPIFixture) putRouter(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -620,7 +623,7 @@ func (f *NeutronAPIFixture) getQuotas(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NeutronAPIFixture) putQuotas(w http.ResponseWriter, r *http.Request) {
@@ -640,12 +643,12 @@ func (f *NeutronAPIFixture) putQuotas(w http.ResponseWriter, r *http.Request) {
 		f.InternalError(err, "Error during unmarshalling request", w, r)
 		return
 	}
-	f.APIFixture.Log.Info(fmt.Sprintf("Set quotas for %s to %+v\n", tenantID, q.Quota))
+	f.Log.Info(fmt.Sprintf("Set quotas for %s to %+v\n", tenantID, q.Quota))
 	f.Quotas[tenantID] = q.Quota
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
 func (f *NeutronAPIFixture) rbacHandler(w http.ResponseWriter, r *http.Request) {
@@ -687,7 +690,7 @@ func (f *NeutronAPIFixture) getRBAC(w http.ResponseWriter, r *http.Request) {
 
 		w.Header().Add("Content-Type", "application/json")
 		w.WriteHeader(200)
-		fmt.Fprint(w, string(bytes))
+		_, _ = fmt.Fprint(w, string(bytes))
 	}
 }
 
@@ -712,14 +715,15 @@ func (f *NeutronAPIFixture) putRBAC(w http.ResponseWriter, r *http.Request) {
 	if rbac.RBAC.TargetTenant != "" {
 		updatedRBAC.TargetTenant = rbac.RBAC.TargetTenant
 	}
-	f.APIFixture.Log.Info(fmt.Sprintf("Set RBAC %s to %+v\n", rbacID, updatedRBAC))
+	f.Log.Info(fmt.Sprintf("Set RBAC %s to %+v\n", rbacID, updatedRBAC))
 	f.RBACs[rbacID] = updatedRBAC
 
 	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(200)
-	fmt.Fprint(w, string(bytes))
+	_, _ = fmt.Fprint(w, string(bytes))
 }
 
+// NewNeutronAPIFixtureWithServer creates a new NeutronAPIFixture with its own test server
 func NewNeutronAPIFixtureWithServer(log logr.Logger) *NeutronAPIFixture {
 	server := &api.FakeAPIServer{}
 	server.Setup(log)
@@ -728,6 +732,7 @@ func NewNeutronAPIFixtureWithServer(log logr.Logger) *NeutronAPIFixture {
 	return fixture
 }
 
+// AddNeutronAPIFixture adds a NeutronAPIFixture to an existing test server
 func AddNeutronAPIFixture(log logr.Logger, server *api.FakeAPIServer) *NeutronAPIFixture {
 	fixture := &NeutronAPIFixture{
 		APIFixture: api.APIFixture{
