@@ -59,7 +59,7 @@ func GetRangeFromCIDR(
 ) (start netip.Addr, end netip.Addr) {
 	// start is the 5th address of the Cidr
 	start = cidr.Masked().Addr()
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		start = start.Next()
 	}
 
@@ -108,7 +108,7 @@ func GetNetworkParametersFromNAD(
 	// RangeEnd.
 	networkParameters.ProviderAllocationStart = nadConfig.IPAM.RangeEnd.Next()
 	end := networkParameters.ProviderAllocationStart
-	for i := 0; i < LbProvSubnetPoolSize; i++ {
+	for range LbProvSubnetPoolSize {
 		if !networkParameters.ProviderCIDR.Contains(end) {
 			return nil, fmt.Errorf("%w: %d in %s", ErrCannotAllocateIPAddresses, LbProvSubnetPoolSize, networkParameters.ProviderCIDR)
 		}

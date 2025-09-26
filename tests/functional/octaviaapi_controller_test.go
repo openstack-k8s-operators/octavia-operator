@@ -37,7 +37,7 @@ import (
 
 var _ = Describe("OctaviaAPI controller", func() {
 	var name string
-	var spec map[string]interface{}
+	var spec map[string]any
 	var octaviaAPIName types.NamespacedName
 	var transportURLSecretName types.NamespacedName
 

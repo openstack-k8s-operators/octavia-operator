@@ -71,7 +71,7 @@ func CreateTransportURLSecret(name types.NamespacedName) *corev1.Secret {
 	secret := th.CreateSecret(
 		name,
 		map[string][]byte{
-			"transport_url": []byte(fmt.Sprintf("rabbit://%s/", name)),
+			"transport_url": fmt.Appendf(nil, "rabbit://%s/", name),
 		},
 	)
 	logger.Info("Created TransportURLSecret", "secret", secret)
@@ -107,14 +107,14 @@ func SimulateKeystoneReady(
 	}, timeout, interval).Should(Succeed())
 }
 
-func GetDefaultOctaviaSpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultOctaviaSpec() map[string]any {
+	return map[string]any{
 		"databaseInstance":           "test-octavia-db-instance",
 		"secret":                     SecretName,
 		"octaviaNetworkAttachment":   "octavia-attachement",
 		"databaseAccount":            "octavia-db-account",
 		"persistenceDatabaseAccount": "octavia-persistence-db-account",
-		"lbMgmtNetwork": map[string]interface{}{
+		"lbMgmtNetwork": map[string]any{
 			"availabilityZones": []string{"az0"},
 			// It seems that the functional tests don't use the correct default
 			// values for nested structures, when the default is defined in the
@@ -125,12 +125,12 @@ func GetDefaultOctaviaSpec() map[string]interface{} {
 	}
 }
 
-func CreateOctavia(name types.NamespacedName, spec map[string]interface{}) client.Object {
+func CreateOctavia(name types.NamespacedName, spec map[string]any) client.Object {
 
-	raw := map[string]interface{}{
+	raw := map[string]any{
 		"apiVersion": "octavia.openstack.org/v1beta1",
 		"kind":       "Octavia",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
@@ -198,8 +198,8 @@ func SimulateOctaviaCertsSecret(namespace string, name string) *corev1.Secret {
 }
 
 // OctaviaAPI
-func GetDefaultOctaviaAPISpec() map[string]interface{} {
-	return map[string]interface{}{
+func GetDefaultOctaviaAPISpec() map[string]any {
+	return map[string]any{
 		"databaseHostname": "hostname-for-octavia-api",
 		"databaseInstance": "test-octavia-db-instance",
 		"secret":           SecretName,
@@ -208,11 +208,11 @@ func GetDefaultOctaviaAPISpec() map[string]interface{} {
 	}
 }
 
-func CreateOctaviaAPI(name types.NamespacedName, spec map[string]interface{}) client.Object {
-	raw := map[string]interface{}{
+func CreateOctaviaAPI(name types.NamespacedName, spec map[string]any) client.Object {
+	raw := map[string]any{
 		"apiVersion": "octavia.openstack.org/v1beta1",
 		"kind":       "OctaviaAPI",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
@@ -244,14 +244,14 @@ func SimulateOctaviaAPIReady(name types.NamespacedName) {
 }
 
 func CreateNAD(name types.NamespacedName) client.Object {
-	raw := map[string]interface{}{
+	raw := map[string]any{
 		"apiVersion": "k8s.cni.cncf.io/v1",
 		"kind":       "NetworkAttachmentDefinition",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
-		"spec": map[string]interface{}{
+		"spec": map[string]any{
 			"config": `{
 				"cniVersion": "0.3.1",
 				"name": "octavia",
@@ -290,14 +290,14 @@ func GetNADConfig(name types.NamespacedName) *octavia.NADConfig {
 }
 
 func CreateNode(name types.NamespacedName) client.Object {
-	raw := map[string]interface{}{
+	raw := map[string]any{
 		"apiVersion": "v1",
 		"kind":       "Node",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      name.Name,
 			"namespace": name.Namespace,
 		},
-		"spec": map[string]interface{}{},
+		"spec": map[string]any{},
 	}
 	return th.CreateUnstructured(raw)
 
@@ -307,7 +307,7 @@ func CreateSSHPubKey() client.Object {
 	return th.CreateConfigMap(types.NamespacedName{
 		Name:      "octavia-ssh-pubkey",
 		Namespace: namespace,
-	}, map[string]interface{}{
+	}, map[string]any{
 		"key": "public key",
 	})
 }
