@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"maps"
 	"net/http"
 	"sort"
 	"strings"
@@ -1435,9 +1436,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 		common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
 		"my.cnf":                           octaviaDb.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
 	}
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
+	maps.Copy(customData, instance.Spec.DefaultConfigOverwrite)
 
 	databaseAccount := octaviaDb.GetAccount()
 	dbSecret := octaviaDb.GetSecret()
@@ -1446,7 +1445,7 @@ func (r *OctaviaReconciler) generateServiceSecrets(
 
 	// We only need a minimal 00-config.conf that is only used by db-sync job,
 	// hence only passing the database related parameters
-	templateParameters := map[string]interface{}{
+	templateParameters := map[string]any{
 		"MinimalConfig": true, // This tells the template to generate a minimal config
 		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s?read_default_file=/etc/my.cnf",
 			databaseAccount.Spec.UserName,

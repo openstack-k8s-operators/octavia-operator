@@ -20,6 +20,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 	"strings"
 	"time"
@@ -572,9 +573,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 		common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
 		"my.cnf":                           db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
 	}
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
+	maps.Copy(customData, instance.Spec.DefaultConfigOverwrite)
 
 	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
 		ctx, helper, instance.Spec.DatabaseAccount, instance.Namespace)
@@ -608,7 +607,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 		mariadbv1.MariaDBAccountReadyCondition,
 		mariadbv1.MariaDBAccountReadyMessage)
 
-	templateParameters := map[string]interface{}{
+	templateParameters := map[string]any{
 		"DatabaseConnection": fmt.Sprintf("mysql+pymysql://%s:%s@%s/%s?read_default_file=/etc/my.cnf",
 			databaseAccount.Spec.UserName,
 			string(dbSecret.Data[mariadbv1.DatabasePasswordSelector]),

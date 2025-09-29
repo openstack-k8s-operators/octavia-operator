@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -428,11 +429,9 @@ func (r *OctaviaRsyslogReconciler) generateServiceSecrets(
 	cmLabels := labels.GetLabels(instance, labels.GetGroupLabel(instance.Name), map[string]string{})
 
 	customData := map[string]string{}
-	for key, data := range instance.Spec.DefaultConfigOverwrite {
-		customData[key] = data
-	}
+	maps.Copy(customData, instance.Spec.DefaultConfigOverwrite)
 
-	templateParameters := map[string]interface{}{}
+	templateParameters := map[string]any{}
 	templateParameters["AdminLogTargets"] = instance.Spec.AdminLogTargets
 	templateParameters["TenantLogTargets"] = instance.Spec.TenantLogTargets
 

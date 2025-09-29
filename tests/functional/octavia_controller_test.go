@@ -74,7 +74,7 @@ func createAndSimulateTransportURL(
 	infra.SimulateTransportURLReady(transportURLName)
 }
 
-func createAndSimulateDB(spec map[string]interface{}) {
+func createAndSimulateDB(spec map[string]any) {
 	DeferCleanup(
 		mariadb.DeleteDBService,
 		mariadb.CreateDBService(
@@ -112,7 +112,7 @@ func createAndSimulateOctaviaAPI(octaviaName types.NamespacedName) {
 
 var _ = Describe("Octavia controller", func() {
 	var name string
-	var spec map[string]interface{}
+	var spec map[string]any
 	var octaviaName types.NamespacedName
 	var transportURLName types.NamespacedName
 	var transportURLSecretName types.NamespacedName
@@ -705,11 +705,11 @@ var _ = Describe("Octavia controller", func() {
 				Name:      "node1",
 			}))
 
-			spec["lbMgmtNetwork"].(map[string]interface{})["availabilityZoneCIDRs"] = map[string]string{
+			spec["lbMgmtNetwork"].(map[string]any)["availabilityZoneCIDRs"] = map[string]string{
 				"az1": "172.34.0.0/16",
 				"az2": "172.44.8.0/21",
 			}
-			spec["lbMgmtNetwork"].(map[string]interface{})["createDefaultLbMgmtNetwork"] = false
+			spec["lbMgmtNetwork"].(map[string]any)["createDefaultLbMgmtNetwork"] = false
 			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
 
 			th.SimulateJobSuccess(octaviaDBSyncName)
@@ -886,7 +886,7 @@ var _ = Describe("Octavia controller", func() {
 
 	When("Octavia is created with nodeSelector", func() {
 		BeforeEach(func() {
-			spec["nodeSelector"] = map[string]interface{}{
+			spec["nodeSelector"] = map[string]any{
 				"foo": "bar",
 			}
 
@@ -1088,24 +1088,24 @@ var _ = Describe("Octavia controller", func() {
 
 			// API, Worker and KeystoneListener
 			if component != "top-level" {
-				spec[component] = map[string]interface{}{
-					"topologyRef": map[string]interface{}{
+				spec[component] = map[string]any{
+					"topologyRef": map[string]any{
 						"name":      "bar",
 						"namespace": "foo",
 					},
 				}
 				// top-level topologyRef
 			} else {
-				spec["topologyRef"] = map[string]interface{}{
+				spec["topologyRef"] = map[string]any{
 					"name":      "bar",
 					"namespace": "foo",
 				}
 			}
 			// Build the octavia CR
-			raw := map[string]interface{}{
+			raw := map[string]any{
 				"apiVersion": "octavia.openstack.org/v1beta1",
 				"kind":       "Octavia",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      octaviaName.Name,
 					"namespace": octaviaName.Namespace,
 				},

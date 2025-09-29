@@ -224,7 +224,7 @@ func EnsureAmphoraCerts(
 				"client_ca.cert.pem": clientCACert,
 				// Unencrypted client key and cert
 				"client.cert-and-key.pem": clientKeyAndCert,
-				"version":                 []byte(fmt.Sprintf("%d", OctaviaCertSecretVersion)),
+				"version":                 fmt.Appendf(nil, "%d", OctaviaCertSecretVersion),
 			},
 		}
 
