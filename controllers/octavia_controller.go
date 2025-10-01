@@ -343,11 +343,13 @@ func (r *OctaviaReconciler) reconcileInit(
 
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
+			// Since the OpenStack secret should have been manually created by the user and referenced in the spec,
+			// we treat this as a warning because it means that the service will not be able to start.
 			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
-				condition.RequestedReason,
-				condition.SeverityInfo,
+				condition.ErrorReason,
+				condition.SeverityWarning,
 				condition.InputReadyWaitingMessage))
 			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
@@ -359,10 +361,14 @@ func (r *OctaviaReconciler) reconcileInit(
 			err.Error()))
 		return ctrl.Result{}, err
 	} else if (result != ctrl.Result{}) {
+		// We can only get here if the secret is not found, thus we treat this the same
+		// as we do above if there was an actual "not found" error returned.
+		// See https://github.com/openstack-k8s-operators/lib-common/blob/4c240245107747327c5f67256f8d9d76cdd25c7a/modules/common/secret/secret.go#L423-L428
+		// for further details.
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
-			condition.RequestedReason,
-			condition.SeverityInfo,
+			condition.ErrorReason,
+			condition.SeverityWarning,
 			condition.InputReadyWaitingMessage))
 		return result, err
 	}
@@ -377,6 +383,8 @@ func (r *OctaviaReconciler) reconcileInit(
 	)
 	if err != nil {
 		if k8s_errors.IsNotFound(err) {
+			// Since the TransportURL secret is automatically created by this controller earlier in
+			// the reconcile loop, we treat this as an info.
 			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Status.TransportURLSecret))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
@@ -619,11 +627,13 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		nad, err := nad.GetNADWithName(ctx, helper, networkAttachment, instance.Namespace)
 		if err != nil {
 			if k8s_errors.IsNotFound(err) {
+				// Since the net-attach-def CR should have been manually created by the user and referenced in the spec,
+				// we treat this as a warning because it means that the service will not be able to start.
 				Log.Info(fmt.Sprintf("network-attachment-definition %s not found", networkAttachment))
 				instance.Status.Conditions.Set(condition.FalseCondition(
 					condition.NetworkAttachmentsReadyCondition,
-					condition.RequestedReason,
-					condition.SeverityInfo,
+					condition.ErrorReason,
+					condition.SeverityWarning,
 					condition.NetworkAttachmentsReadyWaitingMessage,
 					networkAttachment))
 				return ctrl.Result{RequeueAfter: time.Second * 10}, nil
