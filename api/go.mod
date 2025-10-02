@@ -3,7 +3,7 @@ module github.com/openstack-k8s-operators/octavia-operator/api
 go 1.24.4
 
 require (
-	github.com/onsi/ginkgo/v2 v2.25.1
+	github.com/onsi/ginkgo/v2 v2.25.3
 	github.com/onsi/gomega v1.38.2
 	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20250922155301-057562fb7182
 	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20250922082314-c83d83092a04
