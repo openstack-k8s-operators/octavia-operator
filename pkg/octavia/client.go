@@ -21,11 +21,11 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
-	gophercloudopenstack "github.com/gophercloud/gophercloud/openstack"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/domains"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
+	"github.com/gophercloud/gophercloud/v2"
+	gophercloudopenstack "github.com/gophercloud/gophercloud/v2/openstack"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/domains"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/users"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/endpoint"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
@@ -164,7 +164,7 @@ func getClient(
 		if err != nil {
 			return nil, ctrl.Result{}, err
 		}
-		project, err := getProjectWithDomain(adminClient, clientConfig.TenantName, clientConfig.TenantDomainName)
+		project, err := getProjectWithDomain(ctx, adminClient, clientConfig.TenantName, clientConfig.TenantDomainName)
 		if err != nil {
 			return nil, ctrl.Result{}, err
 		}
@@ -174,6 +174,7 @@ func getClient(
 	}
 
 	os, err := openstack.NewOpenStack(
+		ctx,
 		h.GetLogger(),
 		authOpts,
 	)
@@ -212,6 +213,7 @@ func GetServiceClient(
 }
 
 func getDomain(
+	ctx context.Context,
 	openstack *openstack.OpenStack,
 	domainName string,
 ) (*domains.Domain, error) {
@@ -219,7 +221,7 @@ func getDomain(
 		openstack.GetOSClient(),
 		domains.ListOpts{
 			Name: domainName,
-		}).AllPages()
+		}).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -235,11 +237,12 @@ func getDomain(
 }
 
 func getProjectWithDomain(
+	ctx context.Context,
 	openstack *openstack.OpenStack,
 	projectName string,
 	domainName string,
 ) (*projects.Project, error) {
-	domain, err := getDomain(openstack, domainName)
+	domain, err := getDomain(ctx, openstack, domainName)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +251,7 @@ func getProjectWithDomain(
 		projects.ListOpts{
 			Name:     projectName,
 			DomainID: domain.ID,
-		}).AllPages()
+		}).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -263,8 +266,8 @@ func getProjectWithDomain(
 }
 
 // GetProject -
-func GetProject(openstack *openstack.OpenStack, projectName string) (*projects.Project, error) {
-	allPages, err := projects.List(openstack.GetOSClient(), projects.ListOpts{Name: projectName}).AllPages()
+func GetProject(ctx context.Context, openstack *openstack.OpenStack, projectName string) (*projects.Project, error) {
+	allPages, err := projects.List(openstack.GetOSClient(), projects.ListOpts{Name: projectName}).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -279,8 +282,8 @@ func GetProject(openstack *openstack.OpenStack, projectName string) (*projects.P
 }
 
 // GetUser -
-func GetUser(openstack *openstack.OpenStack, userName string) (*users.User, error) {
-	allPages, err := users.List(openstack.GetOSClient(), users.ListOpts{Name: userName}).AllPages()
+func GetUser(ctx context.Context, openstack *openstack.OpenStack, userName string) (*users.User, error) {
+	allPages, err := users.List(openstack.GetOSClient(), users.ListOpts{Name: userName}).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +336,7 @@ func GetImageClient(o *openstack.OpenStack) (*gophercloud.ServiceClient, error) 
 		Region:       o.GetRegion(),
 		Availability: gophercloud.AvailabilityInternal,
 	}
-	return gophercloudopenstack.NewImageServiceV2(o.GetOSClient().ProviderClient, endpointOpts)
+	return gophercloudopenstack.NewImageV2(o.GetOSClient().ProviderClient, endpointOpts)
 }
 
 // EnsureUserRoles ensures that the service user has the required roles assigned in the project
@@ -354,25 +357,25 @@ func EnsureUserRoles(
 		return ErrGettingClientForUserRoles
 	}
 
-	project, err := getProjectWithDomain(osclient, instance.Spec.TenantName, instance.Spec.TenantDomainName)
+	project, err := getProjectWithDomain(ctx, osclient, instance.Spec.TenantName, instance.Spec.TenantDomainName)
 	if err != nil {
 		return fmt.Errorf("%w: \"%s\" in domain \"%s\"", ErrGettingProjectInDomain, instance.Spec.TenantName, instance.Spec.TenantDomainName)
 	}
 
 	userDomain := "Default"
-	domain, err := getDomain(osclient, userDomain)
+	domain, err := getDomain(ctx, osclient, userDomain)
 	if err != nil {
 		return fmt.Errorf("%w: \"%s\"", ErrGettingDomain, userDomain)
 	}
 
-	user, err := osclient.GetUser(log, instance.Spec.ServiceUser, domain.ID)
+	user, err := osclient.GetUser(ctx, log, instance.Spec.ServiceUser, domain.ID)
 	if err != nil {
 		return fmt.Errorf("%w: \"%s\" in domain \"%s\"", ErrGettingUserInDomain, instance.Spec.ServiceUser, userDomain)
 	}
 
 	roles := []string{"admin", "service"}
 	for _, role := range roles {
-		err = osclient.AssignUserRole(log, role, user.ID, project.ID)
+		err = osclient.AssignUserRole(ctx, log, role, user.ID, project.ID)
 		if err != nil {
 			return fmt.Errorf("%w: \"%s\" to user \"%s\" in project \"%s\"", ErrSettingUserRole, role, user.Name, project.Name)
 		}

@@ -20,9 +20,9 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/imageimport"
-	"github.com/gophercloud/gophercloud/openstack/imageservice/v2/images"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack/image/v2/imageimport"
+	"github.com/gophercloud/gophercloud/v2/openstack/image/v2/images"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
@@ -55,6 +55,7 @@ func getTags(
 }
 
 func ensureAmphoraImage(
+	ctx context.Context,
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
 	amphoraImage AmphoraImage,
@@ -80,7 +81,7 @@ func ensureAmphoraImage(
 		}
 
 		log.Info(fmt.Sprintf("Creating image %s", amphoraImage.Name))
-		image, err := images.Create(imageClient, imageCreateOpts).Extract()
+		image, err := images.Create(ctx, imageClient, imageCreateOpts).Extract()
 		if err != nil {
 			return false, err
 		}
@@ -97,7 +98,7 @@ func ensureAmphoraImage(
 		}
 
 		log.Info(fmt.Sprintf("Uploading image %s %s (%s)", amphoraImage.Name, amphoraImage.ID, amphoraImage.URL))
-		err := imageimport.Create(imageClient, amphoraImage.ID, imageImportCreateOpts).ExtractErr()
+		err := imageimport.Create(ctx, imageClient, amphoraImage.ID, imageImportCreateOpts).ExtractErr()
 		if err != nil {
 			return false, err
 		}
@@ -112,6 +113,7 @@ func ensureAmphoraImage(
 }
 
 func amphoraImageListByTag(
+	ctx context.Context,
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
 	tag string,
@@ -121,7 +123,7 @@ func amphoraImageListByTag(
 		Tags: []string{tag},
 	}
 
-	allPages, err := images.List(imageClient, listOpts).AllPages()
+	allPages, err := images.List(imageClient, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -156,14 +158,15 @@ func amphoraImageListByTag(
 }
 
 func amphoraImageList(
+	ctx context.Context,
 	imageClient *gophercloud.ServiceClient,
 	log *logr.Logger,
 ) (map[string]AmphoraImage, error) {
-	amphoraImages, err := amphoraImageListByTag(imageClient, log, AmphoraImageTag)
+	amphoraImages, err := amphoraImageListByTag(ctx, imageClient, log, AmphoraImageTag)
 	if err != nil {
 		return nil, err
 	}
-	amphoraVertImages, err := amphoraImageListByTag(imageClient, log, AmphoraImageVertTag)
+	amphoraVertImages, err := amphoraImageListByTag(ctx, imageClient, log, AmphoraImageVertTag)
 	if err != nil {
 		return nil, err
 	}
@@ -193,7 +196,7 @@ func EnsureAmphoraImages(
 		return false, fmt.Errorf("error while getting an image client: %w", err)
 	}
 
-	existingAmphoraImages, err := amphoraImageList(imageClient, log)
+	existingAmphoraImages, err := amphoraImageList(ctx, imageClient, log)
 	if err != nil {
 		return false, fmt.Errorf("error while getting the list of images: %w", err)
 	}
@@ -207,7 +210,7 @@ func EnsureAmphoraImages(
 		} else {
 			existingImageStatus = "none"
 		}
-		ready, err := ensureAmphoraImage(imageClient, log, amphoraImage, existingImageStatus)
+		ready, err := ensureAmphoraImage(ctx, imageClient, log, amphoraImage, existingImageStatus)
 		if err != nil {
 			return false, fmt.Errorf("error while uploading the amphora images: %w", err)
 		}
@@ -235,7 +238,7 @@ func GetImageOwnerID(
 		return "", fmt.Errorf("error while getting a service client when getting image owner: %w", err)
 	}
 
-	project, err := GetProject(osclient, instance.Spec.TenantName)
+	project, err := GetProject(ctx, osclient, instance.Spec.TenantName)
 	if err != nil {
 		return "", fmt.Errorf("error while getting the project %s: %w", instance.Spec.TenantName, err)
 	}

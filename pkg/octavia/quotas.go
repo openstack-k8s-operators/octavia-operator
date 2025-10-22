@@ -19,15 +19,16 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/quotas"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/quotasets"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/quotas"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
 
 func ensureComputeQuotas(
+	ctx context.Context,
 	log *logr.Logger,
 	osclient *openstack.OpenStack,
 	serviceTenantID string,
@@ -39,7 +40,7 @@ func ensureComputeQuotas(
 	}
 
 	// Get the current quotas
-	quotaset, err := quotasets.Get(computeClient, serviceTenantID).Extract()
+	quotaset, err := quotasets.Get(ctx, computeClient, serviceTenantID).Extract()
 	if err != nil {
 		return err
 	}
@@ -58,7 +59,7 @@ func ensureComputeQuotas(
 		quotaset.ServerGroups != *updateOpts.ServerGroups ||
 		quotaset.ServerGroupMembers != *updateOpts.ServerGroupMembers {
 
-		quotaset, err := quotasets.Update(computeClient, serviceTenantID, updateOpts).Extract()
+		quotaset, err := quotasets.Update(ctx, computeClient, serviceTenantID, updateOpts).Extract()
 		if err != nil {
 			return err
 		}
@@ -69,6 +70,7 @@ func ensureComputeQuotas(
 }
 
 func ensureNetworkQuotas(
+	ctx context.Context,
 	log *logr.Logger,
 	osclient *openstack.OpenStack,
 	serviceTenantID string,
@@ -80,7 +82,7 @@ func ensureNetworkQuotas(
 	}
 
 	// Get the current quotas
-	quotasInfo, err := quotas.Get(networkClient, serviceTenantID).Extract()
+	quotasInfo, err := quotas.Get(ctx, networkClient, serviceTenantID).Extract()
 	if err != nil {
 		return err
 	}
@@ -95,7 +97,7 @@ func ensureNetworkQuotas(
 		quotasInfo.SecurityGroup != *updateOpts.SecurityGroup ||
 		quotasInfo.SecurityGroupRule != *updateOpts.SecurityGroupRule {
 
-		quotasInfo, err := quotas.Update(networkClient, serviceTenantID, updateOpts).Extract()
+		quotasInfo, err := quotas.Update(ctx, networkClient, serviceTenantID, updateOpts).Extract()
 		if err != nil {
 			return err
 		}
@@ -118,15 +120,15 @@ func EnsureQuotas(
 		return fmt.Errorf("error while getting a service client when set quotas: %w", err)
 	}
 
-	serviceTenant, err := GetProject(osclient, instance.Spec.TenantName)
+	serviceTenant, err := GetProject(ctx, osclient, instance.Spec.TenantName)
 	if err != nil {
 		return fmt.Errorf("error while getting the project %s: %w", instance.Spec.TenantName, err)
 	}
 
-	if err := ensureComputeQuotas(log, osclient, serviceTenant.ID); err != nil {
+	if err := ensureComputeQuotas(ctx, log, osclient, serviceTenant.ID); err != nil {
 		return fmt.Errorf("error while setting the compute quotas: %w", err)
 	}
-	if err := ensureNetworkQuotas(log, osclient, serviceTenant.ID); err != nil {
+	if err := ensureNetworkQuotas(ctx, log, osclient, serviceTenant.ID); err != nil {
 		return fmt.Errorf("error while setting the network quotas: %w", err)
 	}
 

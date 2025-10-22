@@ -27,8 +27,8 @@ import (
 
 	. "github.com/onsi/ginkgo/v2" //nolint:staticcheck,revive // ST1001,dot-imports: dot imports are standard practice for Ginkgo tests
 
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/projects"
-	"github.com/gophercloud/gophercloud/openstack/identity/v3/users"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/projects"
+	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/users"
 	keystone_helpers "github.com/openstack-k8s-operators/keystone-operator/api/test/helpers"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
