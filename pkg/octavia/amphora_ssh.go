@@ -24,7 +24,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/keypairs"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/configmap"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/secret"
@@ -122,7 +122,7 @@ func uploadKeypair(
 		return fmt.Errorf("error getting compute client: %w", err)
 	}
 
-	octaviaUser, err := GetUser(osClient, instance.Spec.ServiceUser)
+	octaviaUser, err := GetUser(ctx, osClient, instance.Spec.ServiceUser)
 	if err != nil {
 		return fmt.Errorf("error getting user details from openstack client: %w", err)
 	}
@@ -130,14 +130,14 @@ func uploadKeypair(
 	getOpts := keypairs.GetOpts{
 		UserID: octaviaUser.ID,
 	}
-	keypair, _ := keypairs.Get(computeClient, NovaKeyPairName, getOpts).Extract()
+	keypair, _ := keypairs.Get(ctx, computeClient, NovaKeyPairName, getOpts).Extract()
 
 	// keypair exists with a different pubkey, delete keypair
 	if keypair != nil && keypair.PublicKey != pubKey {
 		deleteOpts := keypairs.DeleteOpts{
 			UserID: octaviaUser.ID,
 		}
-		err := keypairs.Delete(computeClient, NovaKeyPairName, deleteOpts).ExtractErr()
+		err := keypairs.Delete(ctx, computeClient, NovaKeyPairName, deleteOpts).ExtractErr()
 		if err != nil {
 			return fmt.Errorf("error deleting the existing SSH keypair for amphorae: %w", err)
 		}
@@ -151,7 +151,7 @@ func uploadKeypair(
 			PublicKey: pubKey,
 			UserID:    octaviaUser.ID,
 		}
-		_, err = keypairs.Create(computeClient, createOpts).Extract()
+		_, err = keypairs.Create(ctx, computeClient, createOpts).Extract()
 		if err != nil {
 			return fmt.Errorf("error uploading public key for SSH authentication with amphora: %w", err)
 		}

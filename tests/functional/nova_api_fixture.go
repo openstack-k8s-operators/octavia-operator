@@ -25,8 +25,8 @@ import (
 
 	"github.com/go-logr/logr"
 
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/keypairs"
-	"github.com/gophercloud/gophercloud/openstack/compute/v2/extensions/quotasets"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/keypairs"
+	"github.com/gophercloud/gophercloud/v2/openstack/compute/v2/quotasets"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
 )
@@ -43,8 +43,41 @@ func (f *NovaAPIFixture) registerHandler(handler api.Handler) {
 	f.Server.AddHandler(f.URLBase+handler.Pattern, handler.Func)
 }
 
+func (f *NovaAPIFixture) versionHandler(w http.ResponseWriter, r *http.Request) {
+	f.LogRequest(r)
+	if r.Method != "GET" {
+		f.UnexpectedRequest(w, r)
+		return
+	}
+
+	// Return compute API version information
+	response := map[string]interface{}{
+		"version": map[string]interface{}{
+			"id":     "v2.1",
+			"status": "CURRENT",
+			"links": []map[string]string{
+				{
+					"href": f.Server.Endpoint() + f.URLBase,
+					"rel":  "self",
+				},
+			},
+		},
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		f.InternalError(err, "Error during marshalling response", w, r)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, _ = fmt.Fprint(w, string(bytes))
+}
+
 // Setup initializes the NovaAPIFixture with API handlers and test data
 func (f *NovaAPIFixture) Setup() {
+	f.registerHandler(api.Handler{Pattern: "/", Func: f.versionHandler})
 	f.registerHandler(api.Handler{Pattern: "/os-keypairs", Func: f.keyPairHandler})
 	f.registerHandler(api.Handler{Pattern: "/os-keypairs/", Func: f.keyPairHandler})
 	f.registerHandler(api.Handler{Pattern: "/os-quota-sets/", Func: f.quotaSetsHandler})

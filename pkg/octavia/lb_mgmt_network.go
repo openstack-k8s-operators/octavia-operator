@@ -20,16 +20,16 @@ import (
 	"net/netip"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/provider"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/rbacpolicies"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/rules"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/gophercloud/gophercloud/v2"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/external"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/provider"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/rbacpolicies"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/security/groups"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/security/rules"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/subnets"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 )
@@ -49,11 +49,11 @@ type NetworkProvisioningSummary struct {
 // status.
 //
 
-func findPort(client *gophercloud.ServiceClient, networkID string, name string, log *logr.Logger) (*ports.Port, error) {
+func findPort(ctx context.Context, client *gophercloud.ServiceClient, networkID string, name string, log *logr.Logger) (*ports.Port, error) {
 	listOpts := ports.ListOpts{
 		NetworkID: networkID,
 	}
-	allPages, err := ports.List(client, listOpts).AllPages()
+	allPages, err := ports.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		log.Error(err, fmt.Sprintf("Unable to list ports for %s", networkID))
 		return nil, err
@@ -74,7 +74,7 @@ func findPort(client *gophercloud.ServiceClient, networkID string, name string, 
 	return nil, nil
 }
 
-func ensurePort(client *gophercloud.ServiceClient, availabilityZone *string, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, bool, error) {
+func ensurePort(ctx context.Context, client *gophercloud.ServiceClient, availabilityZone *string, tenantNetwork *networks.Network, securityGroups *[]string, log *logr.Logger) (*ports.Port, bool, error) {
 	var portName string
 	if availabilityZone == nil {
 		portName = LbMgmtRouterPortName
@@ -82,7 +82,7 @@ func ensurePort(client *gophercloud.ServiceClient, availabilityZone *string, ten
 		portName = fmt.Sprintf(LbMgmtRouterPortNameAZ, *availabilityZone)
 	}
 
-	p, err := findPort(client, tenantNetwork.ID, portName, log)
+	p, err := findPort(ctx, client, tenantNetwork.ID, portName, log)
 	if err != nil {
 		return nil, false, err
 	}
@@ -100,7 +100,7 @@ func ensurePort(client *gophercloud.ServiceClient, availabilityZone *string, ten
 		NetworkID:      tenantNetwork.ID,
 		SecurityGroups: securityGroups,
 	}
-	p, err = ports.Create(client, createOpts).Extract()
+	p, err = ports.Create(ctx, client, createOpts).Extract()
 	if err != nil {
 		log.Error(err, "Error creating port")
 		return nil, false, err
@@ -108,14 +108,14 @@ func ensurePort(client *gophercloud.ServiceClient, availabilityZone *string, ten
 	return p, true, nil
 }
 
-func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts subnets.CreateOpts, log *logr.Logger) (*subnets.Subnet, error) {
+func ensureSubnet(ctx context.Context, client *gophercloud.ServiceClient, ipVersion int, createOpts subnets.CreateOpts, log *logr.Logger) (*subnets.Subnet, error) {
 	listOpts := subnets.ListOpts{
 		Name:      createOpts.Name,
 		NetworkID: createOpts.NetworkID,
 		TenantID:  createOpts.TenantID,
 		IPVersion: ipVersion,
 	}
-	allPages, err := subnets.List(client, listOpts).AllPages()
+	allPages, err := subnets.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts s
 	var lbMgmtSubnet *subnets.Subnet
 	if len(allSubnets) == 0 {
 		log.Info(fmt.Sprintf("Creating Octavia management subnet \"%s\"", createOpts.Name))
-		lbMgmtSubnet, err = subnets.Create(client, createOpts).Extract()
+		lbMgmtSubnet, err = subnets.Create(ctx, client, createOpts).Extract()
 		if err != nil {
 			return nil, err
 		}
@@ -155,7 +155,7 @@ func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts s
 		}
 		if updateNeeded {
 			log.Info(fmt.Sprintf("Updating Octavia management subnet \"%s\"", createOpts.Name))
-			lbMgmtSubnet, err = subnets.Update(client, lbMgmtSubnet.ID, delta).Extract()
+			lbMgmtSubnet, err = subnets.Update(ctx, client, lbMgmtSubnet.ID, delta).Extract()
 			if err != nil {
 				return nil, err
 			}
@@ -164,12 +164,12 @@ func ensureSubnet(client *gophercloud.ServiceClient, ipVersion int, createOpts s
 	return lbMgmtSubnet, nil
 }
 
-func getNetwork(client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
+func getNetwork(ctx context.Context, client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
 	listOpts := networks.ListOpts{
 		Name:     networkName,
 		TenantID: serviceTenantID,
 	}
-	allPages, err := networks.List(client, listOpts).AllPages()
+	allPages, err := networks.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func getNetwork(client *gophercloud.ServiceClient, networkName string, serviceTe
 	return nil, nil
 }
 
-func getNetworkExt(client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
+func getNetworkExt(ctx context.Context, client *gophercloud.ServiceClient, networkName string, serviceTenantID string) (*networks.Network, error) {
 	extTrue := true
 	listOpts := external.ListOptsExt{
 		ListOptsBuilder: networks.ListOpts{
@@ -192,7 +192,7 @@ func getNetworkExt(client *gophercloud.ServiceClient, networkName string, servic
 		},
 		External: &extTrue,
 	}
-	allPages, err := networks.List(client, listOpts).AllPages()
+	allPages, err := networks.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -206,12 +206,12 @@ func getNetworkExt(client *gophercloud.ServiceClient, networkName string, servic
 	return nil, nil
 }
 
-func getSubnet(client *gophercloud.ServiceClient, subnetName string, serviceTenantID string) (*subnets.Subnet, error) {
+func getSubnet(ctx context.Context, client *gophercloud.ServiceClient, subnetName string, serviceTenantID string) (*subnets.Subnet, error) {
 	listOpts := subnets.ListOpts{
 		Name:     subnetName,
 		TenantID: serviceTenantID,
 	}
-	allPages, err := subnets.List(client, listOpts).AllPages()
+	allPages, err := subnets.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -225,16 +225,16 @@ func getSubnet(client *gophercloud.ServiceClient, subnetName string, serviceTena
 	return nil, nil
 }
 
-func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger,
+func ensureNetwork(ctx context.Context, client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger,
 	serviceTenantID string) (*networks.Network, error) {
-	foundNetwork, err := getNetwork(client, createOpts.Name, serviceTenantID)
+	foundNetwork, err := getNetwork(ctx, client, createOpts.Name, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
 
 	if foundNetwork == nil {
 		log.Info(fmt.Sprintf("Creating Octavia network \"%s\"", createOpts.Name))
-		foundNetwork, err = networks.Create(client, createOpts).Extract()
+		foundNetwork, err = networks.Create(ctx, client, createOpts).Extract()
 		if err != nil {
 			return nil, err
 		}
@@ -249,7 +249,7 @@ func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.Create
 		}
 		if delta != emptyOpts {
 			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
-			foundNetwork, err = networks.Update(client, foundNetwork.ID, delta).Extract()
+			foundNetwork, err = networks.Update(ctx, client, foundNetwork.ID, delta).Extract()
 			if err != nil {
 				return nil, err
 			}
@@ -258,8 +258,8 @@ func ensureNetwork(client *gophercloud.ServiceClient, createOpts networks.Create
 	return foundNetwork, nil
 }
 
-func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
-	foundNetwork, err := getNetworkExt(client, createOpts.Name, serviceTenantID)
+func ensureNetworkExt(ctx context.Context, client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+	foundNetwork, err := getNetworkExt(ctx, client, createOpts.Name, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -284,7 +284,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 		}
 
 		log.Info(fmt.Sprintf("Creating Octavia network \"%s\"", createOpts.Name))
-		foundNetwork, err = networks.Create(client, extCreateOpts).Extract()
+		foundNetwork, err = networks.Create(ctx, client, extCreateOpts).Extract()
 		if err != nil {
 			return nil, err
 		}
@@ -299,7 +299,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 		}
 		if delta != emptyOpts {
 			log.Info(fmt.Sprintf("Updating Octavia management network \"%s\"", createOpts.Name))
-			foundNetwork, err = networks.Update(client, foundNetwork.ID, delta).Extract()
+			foundNetwork, err = networks.Update(ctx, client, foundNetwork.ID, delta).Extract()
 			if err != nil {
 				return nil, err
 			}
@@ -309,6 +309,7 @@ func ensureNetworkExt(client *gophercloud.ServiceClient, createOpts networks.Cre
 }
 
 func ensureProvSubnet(
+	ctx context.Context,
 	client *gophercloud.ServiceClient,
 	providerNetwork *networks.Network,
 	networkParameters *NetworkParameters,
@@ -336,12 +337,12 @@ func ensureProvSubnet(
 		},
 		GatewayIP: &gatewayIP,
 	}
-	return ensureSubnet(client, ipVersion, createOpts, log)
+	return ensureSubnet(ctx, client, ipVersion, createOpts, log)
 }
 
-func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.OctaviaLbMgmtNetworks, serviceTenantID string, log *logr.Logger) (
+func ensureProvNetwork(ctx context.Context, client *gophercloud.ServiceClient, netDetails *octaviav1.OctaviaLbMgmtNetworks, serviceTenantID string, log *logr.Logger) (
 	*networks.Network, error) {
-	_, err := getNetwork(client, LbProvNetName, serviceTenantID)
+	_, err := getNetwork(ctx, client, LbProvNetName, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -354,7 +355,7 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 		TenantID:              serviceTenantID,
 		AvailabilityZoneHints: netDetails.AvailabilityZones,
 	}
-	provNet, err := ensureNetworkExt(client, createOpts, log, serviceTenantID)
+	provNet, err := ensureNetworkExt(ctx, client, createOpts, log, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +368,7 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 		ObjectID:     provNet.ID,
 		TargetTenant: "*",
 	}
-	allPages, err := rbacpolicies.List(client, listOpts).AllPages()
+	allPages, err := rbacpolicies.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +383,7 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 			TargetTenant: serviceTenantID,
 		}
 
-		_, err := rbacpolicies.Update(client, rbacpolicy.ID, updateOpts).Extract()
+		_, err := rbacpolicies.Update(ctx, client, rbacpolicy.ID, updateOpts).Extract()
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Cannot update RBAC policy %s", rbacpolicy.ID))
 		}
@@ -392,6 +393,7 @@ func ensureProvNetwork(client *gophercloud.ServiceClient, netDetails *octaviav1.
 }
 
 func ensureLbMgmtSubnetRoutes(
+	ctx context.Context,
 	client *gophercloud.ServiceClient,
 	tenantSubnet *subnets.Subnet,
 	networkParameters *NetworkParameters,
@@ -408,7 +410,7 @@ func ensureLbMgmtSubnetRoutes(
 		updateOpts := subnets.UpdateOpts{
 			HostRoutes: &hostRoutes,
 		}
-		_, err := subnets.Update(client, tenantSubnet.ID, updateOpts).Extract()
+		_, err := subnets.Update(ctx, client, tenantSubnet.ID, updateOpts).Extract()
 		if err != nil {
 			return err
 		}
@@ -418,6 +420,7 @@ func ensureLbMgmtSubnetRoutes(
 }
 
 func ensureLbMgmtSubnet(
+	ctx context.Context,
 	client *gophercloud.ServiceClient,
 	availabilityZone *string,
 	tenantNetwork *networks.Network,
@@ -480,10 +483,11 @@ func ensureLbMgmtSubnet(
 			GatewayIP: &gatewayIP,
 		}
 	}
-	return ensureSubnet(client, ipVersion, createOpts, log)
+	return ensureSubnet(ctx, client, ipVersion, createOpts, log)
 }
 
 func ensureLbMgmtNetwork(
+	ctx context.Context,
 	client *gophercloud.ServiceClient,
 	availabilityZone *string,
 	networkDetails *octaviav1.OctaviaLbMgmtNetworks,
@@ -502,7 +506,7 @@ func ensureLbMgmtNetwork(
 		description = fmt.Sprintf(LbMgmtNetDescriptionAZ, *availabilityZone)
 		azHints = []string{*availabilityZone}
 	}
-	mgmtNetwork, err := getNetwork(client, networkName, serviceTenantID)
+	mgmtNetwork, err := getNetwork(ctx, client, networkName, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +523,7 @@ func ensureLbMgmtNetwork(
 		TenantID:              serviceTenantID,
 		AvailabilityZoneHints: azHints,
 	}
-	mgmtNetwork, err = ensureNetwork(client, createOpts, log, serviceTenantID)
+	mgmtNetwork, err = ensureNetwork(ctx, client, createOpts, log, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}
@@ -554,7 +558,7 @@ func compareExternalFixedIPs(a []routers.ExternalFixedIP, b []routers.ExternalFi
 
 // reconcileRouter compares existing router properties against what is expected/desired and updates the router if
 // necessary!
-func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
+func reconcileRouter(ctx context.Context, client *gophercloud.ServiceClient, router *routers.Router,
 	gatewayNetwork *networks.Network,
 	gatewaySubnet *subnets.Subnet,
 	networkParameters *NetworkParameters,
@@ -589,7 +593,7 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 		needsUpdate = true
 	}
 	if needsUpdate {
-		updatedRouter, err := routers.Update(client, router.ID, updateInfo).Extract()
+		updatedRouter, err := routers.Update(ctx, client, router.ID, updateInfo).Extract()
 		if err != nil {
 			return nil, err
 		}
@@ -601,11 +605,11 @@ func reconcileRouter(client *gophercloud.ServiceClient, router *routers.Router,
 }
 
 // findRouter is a simple helper method...
-func findRouter(client *gophercloud.ServiceClient, log *logr.Logger) (*routers.Router, error) {
+func findRouter(ctx context.Context, client *gophercloud.ServiceClient, log *logr.Logger) (*routers.Router, error) {
 	listOpts := routers.ListOpts{
 		Name: LbRouterName,
 	}
-	allPages, err := routers.List(client, listOpts).AllPages()
+	allPages, err := routers.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		log.Error(err, "Unable to list routers")
 		return nil, err
@@ -635,14 +639,14 @@ func findRouter(client *gophercloud.ServiceClient, log *logr.Logger) (*routers.R
 
 // findSecurityGroupRule is different than the other findX helper functions because of the wide variety of
 // potential values
-func findSecurityGroupRule(client *gophercloud.ServiceClient, criteria *rules.ListOpts, log *logr.Logger) (*rules.SecGroupRule, error) {
+func findSecurityGroupRule(ctx context.Context, client *gophercloud.ServiceClient, criteria *rules.ListOpts, log *logr.Logger) (*rules.SecGroupRule, error) {
 	//
 	// Strip description out of search. While informative, we are not concerned with that field.
 	//
 	listOpts := *criteria
 	listOpts.Description = ""
 
-	allPages, err := rules.List(client, listOpts).AllPages()
+	allPages, err := rules.List(client, listOpts).AllPages(ctx)
 
 	if err != nil {
 		log.Error(err, "findSecurityGroupRule: Unable to find security group rule")
@@ -677,12 +681,12 @@ func strToRuleProtocol(p string) rules.RuleProtocol {
 	return ""
 }
 
-func ensureSecurityGroupRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, rulesDefinitions []rules.ListOpts, log *logr.Logger) error {
+func ensureSecurityGroupRules(ctx context.Context, client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, rulesDefinitions []rules.ListOpts, log *logr.Logger) error {
 	for _, r := range rulesDefinitions {
 		r.TenantID = securityGroup.TenantID
 		r.SecGroupID = securityGroup.ID
 		r.Direction = "ingress"
-		rule, err := findSecurityGroupRule(client, &r, log)
+		rule, err := findSecurityGroupRule(ctx, client, &r, log)
 		// Don't break on error if not found, but create the rest.
 		if err != nil {
 			log.Error(err, fmt.Sprintf("ensureSecurityGroupRules: error searching for %s", r.Description))
@@ -704,7 +708,7 @@ func ensureSecurityGroupRules(client *gophercloud.ServiceClient, securityGroup *
 			Direction:    rules.DirIngress,
 			ProjectID:    securityGroup.TenantID,
 		}
-		_, err = rules.Create(client, createOpts).Extract()
+		_, err = rules.Create(ctx, client, createOpts).Extract()
 		if err != nil {
 			log.Error(err, fmt.Sprintf("ensureSecurityGroupRules: error creating rule %s", r.Description))
 		}
@@ -712,9 +716,9 @@ func ensureSecurityGroupRules(client *gophercloud.ServiceClient, securityGroup *
 	return nil
 }
 
-type ensureRules func(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error
+type ensureRules func(ctx context.Context, client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error
 
-func ensureMgmtRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
+func ensureMgmtRules(ctx context.Context, client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
 	rulesDefinitions := []rules.ListOpts{
 		{
 			Description:  "ssh port IPv4 rule",
@@ -745,10 +749,10 @@ func ensureMgmtRules(client *gophercloud.ServiceClient, securityGroup *groups.Se
 			Protocol:     "tcp",
 		},
 	}
-	return ensureSecurityGroupRules(client, securityGroup, rulesDefinitions, log)
+	return ensureSecurityGroupRules(ctx, client, securityGroup, rulesDefinitions, log)
 }
 
-func ensureHealthMgrRules(client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
+func ensureHealthMgrRules(ctx context.Context, client *gophercloud.ServiceClient, securityGroup *groups.SecGroup, log *logr.Logger) error {
 	healthManagerRules := []rules.ListOpts{
 		{
 			Description:  "health manager status port IPv4 rule",
@@ -793,14 +797,14 @@ func ensureHealthMgrRules(client *gophercloud.ServiceClient, securityGroup *grou
 			Protocol:     "tcp",
 		},
 	}
-	return ensureSecurityGroupRules(client, securityGroup, healthManagerRules, log)
+	return ensureSecurityGroupRules(ctx, client, securityGroup, healthManagerRules, log)
 }
 
-func findSecurityGroup(client *gophercloud.ServiceClient, tenantID string, groupName string, log *logr.Logger) (*groups.SecGroup, error) {
+func findSecurityGroup(ctx context.Context, client *gophercloud.ServiceClient, tenantID string, groupName string, log *logr.Logger) (*groups.SecGroup, error) {
 	listOpts := groups.ListOpts{
 		TenantID: tenantID,
 	}
-	allPages, err := groups.List(client, listOpts).AllPages()
+	allPages, err := groups.List(client, listOpts).AllPages(ctx)
 	if err != nil {
 		log.Error(err, "findSecurityGroup: Unable to find security groups")
 		return nil, err
@@ -819,6 +823,7 @@ func findSecurityGroup(client *gophercloud.ServiceClient, tenantID string, group
 }
 
 func ensureSecurityGroup(
+	ctx context.Context,
 	client *gophercloud.ServiceClient,
 	tenantID string,
 	groupName string,
@@ -826,7 +831,7 @@ func ensureSecurityGroup(
 	log *logr.Logger) (
 	string, error) {
 
-	secGroup, err := findSecurityGroup(client, tenantID, groupName, log)
+	secGroup, err := findSecurityGroup(ctx, client, tenantID, groupName, log)
 	if err != nil {
 		return "", err
 	}
@@ -836,7 +841,7 @@ func ensureSecurityGroup(
 			Name:     groupName,
 			TenantID: tenantID,
 		}
-		secGroup, err = groups.Create(client, createOpts).Extract()
+		secGroup, err = groups.Create(ctx, client, createOpts).Extract()
 		if err != nil {
 			log.Error(err, fmt.Sprintf("ensureLbMgmtSecurityGroup: unable to create security group %s",
 				groupName))
@@ -844,7 +849,7 @@ func ensureSecurityGroup(
 		}
 	}
 
-	err = ruleFn(client, secGroup, log)
+	err = ruleFn(ctx, client, secGroup, log)
 	if err != nil {
 		return "", err
 	}
@@ -868,19 +873,19 @@ func HandleUnmanagedAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	serviceTenant, err := GetProject(o, tenantName)
+	serviceTenant, err := GetProject(ctx, o, tenantName)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 
 	tenantNetworkID := ""
-	network, err := getNetwork(client, LbMgmtNetName, serviceTenant.ID)
+	network, err := getNetwork(ctx, client, LbMgmtNetName, serviceTenant.ID)
 	if err == nil && network != nil {
 		tenantNetworkID = network.ID
 	}
 
 	managementSubnetGateway := ""
-	router, err := findRouter(client, log)
+	router, err := findRouter(ctx, client, log)
 	if err == nil && router != nil {
 		if len(router.GatewayInfo.ExternalFixedIPs) > 0 {
 			managementSubnetGateway = router.GatewayInfo.ExternalFixedIPs[0].IPAddress
@@ -890,21 +895,21 @@ func HandleUnmanagedAmphoraManagementNetwork(
 	}
 
 	managementSubnetCIDR := ""
-	subnet, err := getSubnet(client, LbMgmtSubnetName, serviceTenant.ID)
+	subnet, err := getSubnet(ctx, client, LbMgmtSubnetName, serviceTenant.ID)
 	if err == nil && subnet != nil {
 		managementSubnetCIDR = subnet.CIDR
 	}
 
 	managementSubnetExtraCIDRs := []string{}
 	for _, az := range netDetails.AvailabilityZones {
-		subnet, err := getSubnet(client, fmt.Sprintf(LbMgmtSubnetNameAZ, az), serviceTenant.ID)
+		subnet, err := getSubnet(ctx, client, fmt.Sprintf(LbMgmtSubnetNameAZ, az), serviceTenant.ID)
 		if err == nil && subnet != nil {
 			managementSubnetExtraCIDRs = append(managementSubnetExtraCIDRs, subnet.CIDR)
 		}
 	}
 
 	securityGroupID := ""
-	securityGroup, err := findSecurityGroup(client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, log)
+	securityGroup, err := findSecurityGroup(ctx, client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, log)
 	if err == nil && securityGroup != nil {
 		securityGroupID = securityGroup.ID
 	}
@@ -937,16 +942,16 @@ func EnsureAmphoraManagementNetwork(
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
-	serviceTenant, err := GetProject(o, tenantName)
+	serviceTenant, err := GetProject(ctx, o, tenantName)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 
-	lbMgmtSecurityGroupID, err := ensureSecurityGroup(client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, ensureMgmtRules, log)
+	lbMgmtSecurityGroupID, err := ensureSecurityGroup(ctx, client, serviceTenant.ID, LbMgmtNetworkSecurityGroupName, ensureMgmtRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
 	}
-	lbHealthSecurityGroupID, err := ensureSecurityGroup(client, serviceTenant.ID, LbMgmtHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
+	lbHealthSecurityGroupID, err := ensureSecurityGroup(ctx, client, serviceTenant.ID, LbMgmtHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of management network security groups, continuing...")
 	}
@@ -959,54 +964,54 @@ func EnsureAmphoraManagementNetwork(
 	tenantNetworkID := ""
 
 	if netDetails.CreateDefaultLbMgmtNetwork {
-		tenantNetwork, err = ensureLbMgmtNetwork(client, nil, netDetails, serviceTenant.ID, log)
+		tenantNetwork, err = ensureLbMgmtNetwork(ctx, client, nil, netDetails, serviceTenant.ID, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
 		tenantNetworkID = tenantNetwork.ID
 
-		tenantSubnet, err = ensureLbMgmtSubnet(client, nil, tenantNetwork, networkParameters, log)
+		tenantSubnet, err = ensureLbMgmtSubnet(ctx, client, nil, tenantNetwork, networkParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
 
-		tenantRouterPort, _, err = ensurePort(client, nil, tenantNetwork, &securityGroups, log)
+		tenantRouterPort, _, err = ensurePort(ctx, client, nil, tenantNetwork, &securityGroups, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
 	}
 
-	adminTenant, err := GetProject(o, AdminTenant)
+	adminTenant, err := GetProject(ctx, o, AdminTenant)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 
-	_, err = ensureSecurityGroup(client, adminTenant.ID, LbProvNetworkSecurityGroupName, ensureMgmtRules, log)
+	_, err = ensureSecurityGroup(ctx, client, adminTenant.ID, LbProvNetworkSecurityGroupName, ensureMgmtRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of octavia provider network security groups, continuing...")
 	}
-	_, err = ensureSecurityGroup(client, adminTenant.ID, LbProvHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
+	_, err = ensureSecurityGroup(ctx, client, adminTenant.ID, LbProvHealthManagerSecurityGroupName, ensureHealthMgrRules, log)
 	if err != nil {
 		log.Error(err, "Unable to complete configuration of octavia provider network security groups, continuing...")
 	}
 
-	providerNetwork, err := ensureProvNetwork(client, netDetails, adminTenant.ID, log)
+	providerNetwork, err := ensureProvNetwork(ctx, client, netDetails, adminTenant.ID, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 
-	providerSubnet, err := ensureProvSubnet(client, providerNetwork, networkParameters, log)
+	providerSubnet, err := ensureProvSubnet(ctx, client, providerNetwork, networkParameters, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 
-	router, err := findRouter(client, log)
+	router, err := findRouter(ctx, client, log)
 	if err != nil {
 		return NetworkProvisioningSummary{}, err
 	}
 	if router != nil {
 		log.Info("Router object found, reconciling")
-		router, err = reconcileRouter(client, router, providerNetwork, providerSubnet, networkParameters, log)
+		router, err = reconcileRouter(ctx, client, router, providerNetwork, providerSubnet, networkParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -1026,7 +1031,7 @@ func EnsureAmphoraManagementNetwork(
 			GatewayInfo:           &gatewayInfo,
 			AvailabilityZoneHints: netDetails.AvailabilityZones,
 		}
-		router, err = routers.Create(client, createOpts).Extract()
+		router, err = routers.Create(ctx, client, createOpts).Extract()
 		if err != nil {
 			log.Error(err, "Unable to create router object")
 			return NetworkProvisioningSummary{}, err
@@ -1036,7 +1041,7 @@ func EnsureAmphoraManagementNetwork(
 			interfaceOpts := routers.AddInterfaceOpts{
 				PortID: tenantRouterPort.ID,
 			}
-			_, err := routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+			_, err := routers.AddInterface(ctx, client, router.ID, interfaceOpts).Extract()
 			if err != nil {
 				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
 			}
@@ -1045,7 +1050,7 @@ func EnsureAmphoraManagementNetwork(
 
 	if tenantSubnet != nil {
 		// Set route on subnet
-		err = ensureLbMgmtSubnetRoutes(client, tenantSubnet, networkParameters, tenantRouterPort)
+		err = ensureLbMgmtSubnetRoutes(ctx, client, tenantSubnet, networkParameters, tenantRouterPort)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", tenantSubnet.ID))
 		}
@@ -1054,7 +1059,7 @@ func EnsureAmphoraManagementNetwork(
 	managementSubnetAZCIDRs := []string{}
 	for az, cidr := range netDetails.AvailabilityZoneCIDRs {
 		// Create Management network and subnet for AZ
-		network, err := ensureLbMgmtNetwork(client, &az, netDetails, serviceTenant.ID, log)
+		network, err := ensureLbMgmtNetwork(ctx, client, &az, netDetails, serviceTenant.ID, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -1069,13 +1074,13 @@ func EnsureAmphoraManagementNetwork(
 			TenantAllocationStart: start,
 			TenantAllocationEnd:   end,
 		}
-		subnet, err := ensureLbMgmtSubnet(client, &az, network, &networkAZParameters, log)
+		subnet, err := ensureLbMgmtSubnet(ctx, client, &az, network, &networkAZParameters, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
 
 		// Create a port for the router, will be the gateway from the subnet to the control plane
-		routerPort, created, err := ensurePort(client, &az, network, &securityGroups, log)
+		routerPort, created, err := ensurePort(ctx, client, &az, network, &securityGroups, log)
 		if err != nil {
 			return NetworkProvisioningSummary{}, err
 		}
@@ -1086,14 +1091,14 @@ func EnsureAmphoraManagementNetwork(
 				PortID: routerPort.ID,
 			}
 
-			_, err = routers.AddInterface(client, router.ID, interfaceOpts).Extract()
+			_, err = routers.AddInterface(ctx, client, router.ID, interfaceOpts).Extract()
 			if err != nil {
 				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", routerPort.ID, router.ID))
 			}
 		}
 
 		// Set route to the control plane
-		err = ensureLbMgmtSubnetRoutes(client, subnet, networkParameters, routerPort)
+		err = ensureLbMgmtSubnetRoutes(ctx, client, subnet, networkParameters, routerPort)
 		if err != nil {
 			log.Error(err, fmt.Sprintf("Unable to set host routes on subnet %s", subnet.ID))
 		}

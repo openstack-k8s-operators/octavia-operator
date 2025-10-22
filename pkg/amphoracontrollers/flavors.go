@@ -22,10 +22,10 @@ import (
 	"strings"
 
 	"github.com/go-logr/logr"
-	"github.com/gophercloud/gophercloud"
-	computeflavors "github.com/gophercloud/gophercloud/openstack/compute/v2/flavors"
-	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/flavorprofiles"
-	"github.com/gophercloud/gophercloud/openstack/loadbalancer/v2/flavors"
+	"github.com/gophercloud/gophercloud/v2"
+	computeflavors "github.com/gophercloud/gophercloud/v2/openstack/compute/v2/flavors"
+	"github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/flavorprofiles"
+	"github.com/gophercloud/gophercloud/v2/openstack/loadbalancer/v2/flavors"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/openstack"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
@@ -71,12 +71,12 @@ var (
 	}
 )
 
-func getAmphoraFlavors(computeClient *gophercloud.ServiceClient) (map[string]computeflavors.Flavor, error) {
+func getAmphoraFlavors(ctx context.Context, computeClient *gophercloud.ServiceClient) (map[string]computeflavors.Flavor, error) {
 	// Get Octavia flavors
 	listOpts := computeflavors.ListOpts{
 		AccessType: computeflavors.AllAccess,
 	}
-	allPages, err := computeflavors.ListDetail(computeClient, listOpts).AllPages()
+	allPages, err := computeflavors.ListDetail(computeClient, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error listing compute flavors: %w", err)
 	}
@@ -93,9 +93,9 @@ func getAmphoraFlavors(computeClient *gophercloud.ServiceClient) (map[string]com
 	return amphoraFlavors, nil
 }
 
-func getOctaviaFlavorProfiles(lbClient *gophercloud.ServiceClient) (map[string]flavorprofiles.FlavorProfile, error) {
+func getOctaviaFlavorProfiles(ctx context.Context, lbClient *gophercloud.ServiceClient) (map[string]flavorprofiles.FlavorProfile, error) {
 	listOpts := flavorprofiles.ListOpts{}
-	allPages, err := flavorprofiles.List(lbClient, listOpts).AllPages()
+	allPages, err := flavorprofiles.List(lbClient, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error listing flavor profiles: %w", err)
 	}
@@ -110,9 +110,9 @@ func getOctaviaFlavorProfiles(lbClient *gophercloud.ServiceClient) (map[string]f
 	return flavorProfiles, nil
 }
 
-func getOctaviaFlavors(lbClient *gophercloud.ServiceClient) (map[string]flavors.Flavor, error) {
+func getOctaviaFlavors(ctx context.Context, lbClient *gophercloud.ServiceClient) (map[string]flavors.Flavor, error) {
 	listOpts := flavors.ListOpts{}
-	allPages, err := flavors.List(lbClient, listOpts).AllPages()
+	allPages, err := flavors.List(lbClient, listOpts).AllPages(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error listing flavors: %w", err)
 	}
@@ -127,7 +127,7 @@ func getOctaviaFlavors(lbClient *gophercloud.ServiceClient) (map[string]flavors.
 	return flavors, nil
 }
 
-func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *octaviav1.OctaviaAmphoraController) (string, error) {
+func ensureFlavors(ctx context.Context, osclient *openstack.OpenStack, log *logr.Logger, instance *octaviav1.OctaviaAmphoraController) (string, error) {
 	computeClient, err := octavia.GetComputeClient(osclient)
 	if err != nil {
 		return "", fmt.Errorf("error getting compute client: %w", err)
@@ -138,7 +138,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 		return "", fmt.Errorf("error getting loadbalancer client: %w", err)
 	}
 
-	amphoraFlavors, err := getAmphoraFlavors(computeClient)
+	amphoraFlavors, err := getAmphoraFlavors(ctx, computeClient)
 	if err != nil {
 		return "", fmt.Errorf("error getting amphora flavors: %w", err)
 	}
@@ -187,7 +187,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 	for idx, flavorOpts := range flavorsCreateOpts {
 		if _, ok := amphoraFlavors[flavorOpts.Name]; !ok {
 			log.Info(fmt.Sprintf("Creating Amphora flavor \"%s\"", flavorOpts.Name))
-			flavor, err := computeflavors.Create(computeClient, flavorOpts).Extract()
+			flavor, err := computeflavors.Create(ctx, computeClient, flavorOpts).Extract()
 			if err != nil {
 				return "", fmt.Errorf("error creating amphora flavor \"%s\": %w", flavorOpts.Name, err)
 			}
@@ -199,12 +199,12 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 	}
 
 	// Get Octavia FlavorProfiles and Flavors
-	flavorProfileMap, err := getOctaviaFlavorProfiles(lbClient)
+	flavorProfileMap, err := getOctaviaFlavorProfiles(ctx, lbClient)
 	if err != nil {
 		return "", fmt.Errorf("error getting flavor profiles: %w", err)
 	}
 
-	flavorMap, err := getOctaviaFlavors(lbClient)
+	flavorMap, err := getOctaviaFlavors(ctx, lbClient)
 	if err != nil {
 		return "", fmt.Errorf("error getting flavors: %w", err)
 	}
@@ -218,7 +218,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 			flavorName := flavorProfile.Name
 
 			if flavor, ok := flavorMap[flavorName]; ok {
-				err := flavors.Delete(lbClient, flavor.ID).ExtractErr()
+				err := flavors.Delete(ctx, lbClient, flavor.ID).ExtractErr()
 				if err != nil {
 					log.Info("Cannot delete flavor %s (%s), skipping.", flavorName, flavor.ID)
 					continue
@@ -226,7 +226,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 				delete(flavorMap, flavorName)
 			}
 
-			err = flavorprofiles.Delete(lbClient, flavorProfile.ID).ExtractErr()
+			err = flavorprofiles.Delete(ctx, lbClient, flavorProfile.ID).ExtractErr()
 			if err != nil {
 				log.Info("Cannot delete flavorprofile %s (%s), skipping.", flavorName, flavorProfile.ID)
 				continue
@@ -261,7 +261,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 			}
 
 			log.Info(fmt.Sprintf("Creating Octavia flavor profile \"%s\"", flavorProfileCreateOpts.Name))
-			fp, err := flavorprofiles.Create(lbClient, flavorProfileCreateOpts).Extract()
+			fp, err := flavorprofiles.Create(ctx, lbClient, flavorProfileCreateOpts).Extract()
 			if err != nil {
 				log.Info(fmt.Sprintf("Warning: Could not create flavor profile. "+
 					"Amphora image might be missing or not "+
@@ -282,7 +282,7 @@ func ensureFlavors(osclient *openstack.OpenStack, log *logr.Logger, instance *oc
 				Enabled:         true,
 			}
 			log.Info(fmt.Sprintf("Creating Octavia flavor \"%s\"", flavorCreateOpts.Name))
-			_, err := flavors.Create(lbClient, flavorCreateOpts).Extract()
+			_, err := flavors.Create(ctx, lbClient, flavorCreateOpts).Extract()
 			if err != nil {
 				return "", fmt.Errorf("error creating flavor \"%s\": %w", flavorCreateOpts.Name, err)
 			}
@@ -304,7 +304,7 @@ func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraContro
 		return "", fmt.Errorf("error while getting a service client when creating flavors: %w", err)
 	}
 
-	defaultNovaFlavorID, err := ensureFlavors(osclient, log, instance)
+	defaultNovaFlavorID, err := ensureFlavors(ctx, osclient, log, instance)
 	if err != nil {
 		return "", fmt.Errorf("error while creating flavors: %w", err)
 	}

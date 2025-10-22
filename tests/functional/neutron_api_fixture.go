@@ -25,14 +25,14 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/google/uuid"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/external"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/layer3/routers"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/quotas"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/rbacpolicies"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/extensions/security/groups"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/networks"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/ports"
-	"github.com/gophercloud/gophercloud/openstack/networking/v2/subnets"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/external"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/layer3/routers"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/quotas"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/rbacpolicies"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/extensions/security/groups"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/networks"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/ports"
+	"github.com/gophercloud/gophercloud/v2/openstack/networking/v2/subnets"
 
 	api "github.com/openstack-k8s-operators/lib-common/modules/test/apis"
 	"github.com/openstack-k8s-operators/octavia-operator/pkg/octavia"
@@ -62,8 +62,43 @@ func (f *NeutronAPIFixture) registerHandler(handler api.Handler) {
 	f.Server.AddHandler(f.URLBase+handler.Pattern, handler.Func)
 }
 
+func (f *NeutronAPIFixture) versionHandler(w http.ResponseWriter, r *http.Request) {
+	f.LogRequest(r)
+	if r.Method != "GET" {
+		f.UnexpectedRequest(w, r)
+		return
+	}
+
+	// Return network API version information
+	response := map[string]interface{}{
+		"versions": []map[string]interface{}{
+			{
+				"id":     "v2.0",
+				"status": "CURRENT",
+				"links": []map[string]string{
+					{
+						"href": f.Server.Endpoint() + f.URLBase + "/v2.0",
+						"rel":  "self",
+					},
+				},
+			},
+		},
+	}
+
+	bytes, err := json.Marshal(response)
+	if err != nil {
+		f.InternalError(err, "Error during marshalling response", w, r)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, _ = fmt.Fprint(w, string(bytes))
+}
+
 // Setup initializes the NeutronAPIFixture with API handlers and test data
 func (f *NeutronAPIFixture) Setup() {
+	f.registerHandler(api.Handler{Pattern: "/", Func: f.versionHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/networks/", Func: f.networkHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/networks", Func: f.networkHandler})
 	f.registerHandler(api.Handler{Pattern: "/v2.0/subnets/", Func: f.subnetHandler})
