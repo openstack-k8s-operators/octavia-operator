@@ -18,9 +18,14 @@ import (
 	"fmt"
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 type conditionUpdater interface {
@@ -72,4 +77,62 @@ func ensureTopology(
 		)
 	}
 	return topology, nil
+}
+
+// PodLabelingConfig contains configuration for pod labeling
+type PodLabelingConfig struct {
+	ConfigMapName string
+	IPKeyPrefix   string
+	ServiceName   string
+}
+
+// HandlePodLabeling adds predictableip labels to all pods owned by the specified instance
+func HandlePodLabeling(ctx context.Context, helper *helper.Helper, instanceName, namespace string, config PodLabelingConfig) error {
+	// Get the ConfigMap once
+	configMap := &corev1.ConfigMap{}
+	if err := helper.GetClient().Get(ctx, types.NamespacedName{Name: config.ConfigMapName, Namespace: namespace}, configMap); err != nil {
+		return fmt.Errorf("failed to get configmap %s: %w", config.ConfigMapName, err)
+	}
+
+	// List all pods owned by this instance
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(namespace),
+		client.MatchingLabels(map[string]string{
+			common.AppSelector: instanceName,
+		}),
+	}
+
+	if err := helper.GetClient().List(ctx, podList, listOpts...); err != nil {
+		return fmt.Errorf("failed to list pods: %w", err)
+	}
+
+	// Process each pod
+	for i := range podList.Items {
+		pod := &podList.Items[i]
+
+		// Skip if already labeled or no node assigned
+		if (pod.Labels != nil && pod.Labels["predictableip"] != "") || pod.Spec.NodeName == "" {
+			continue
+		}
+
+		// Get predictable IP from configmap
+		ipKey := fmt.Sprintf("%s%s", config.IPKeyPrefix, pod.Spec.NodeName)
+		predictableIP, exists := configMap.Data[ipKey]
+		if !exists {
+			continue // Skip pods without predictable IPs
+		}
+
+		// Add the label and update
+		if pod.Labels == nil {
+			pod.Labels = make(map[string]string)
+		}
+		pod.Labels["predictableip"] = predictableIP
+
+		if err := helper.GetClient().Update(ctx, pod); err != nil {
+			log.FromContext(ctx).Error(err, "Failed to update pod", "pod", pod.Name, "predictableIP", predictableIP)
+		}
+	}
+
+	return nil
 }
