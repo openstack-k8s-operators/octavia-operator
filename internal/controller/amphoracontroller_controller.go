@@ -704,6 +704,26 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+
+	// Check for Application Credentials
+	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
+		secret := &corev1.Secret{}
+		key := types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Auth.ApplicationCredentialSecret}
+		if err := helper.GetClient().Get(ctx, key, secret); err != nil {
+			if !k8s_errors.IsNotFound(err) {
+				Log.Error(err, "Failed to get ApplicationCredential secret", "secret", key)
+				return err
+			}
+		} else {
+			acID, okID := secret.Data[keystonev1.ACIDSecretKey]
+			acSecret, okSecret := secret.Data[keystonev1.ACSecretSecretKey]
+			if okID && len(acID) > 0 && okSecret && len(acSecret) > 0 {
+				templateParameters["ApplicationCredentialID"] = string(acID)
+				templateParameters["ApplicationCredentialSecret"] = string(acSecret)
+				Log.Info("Using ApplicationCredentials auth", "secret", key)
+			}
+		}
+	}
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
@@ -889,6 +909,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 		passwordSecretField,
 		caBundleSecretNameField,
 		transportURLSecretField,
+		authAppCredSecretField,
 	}
 
 	for _, field := range allWatchFields {
