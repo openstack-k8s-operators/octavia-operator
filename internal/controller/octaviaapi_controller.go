@@ -301,6 +301,42 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
+	// Application Credential secret watching function
+	acSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
+		name := o.GetName()
+		ns := o.GetNamespace()
+		result := []reconcile.Request{}
+
+		// Only handle Secret objects
+		if _, isSecret := o.(*corev1.Secret); !isSecret {
+			return nil
+		}
+
+		// Check if this is an octavia AC secret by name pattern (ac-octavia-secret)
+		expectedSecretName := keystonev1.GetACSecretName(octavia.ServiceName)
+		if name == expectedSecretName {
+			// get all OctaviaAPI CRs in this namespace
+			octaviaAPIs := &octaviav1.OctaviaAPIList{}
+			listOpts := []client.ListOption{
+				client.InNamespace(ns),
+			}
+			if err := r.List(context.Background(), octaviaAPIs, listOpts...); err != nil {
+				return nil
+			}
+
+			// Enqueue reconcile for all octavia API instances
+			for _, cr := range octaviaAPIs.Items {
+				objKey := client.ObjectKey{
+					Namespace: ns,
+					Name:      cr.Name,
+				}
+				result = append(result, reconcile.Request{NamespacedName: objKey})
+			}
+		}
+
+		return result
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -316,6 +352,8 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(acSecretFn)).
 		Watches(&topologyv1.Topology{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
@@ -650,6 +688,19 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// Secrets
 	secretsVars := make(map[string]env.Setter)
 
+	// Verify Application Credentials if available
+	ctrlResult, err := keystonev1.VerifyApplicationCredentialsForService(
+		ctx,
+		r.Client,
+		instance.Namespace,
+		octavia.ServiceName,
+		&secretsVars,
+		10*time.Second,
+	)
+	if (err != nil || ctrlResult != ctrl.Result{}) {
+		return ctrlResult, err
+	}
+
 	//
 	// TLS input validation
 	//
@@ -722,7 +773,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// - %-scripts secret holding scripts to e.g. bootstrap the service
 	// - %-config secret holding minimal octavia config required to get the service up, user can add additional files to be added to the service
 	//
-	err := r.generateServiceSecrets(ctx, instance, helper, &secretsVars)
+	err = r.generateServiceSecrets(ctx, instance, helper, &secretsVars)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.ServiceConfigReadyCondition,
@@ -794,7 +845,7 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	}
 
 	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels)
+	ctrlResult, err = r.reconcileInit(ctx, instance, helper, serviceLabels)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -1105,6 +1156,17 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+
+	// Check for Application Credentials
+	if acData, err := keystonev1.GetApplicationCredentialFromSecret(ctx, h.GetClient(), instance.Namespace, octavia.ServiceName); err != nil {
+		Log.Error(err, "Failed to get ApplicationCredential for service", "service", octavia.ServiceName)
+		return err
+	} else if acData != nil {
+		templateParameters["ApplicationCredentialID"] = acData.ID
+		templateParameters["ApplicationCredentialSecret"] = acData.Secret
+		Log.Info("Using ApplicationCredentials auth", "service", octavia.ServiceName)
+	}
+
 	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
 	if err != nil {
 		return err
