@@ -1,0 +1,27 @@
+# permissions for end users to edit octaviarsyslogs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: octavia-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: octaviarsyslog-editor-role
+rules:
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs/status
+  verbs:
+  - get
