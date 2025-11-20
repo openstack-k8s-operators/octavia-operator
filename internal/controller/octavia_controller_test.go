@@ -1,0 +1,85 @@
+/*
+Copyright 2025.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+package controller
+
+import (
+	"context"
+
+	//nolint:revive // dot-imports are standard practice for Ginkgo/Gomega tests
+	. "github.com/onsi/ginkgo/v2" //nolint:revive
+	. "github.com/onsi/gomega"    //nolint:revive
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	octaviav1beta1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+)
+
+var _ = Describe("Octavia Controller", func() {
+	Context("When reconciling a resource", func() {
+		const resourceName = "test-resource"
+
+		ctx := context.Background()
+
+		typeNamespacedName := types.NamespacedName{
+			Name:      resourceName,
+			Namespace: "default", // TODO(user):Modify as needed
+		}
+		octavia := &octaviav1beta1.Octavia{}
+
+		BeforeEach(func() {
+			By("creating the custom resource for the Kind Octavia")
+			err := k8sClient.Get(ctx, typeNamespacedName, octavia)
+			if err != nil && errors.IsNotFound(err) {
+				resource := &octaviav1beta1.Octavia{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      resourceName,
+						Namespace: "default",
+					},
+					// TODO(user): Specify other spec details if needed.
+				}
+				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
+			}
+		})
+
+		AfterEach(func() {
+			// TODO(user): Cleanup logic after each test, like removing the resource instance.
+			resource := &octaviav1beta1.Octavia{}
+			err := k8sClient.Get(ctx, typeNamespacedName, resource)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("Cleanup the specific resource instance Octavia")
+			Expect(k8sClient.Delete(ctx, resource)).To(Succeed())
+		})
+		It("should successfully reconcile the resource", func() {
+			By("Reconciling the created resource")
+			controllerReconciler := &OctaviaReconciler{
+				Client: k8sClient,
+				Scheme: k8sClient.Scheme(),
+			}
+
+			_, err := controllerReconciler.Reconcile(ctx, reconcile.Request{
+				NamespacedName: typeNamespacedName,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			// TODO(user): Add more specific assertions depending on your controller's reconciliation logic.
+			// Example: If you expect a certain status condition after reconciliation, verify it here.
+		})
+	})
+})

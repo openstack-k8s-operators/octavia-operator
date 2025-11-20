@@ -20,9 +20,14 @@ spec:
   apiservicedefinitions: {}
   customresourcedefinitions:
     owned:
-    - displayName: Octavia Amphora Controller
+    - description: OctaviaAmphoraController is the Schema for the octaviaworkers API
+      displayName: Octavia Amphora Controller
       kind: OctaviaAmphoraController
       name: octaviaamphoracontrollers.octavia.openstack.org
+      specDescriptors:
+      - description: TLS - Parameters related to the TLS
+        displayName: TLS
+        path: tls
       version: v1beta1
     - description: OctaviaAPI is the Schema for the octaviaapis API
       displayName: Octavia API
@@ -38,6 +43,11 @@ spec:
       - description: Ovn GenericService - holds the secret for the OvnDb client cert
         displayName: Ovn
         path: tls.ovn
+      version: v1beta1
+    - description: OctaviaRsyslog is the Schema for the octaviaworkers API
+      displayName: Octavia Rsyslog
+      kind: OctaviaRsyslog
+      name: octaviarsyslogs.octavia.openstack.org
       version: v1beta1
     - description: Octavia is the Schema for the octavia API
       displayName: Octavia

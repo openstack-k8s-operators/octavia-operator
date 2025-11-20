@@ -12,7 +12,7 @@ webhooks:
       namespace: system
       path: /mutate-octavia-openstack-org-v1beta1-octavia
   failurePolicy: Fail
-  name: moctavia.kb.io
+  name: moctavia-v1beta1.kb.io
   rules:
   - apiGroups:
     - octavia.openstack.org
@@ -38,7 +38,7 @@ webhooks:
       namespace: system
       path: /validate-octavia-openstack-org-v1beta1-octavia
   failurePolicy: Fail
-  name: voctavia.kb.io
+  name: voctavia-v1beta1.kb.io
   rules:
   - apiGroups:
     - octavia.openstack.org

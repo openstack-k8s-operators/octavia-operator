@@ -1,0 +1,23 @@
+# permissions for end users to view octaviarsyslogs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: octavia-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: octaviarsyslog-viewer-role
+rules:
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - octavia.openstack.org
+  resources:
+  - octaviarsyslogs/status
+  verbs:
+  - get

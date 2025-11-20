@@ -303,7 +303,7 @@
 # Either using VSCode or directly in a shell:
 # In VSCode open the home folder and add the ~/octavia_operator folder to the
 # workspace (File->Add folder to workspace...). Then open
-# ~/octavia_operator/main.go and press F5 to start the debugger
+# ~/octavia_operator/cmd/main.go and press F5 to start the debugger
 # In shell:
 # cd ~/octavia-operator; ENABLE_WEBHOOKS=false METRICS_PORT=8082 HEALTH_PORT=8083 GOWORK= OPERATOR_TEMPLATES=./templates make install run
 #

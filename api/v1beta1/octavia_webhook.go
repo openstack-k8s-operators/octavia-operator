@@ -60,8 +60,6 @@ func (r *Octavia) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:path=/mutate-octavia-openstack-org-v1beta1-octavia,mutating=true,failurePolicy=fail,sideEffects=None,groups=octavia.openstack.org,resources=octavias,verbs=create;update,versions=v1beta1,name=moctavia.kb.io,admissionReviewVersions=v1
-
 var _ webhook.Defaulter = &Octavia{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
@@ -103,9 +101,6 @@ func (spec *OctaviaSpec) Default() {
 func (spec *OctaviaSpecCore) Default() {
 	// nothing here yet
 }
-
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-octavia-openstack-org-v1beta1-octavia,mutating=false,failurePolicy=fail,sideEffects=None,groups=octavia.openstack.org,resources=octavias,verbs=create;update,versions=v1beta1,name=voctavia.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Octavia{}
 
