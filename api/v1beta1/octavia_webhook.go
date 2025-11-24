@@ -19,16 +19,15 @@ package v1beta1
 import (
 	"fmt"
 
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
-	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
-	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
 
 // OctaviaDefaults -
@@ -52,15 +51,6 @@ func SetupOctaviaDefaults(defaults OctaviaDefaults) {
 	octaviaDefaults = defaults
 	octavialog.Info("Octavia defaults initialized", "defaults", defaults)
 }
-
-// SetupWebhookWithManager sets up the webhook with the Manager
-func (r *Octavia) SetupWebhookWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewWebhookManagedBy(mgr).
-		For(r).
-		Complete()
-}
-
-//+kubebuilder:webhook:path=/mutate-octavia-openstack-org-v1beta1-octavia,mutating=true,failurePolicy=fail,sideEffects=None,groups=octavia.openstack.org,resources=octavias,verbs=create;update,versions=v1beta1,name=moctavia.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Defaulter = &Octavia{}
 
@@ -103,9 +93,6 @@ func (spec *OctaviaSpec) Default() {
 func (spec *OctaviaSpecCore) Default() {
 	// nothing here yet
 }
-
-// TODO(user): change verbs to "verbs=create;update;delete" if you want to enable deletion validation.
-//+kubebuilder:webhook:path=/validate-octavia-openstack-org-v1beta1-octavia,mutating=false,failurePolicy=fail,sideEffects=None,groups=octavia.openstack.org,resources=octavias,verbs=create;update,versions=v1beta1,name=voctavia.kb.io,admissionReviewVersions=v1
 
 var _ webhook.Validator = &Octavia{}
 
