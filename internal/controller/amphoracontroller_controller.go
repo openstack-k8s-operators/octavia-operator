@@ -299,6 +299,19 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	// Handle secrets
 	secretsVars := make(map[string]env.Setter)
 
+	// Verify Application Credentials if available
+	ctrlResult, err := keystonev1.VerifyApplicationCredentialsForService(
+		ctx,
+		r.Client,
+		instance.Namespace,
+		octavia.ServiceName,
+		&secretsVars,
+		10*time.Second,
+	)
+	if (err != nil || ctrlResult != ctrl.Result{}) {
+		return ctrlResult, err
+	}
+
 	defaultFlavorID, err := amphoracontrollers.EnsureFlavors(ctx, instance, &Log, helper)
 	if err != nil {
 		Log.Info(fmt.Sprintf("Cannot define flavors: %s", err))
@@ -388,7 +401,7 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	instance.Status.Conditions.MarkTrue(condition.ServiceConfigReadyCondition, condition.ServiceConfigReadyMessage)
 
 	// Handle service update
-	ctrlResult, err := r.reconcileUpdate(ctx)
+	ctrlResult, err = r.reconcileUpdate(ctx)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -704,6 +717,16 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+
+	// Check for Application Credentials
+	if acData, err := keystonev1.GetApplicationCredentialFromSecret(ctx, helper.GetClient(), instance.Namespace, octavia.ServiceName); err != nil {
+		Log.Error(err, "Failed to get ApplicationCredential for service", "service", octavia.ServiceName)
+		return err
+	} else if acData != nil {
+		templateParameters["ApplicationCredentialID"] = acData.ID
+		templateParameters["ApplicationCredentialSecret"] = acData.Secret
+		Log.Info("Using ApplicationCredentials auth", "service", octavia.ServiceName)
+	}
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
@@ -857,6 +880,42 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		return nil
 	}
 
+	// Application Credential secret watching function
+	acSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
+		name := o.GetName()
+		ns := o.GetNamespace()
+		result := []reconcile.Request{}
+
+		// Only handle Secret objects
+		if _, isSecret := o.(*corev1.Secret); !isSecret {
+			return nil
+		}
+
+		// Check if this is an octavia AC secret by name pattern (ac-octavia-secret)
+		expectedSecretName := keystonev1.GetACSecretName(octavia.ServiceName)
+		if name == expectedSecretName {
+			// get all OctaviaAmphoraController CRs in this namespace
+			amphoraControllers := &octaviav1.OctaviaAmphoraControllerList{}
+			listOpts := []client.ListOption{
+				client.InNamespace(ns),
+			}
+			if err := r.List(context.Background(), amphoraControllers, listOpts...); err != nil {
+				return nil
+			}
+
+			// Enqueue reconcile for all amphora controller instances
+			for _, cr := range amphoraControllers.Items {
+				objKey := client.ObjectKey{
+					Namespace: ns,
+					Name:      cr.Name,
+				}
+				result = append(result, reconcile.Request{NamespacedName: objKey})
+			}
+		}
+
+		return result
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAmphoraController{}).
 		Owns(&corev1.Service{}).
@@ -871,6 +930,8 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.ResourceVersionChangedPredicate{}),
 		).
+		Watches(&corev1.Secret{},
+			handler.EnqueueRequestsFromMapFunc(acSecretFn)).
 		Watches(&topologyv1.Topology{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
