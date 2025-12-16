@@ -21,6 +21,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
 
@@ -131,6 +132,14 @@ type OctaviaSpecBase struct {
 	// RabbitMQ instance name
 	// Needed to request a transportURL that is created and used in Octavia
 	RabbitMqClusterName string `json:"rabbitMqClusterName"`
+
+	// +kubebuilder:validation:Optional
+	// MessagingBus configuration (cluster, username, and vhost)
+	MessagingBus rabbitmqv1.RabbitMqConfig `json:"messagingBus,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// NotificationsBus configuration (cluster, username, and vhost) for a dedicated notifications RabbitMQ cluster
+	NotificationsBus *rabbitmqv1.RabbitMqConfig `json:"notificationsBus,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=octavia
@@ -311,6 +320,9 @@ type OctaviaStatus struct {
 
 	// TransportURLSecret - Secret containing RabbitMQ transportURL
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
+
+	// NotificationsTransportURLSecret - Secret containing RabbitMQ notifications transportURL
+	NotificationsTransportURLSecret string `json:"notificationsTransportURLSecret,omitempty"`
 
 	// ReadyCount of octavia API instances
 	OctaviaAPIReadyCount int32 `json:"apireadyCount,omitempty"`

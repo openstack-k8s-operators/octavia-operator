@@ -42,6 +42,8 @@ const (
 	OctaviaRsyslogReadyCondition condition.Type = "OctaviaRsyslogReady"
 
 	OctaviaManagementNetworkReadyCondition condition.Type = "OctaviaManagementNetworkReady"
+
+	OctaviaRabbitMqNotificationsTransportURLReadyCondition condition.Type = "OctaviaRabbitMqNotificationsTransportURLReady"
 )
 
 // Common Messages used by API objects
@@ -144,4 +146,16 @@ const (
 
 	// OctaviaManagementNetworkReadyCompleteMessage
 	OctaviaManagementNetworkReadyCompleteMessage = "Octavia Management Network setup completed"
+
+	//
+	// OctaviaRabbitMqNotificationsTransportURLReady condition messages
+	//
+	// OctaviaRabbitMqNotificationsTransportURLReadyInitMessage
+	OctaviaRabbitMqNotificationsTransportURLReadyInitMessage = "Octavia RabbitMQ notifications transport URL not initialized"
+
+	// OctaviaRabbitMqNotificationsTransportURLReadyErrorMessage
+	OctaviaRabbitMqNotificationsTransportURLReadyErrorMessage = "Octavia RabbitMQ notifications transport URL error occurred %s"
+
+	// OctaviaRabbitMqNotificationsTransportURLReadyMessage
+	OctaviaRabbitMqNotificationsTransportURLReadyMessage = "Octavia RabbitMQ notifications transport URL ready"
 )

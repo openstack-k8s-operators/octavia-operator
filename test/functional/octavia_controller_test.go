@@ -37,6 +37,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
+	ovnv1 "github.com/openstack-k8s-operators/ovn-operator/api/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
@@ -72,6 +73,13 @@ func createAndSimulateTransportURL(
 	DeferCleanup(k8sClient.Delete, ctx, CreateTransportURL(transportURLName))
 	DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
 	infra.SimulateTransportURLReady(transportURLName)
+
+	// Update the TransportURL status to use the correct secret name
+	Eventually(func(g Gomega) {
+		transportURL := infra.GetTransportURL(transportURLName)
+		transportURL.Status.SecretName = transportURLSecretName.Name
+		g.Expect(k8sClient.Status().Update(ctx, transportURL)).To(Succeed())
+	}, timeout, interval).Should(Succeed())
 }
 
 func createAndSimulateDB(spec map[string]any) {
@@ -243,6 +251,134 @@ var _ = Describe("Octavia controller", func() {
 				Name:      fmt.Sprintf("%s-%s", octaviaName.Name, "config-data"),
 			}
 			th.AssertSecretDoesNotExist(secret)
+		})
+	})
+
+	// MessagingBus custom user and vhost
+	When("MessagingBus custom user and vhost are specified", func() {
+		BeforeEach(func() {
+			spec["messagingBus"] = map[string]interface{}{
+				"cluster": "rabbitmq",
+				"user":    "custom-user",
+				"vhost":   "custom-vhost",
+			}
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+		})
+
+		It("should create TransportURL with custom user and vhost", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(transportURLName)
+				g.Expect(transportURL.Spec.Username).To(Equal("custom-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("custom-vhost"))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should be in state of having the TransportURL ready", func() {
+			th.ExpectCondition(
+				octaviaName,
+				ConditionGetterFunc(OctaviaConditionGetter),
+				condition.RabbitMqTransportURLReadyCondition,
+				corev1.ConditionTrue,
+			)
+		})
+	})
+
+	When("MessagingBus default configuration is used", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+		})
+
+		It("should create TransportURL with cluster from RabbitMqClusterName", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(transportURLName)
+				g.Expect(transportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq"))
+				g.Expect(transportURL.Spec.Username).To(BeEmpty())
+				g.Expect(transportURL.Spec.Vhost).To(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should be in state of having the TransportURL ready", func() {
+			th.ExpectCondition(
+				octaviaName,
+				ConditionGetterFunc(OctaviaConditionGetter),
+				condition.RabbitMqTransportURLReadyCondition,
+				corev1.ConditionTrue,
+			)
+		})
+	})
+
+	When("NotificationsBus is specified", func() {
+		var notificationsTransportURLName types.NamespacedName
+		var notificationsTransportURLSecretName types.NamespacedName
+
+		BeforeEach(func() {
+			spec["notificationsBus"] = map[string]interface{}{
+				"cluster": "rabbitmq-notifications",
+				"user":    "notifications-user",
+				"vhost":   "notifications-vhost",
+			}
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			// Wait for the Octavia controller to create the notifications TransportURL
+			notificationsTransportURLName = types.NamespacedName{
+				Namespace: namespace,
+				Name:      fmt.Sprintf("%s-octavia-notifications-transport", octaviaName.Name),
+			}
+			notificationsTransportURLSecretName = types.NamespacedName{
+				Namespace: namespace,
+				Name:      "octavia-notifications-transport-secret",
+			}
+
+			// The controller creates the TransportURL, we just need to create the secret and simulate it being ready
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(transportURL).ToNot(BeNil())
+			}, timeout, interval).Should(Succeed())
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(notificationsTransportURLSecretName))
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+
+			// Update the TransportURL status to use the correct secret name
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(notificationsTransportURLName)
+				transportURL.Status.SecretName = notificationsTransportURLSecretName.Name
+				g.Expect(k8sClient.Status().Update(ctx, transportURL)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should create notifications TransportURL with custom settings", func() {
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(notificationsTransportURLName)
+				g.Expect(transportURL.Spec.RabbitmqClusterName).To(Equal("rabbitmq-notifications"))
+				g.Expect(transportURL.Spec.Username).To(Equal("notifications-user"))
+				g.Expect(transportURL.Spec.Vhost).To(Equal("notifications-vhost"))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should be in state of having the notifications TransportURL ready", func() {
+			th.ExpectCondition(
+				octaviaName,
+				ConditionGetterFunc(OctaviaConditionGetter),
+				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
+				corev1.ConditionTrue,
+			)
+		})
+
+		It("should set NotificationsTransportURLSecret in Octavia status", func() {
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				g.Expect(octavia.Status.NotificationsTransportURLSecret).To(Equal("octavia-notifications-transport-secret"))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -1204,6 +1340,110 @@ var _ = Describe("Octavia controller", func() {
 			Expect(conf).Should(
 				ContainSubstring(fmt.Sprintf(
 					"project_domain_name=%s\n", spec["tenantDomainName"])))
+		})
+	})
+
+	When("Octavia starts with notifications enabled and then disables them", func() {
+		var notificationsTransportURLName types.NamespacedName
+
+		BeforeEach(func() {
+			spec := GetDefaultOctaviaSpec()
+			spec["messagingBus"] = map[string]any{
+				"cluster": "rabbitmq",
+				"user":    "main-user",
+				"vhost":   "main-vhost",
+			}
+			spec["notificationsBus"] = map[string]any{
+				"cluster": "rabbitmq-notifications",
+				"user":    "octavia-notifications",
+				"vhost":   "/notifications",
+			}
+
+			createAndSimulateKeystone(octaviaName)
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateOctaviaCertsSecrets(octaviaName)
+
+			// Create OVN DBClusters (Northbound and Southbound)
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			transportURLName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      octaviaName.Name + "-octavia-transport",
+			}
+			transportURLSecretName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      RabbitmqSecretName,
+			}
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+
+			notificationsTransportURLName = types.NamespacedName{
+				Namespace: namespace,
+				Name:      octaviaName.Name + "-octavia-notifications-transport",
+			}
+			notificationsTransportURLSecretName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      "rabbitmq-notifications-secret",
+			}
+			createAndSimulateTransportURL(notificationsTransportURLName, notificationsTransportURLSecretName)
+			createAndSimulateDB(spec)
+
+			// Wait for the Octavia instance to have the NotificationsTransportURLSecret set
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				g.Expect(octavia.Status.NotificationsTransportURLSecret).ToNot(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should initially have notifications enabled", func() {
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				g.Expect(octavia.Status.NotificationsTransportURLSecret).ToNot(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should disable notifications when notificationsBus is removed", func() {
+			// Verify notifications are initially enabled
+			octavia := GetOctavia(octaviaName)
+			Expect(octavia.Status.NotificationsTransportURLSecret).ToNot(BeEmpty())
+
+			// Update the Octavia spec to remove notificationsBus
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				octavia.Spec.NotificationsBus = nil
+				g.Expect(k8sClient.Update(ctx, octavia)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Wait for notifications to be disabled
+			Eventually(func(g Gomega) {
+				octavia := GetOctavia(octaviaName)
+				g.Expect(octavia.Status.NotificationsTransportURLSecret).To(BeEmpty())
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
