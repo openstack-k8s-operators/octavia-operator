@@ -580,6 +580,31 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	}
 	transportURL := string(transportURLSecret.Data["transport_url"])
 
+	// Get notifications transport URL if specified
+	var notificationsTransportURL string
+	if instance.Spec.NotificationsTransportURLSecret != "" {
+		notificationsTransportURLSecret, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.NotificationsTransportURLSecret, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				Log.Info(fmt.Sprintf("Notifications TransportURL secret %s not found", instance.Spec.NotificationsTransportURLSecret))
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.InputReadyCondition,
+					condition.ErrorReason,
+					condition.SeverityWarning,
+					condition.InputReadyWaitingMessage))
+				return err
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.InputReadyErrorMessage,
+				err.Error()))
+			return err
+		}
+		notificationsTransportURL = string(notificationsTransportURLSecret.Data["transport_url"])
+	}
+
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	db, err := mariadbv1.GetDatabaseByNameAndAccount(ctx, helper, octavia.DatabaseName, instance.Spec.DatabaseAccount, instance.Namespace)
@@ -710,6 +735,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 
 	spec := instance.Spec
 	templateParameters["TransportURL"] = transportURL
+	templateParameters["NotificationsTransportURL"] = notificationsTransportURL
 	templateParameters["QuorumQueues"] = string(transportURLSecret.Data["quorumqueues"]) == "true"
 	templateParameters["ServiceUser"] = spec.ServiceUser
 	templateParameters["TenantName"] = spec.TenantName
@@ -882,6 +908,17 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		return err
 	}
 
+	// index notificationsTransportURLSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAmphoraController{}, notificationsTransportURLSecretField, func(rawObj client.Object) []string {
+		cr := rawObj.(*octaviav1.OctaviaAmphoraController)
+		if cr.Spec.NotificationsTransportURLSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.NotificationsTransportURLSecret}
+	}); err != nil {
+		return err
+	}
+
 	svcSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		secret := o.(*corev1.Secret)
 		secretName := secret.GetName()
@@ -939,6 +976,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 		caBundleSecretNameField,
 		transportURLSecretField,
 		authAppCredSecretField,
+		notificationsTransportURLSecretField,
 	}
 
 	for _, field := range allWatchFields {
