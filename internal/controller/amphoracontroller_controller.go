@@ -717,6 +717,7 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["Password"] = servicePassword
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+	templateParameters["Region"] = keystoneAPI.GetRegion()
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
