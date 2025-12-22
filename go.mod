@@ -26,6 +26,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20250929092825-4c2402451077
 	golang.org/x/crypto v0.43.0
+	gopkg.in/ini.v1 v1.67.0
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
 )
 
