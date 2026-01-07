@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
+	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -86,6 +87,10 @@ func (spec *OctaviaSpec) Default() {
 		// Replace it by an init container image with pyroute2 when it's available
 		// OSPRH-8434
 		spec.OctaviaRsyslog.InitContainerImage = octaviaDefaults.HealthManagerContainerImageURL
+	}
+	// Default ApplicationCredentialSecret to standard AC secret name if not specified
+	if spec.Auth.ApplicationCredentialSecret == "" {
+		spec.Auth.ApplicationCredentialSecret = keystonev1.GetACSecretName("octavia")
 	}
 }
 

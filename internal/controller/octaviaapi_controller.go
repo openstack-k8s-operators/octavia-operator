@@ -301,6 +301,18 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
+	// index authAppCredSecretField
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, authAppCredSecretField, func(rawObj client.Object) []string {
+		// Extract the application credential secret name from the spec, if one is provided
+		cr := rawObj.(*octaviav1.OctaviaAPI)
+		if cr.Spec.Auth.ApplicationCredentialSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.Auth.ApplicationCredentialSecret}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
@@ -1105,6 +1117,27 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	templateParameters["TenantDomainName"] = instance.Spec.TenantDomainName
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
+
+	// Check for Application Credentials
+	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
+		secret := &corev1.Secret{}
+		key := types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Auth.ApplicationCredentialSecret}
+		if err := h.GetClient().Get(ctx, key, secret); err != nil {
+			if !k8s_errors.IsNotFound(err) {
+				Log.Error(err, "Failed to get ApplicationCredential secret", "secret", key)
+				return err
+			}
+		} else {
+			acID, okID := secret.Data[keystonev1.ACIDSecretKey]
+			acSecret, okSecret := secret.Data[keystonev1.ACSecretSecretKey]
+			if okID && len(acID) > 0 && okSecret && len(acSecret) > 0 {
+				templateParameters["ApplicationCredentialID"] = string(acID)
+				templateParameters["ApplicationCredentialSecret"] = string(acSecret)
+				Log.Info("Using ApplicationCredentials auth", "secret", key)
+			}
+		}
+	}
+
 	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
 	if err != nil {
 		return err

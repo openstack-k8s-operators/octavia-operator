@@ -17,11 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
+	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 )
 
 const (
@@ -232,6 +232,11 @@ type OctaviaSpecBase struct {
 	// +kubebuilder:default=octavia-redis
 	// Name of the Redis database for Jobboard
 	RedisServiceName string `json:"redisServiceName"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication (shared by all Octavia components)
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // PasswordSelector to identify the DB and AdminUser password from the Secret
