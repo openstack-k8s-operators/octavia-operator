@@ -498,6 +498,20 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 	}
 	// create DaemonSet - end
 
+	// Handle pod labeling for predictable IPs
+	ipKeyPrefix := "rsyslog_"
+	if instance.Spec.Role == "healthmanager" {
+		ipKeyPrefix = "hm_"
+	}
+	config := PodLabelingConfig{
+		ConfigMapName: octavia.HmConfigMap,
+		IPKeyPrefix:   ipKeyPrefix,
+		ServiceName:   instance.Name,
+	}
+	if err := HandlePodLabeling(ctx, helper, instance.Name, instance.Namespace, config); err != nil {
+		Log.Error(err, "Failed to handle pod labeling")
+	}
+
 	// We reached the end of the Reconcile, update the Ready condition based on
 	// the sub conditions
 	if instance.Status.Conditions.AllSubConditionIsTrue() {
@@ -863,6 +877,7 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.DaemonSet{}).
+		Owns(&corev1.Pod{}).
 		// watch the secrets we don't own
 		Watches(&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(svcSecretFn)).
