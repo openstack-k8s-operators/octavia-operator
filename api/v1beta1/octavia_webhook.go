@@ -19,6 +19,7 @@ package v1beta1
 import (
 	"fmt"
 
+	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -63,6 +64,9 @@ func (r *Octavia) Default() {
 
 // Default - set defaults for this Octavia spec
 func (spec *OctaviaSpec) Default() {
+	// Set default RabbitMQ configuration and migrate from RabbitMqClusterName if needed
+	rabbitmqv1.DefaultRabbitMqConfig(&spec.MessagingBus, spec.RabbitMqClusterName)
+
 	if spec.OctaviaAPI.ContainerImage == "" {
 		spec.OctaviaAPI.ContainerImage = octaviaDefaults.APIContainerImageURL
 	}
@@ -91,7 +95,8 @@ func (spec *OctaviaSpec) Default() {
 
 // Default - set defaults for this Octavia core spec (this version is used by the OpenStackControlplane webhook)
 func (spec *OctaviaSpecCore) Default() {
-	// nothing here yet
+	// Set default RabbitMQ configuration and migrate from RabbitMqClusterName if needed
+	rabbitmqv1.DefaultRabbitMqConfig(&spec.MessagingBus, spec.RabbitMqClusterName)
 }
 
 var _ webhook.Validator = &Octavia{}
@@ -174,6 +179,13 @@ func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
 
+	// Reject changes to deprecated RabbitMqClusterName field - users should use the new messagingBus.cluster field instead
+	if r.RabbitMqClusterName != old.RabbitMqClusterName {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("rabbitMqClusterName"),
+			"rabbitMqClusterName is deprecated and cannot be changed. Please use messagingBus.cluster instead"))
+	}
+
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
@@ -186,6 +198,13 @@ func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, name
 
 func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
 	var allErrs field.ErrorList
+
+	// Reject changes to deprecated RabbitMqClusterName field - users should use the new messagingBus.cluster field instead
+	if r.RabbitMqClusterName != old.RabbitMqClusterName {
+		allErrs = append(allErrs, field.Forbidden(
+			basePath.Child("rabbitMqClusterName"),
+			"rabbitMqClusterName is deprecated and cannot be changed. Please use messagingBus.cluster instead"))
+	}
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(

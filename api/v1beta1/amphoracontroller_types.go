@@ -111,6 +111,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	TransportURLSecret string `json:"transportURLSecret,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// NotificationsTransportURLSecret - Secret containing RabbitMQ notifications transportURL
+	NotificationsTransportURLSecret string `json:"notificationsTransportURLSecret,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
