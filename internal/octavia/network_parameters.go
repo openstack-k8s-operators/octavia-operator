@@ -71,7 +71,7 @@ func GetRangeFromCIDR(
 	// convert it to a [16]bytes table, set the remaining bits to 1
 	addrBytes := start.As16()
 	for b := bits; b < 128; b++ {
-		addrBytes[b/8] |= 1 << uint(7-(b%8)) // #nosec G115 -- Controlled bit manipulation with small integer values
+		addrBytes[b/8] |= 1 << uint(7-(b%8)) // #nosec G115,G602 -- Controlled bit manipulation with small integer values, b < 128 guarantees b/8 < 16
 	}
 	// convert the table to an ip address to get the last IP
 	// in case of IPv4, the address should be unmapped
