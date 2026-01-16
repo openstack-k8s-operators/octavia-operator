@@ -409,6 +409,16 @@ func (r *OctaviaRsyslogReconciler) reconcileNormal(ctx context.Context, instance
 	}
 	// create DaemonSet - end
 
+	// Handle pod labeling for predictable IPs
+	config := PodLabelingConfig{
+		ConfigMapName: octavia.HmConfigMap,
+		IPKeyPrefix:   "rsyslog_",
+		ServiceName:   instance.Name,
+	}
+	if err := HandlePodLabeling(ctx, helper, instance.Name, instance.Namespace, config); err != nil {
+		Log.Error(err, "Failed to handle pod labeling")
+	}
+
 	// We reached the end of the Reconcile, update the Ready condition based on
 	// the sub conditions
 	if instance.Status.Conditions.AllSubConditionIsTrue() {
@@ -512,6 +522,7 @@ func (r *OctaviaRsyslogReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&corev1.ConfigMap{}).
 		Owns(&appsv1.DaemonSet{}).
+		Owns(&corev1.Pod{}).
 		Watches(&topologyv1.Topology{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
 			builder.WithPredicates(predicate.GenerationChangedPredicate{})).
