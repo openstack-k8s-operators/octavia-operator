@@ -94,8 +94,13 @@ func getClient(
 	clientConfig ClientConfig,
 	keystoneAPI *keystonev1.KeystoneAPI,
 ) (*openstack.OpenStack, ctrl.Result, error) {
-	// get internal endpoint as authurl from keystone instance
-	authURL, err := keystoneAPI.GetEndpoint(endpoint.EndpointInternal)
+	// get endpoint as authurl from keystone instance
+	// default to internal endpoint if not specified
+	epInterface := endpoint.EndpointInternal
+	if keystoneAPI.Spec.ExternalKeystoneAPI {
+		epInterface = endpoint.Endpoint(endpoint.EndpointPublic)
+	}
+	authURL, err := keystoneAPI.GetEndpoint(epInterface)
 	if err != nil {
 		return nil, ctrl.Result{}, err
 	}
@@ -105,6 +110,12 @@ func getClient(
 		return nil, ctrl.Result{}, err
 	}
 
+	// interfaceBundleKeys maps endpoint interfaces to their corresponding key in the CA bundle secret
+	interfaceBundleKeys := map[endpoint.Endpoint]string{
+		endpoint.EndpointInternal: tls.InternalCABundleKey,
+		endpoint.EndpointPublic:   tls.CABundleKey,
+	}
+
 	tlsConfig := &openstack.TLSConfig{}
 	if parsedAuthURL.Scheme == "https" {
 		caCert, ctrlResult, err := secret.GetDataFromSecret(
@@ -112,7 +123,7 @@ func getClient(
 			h,
 			keystoneAPI.Spec.TLS.CaBundleSecretName,
 			time.Duration(10)*time.Second,
-			tls.InternalCABundleKey)
+			interfaceBundleKeys[epInterface])
 		if err != nil {
 			return nil, ctrl.Result{}, err
 		}
