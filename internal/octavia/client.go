@@ -112,7 +112,7 @@ func getClient(
 			h,
 			keystoneAPI.Spec.TLS.CaBundleSecretName,
 			time.Duration(10)*time.Second,
-			tls.InternalCABundleKey)
+			tls.CABundleKey)
 		if err != nil {
 			return nil, ctrl.Result{}, err
 		}
