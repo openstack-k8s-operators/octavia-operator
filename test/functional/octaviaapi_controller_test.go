@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2" //revive:disable:dot-imports
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
+	"gopkg.in/ini.v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
@@ -291,6 +292,69 @@ var _ = Describe("OctaviaAPI controller", func() {
 			Expect(conf).Should(
 				ContainSubstring(fmt.Sprintf(
 					"transport_url=%s\n", string(transportURLSecret.Data["transport_url"]))))
+		})
+
+		It("includes region_name in config when KeystoneAPI has region set", func() {
+			const testRegion = "regionTwo"
+			// Update KeystoneAPI with region in status
+			keystoneAPI := keystone.GetKeystoneAPI(keystoneAPIName)
+			keystoneAPI.Status.Region = testRegion
+			keystoneAPI.Status.APIEndpoints = map[string]string{
+				"internal": keystoneInternalEndpoint,
+				"public":   keystonePublicEndpoint,
+			}
+			Eventually(func(g Gomega) {
+				g.Expect(k8sClient.Status().Update(ctx, keystoneAPI.DeepCopy())).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			// Trigger reconciliation
+			th.ExpectCondition(
+				octaviaAPIName,
+				ConditionGetterFunc(OctaviaAPIConditionGetter),
+				condition.ServiceConfigReadyCondition,
+				corev1.ConditionTrue,
+			)
+
+			configSecret := th.GetSecret(types.NamespacedName{
+				Namespace: octaviaAPIName.Namespace,
+				Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
+			Expect(configSecret).ShouldNot(BeNil())
+			Expect(configSecret.Data).Should(HaveKey("octavia.conf"))
+			configData := string(configSecret.Data["octavia.conf"])
+
+			// Parse the INI file to properly access sections
+			cfg, err := ini.Load([]byte(configData))
+			Expect(err).ShouldNot(HaveOccurred(), "Should be able to parse config as INI")
+
+			// Verify region_name in [keystone_authtoken]
+			section := cfg.Section("keystone_authtoken")
+			Expect(section).ShouldNot(BeNil(), "Should find [keystone_authtoken] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [service_auth]
+			section = cfg.Section("service_auth")
+			Expect(section).ShouldNot(BeNil(), "Should find [service_auth] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [nova]
+			section = cfg.Section("nova")
+			Expect(section).ShouldNot(BeNil(), "Should find [nova] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [cinder]
+			section = cfg.Section("cinder")
+			Expect(section).ShouldNot(BeNil(), "Should find [cinder] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [glance]
+			section = cfg.Section("glance")
+			Expect(section).ShouldNot(BeNil(), "Should find [glance] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
+
+			// Verify region_name in [neutron]
+			section = cfg.Section("neutron")
+			Expect(section).ShouldNot(BeNil(), "Should find [neutron] section")
+			Expect(section.Key("region_name").String()).Should(Equal(testRegion))
 		})
 
 		It("should create a Secret with customServiceConfig input", func() {
