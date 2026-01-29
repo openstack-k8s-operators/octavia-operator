@@ -243,6 +243,7 @@ const (
 	tlsOvnField             = ".spec.tls.ovn.secretName"
 	topologyField           = ".spec.topologyRef.Name"
 	transportURLSecretField = ".spec.transportURLSecret"
+	authAppCredSecretField  = ".spec.auth.applicationCredentialSecret" // #nosec G101
 )
 
 var (
@@ -252,6 +253,7 @@ var (
 		tlsAPIInternalField,
 		tlsAPIPublicField,
 		tlsOvnField,
+		authAppCredSecretField,
 		topologyField,
 		transportURLSecretField,
 	}
@@ -1557,6 +1559,7 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		deployment.Spec.TLS = instance.Spec.OctaviaAPI.TLS
 		deployment.Spec.APITimeout = instance.Spec.APITimeout
+		deployment.Spec.Auth = instance.Spec.Auth
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -1657,6 +1660,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
 		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
+		daemonset.Spec.Auth = instance.Spec.Auth
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err
