@@ -19,7 +19,6 @@ package v1beta1
 import (
 	"fmt"
 
-	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	common_webhook "github.com/openstack-k8s-operators/lib-common/modules/common/webhook"
@@ -65,10 +64,10 @@ func (r *Octavia) Default() {
 
 // Default - set defaults for this Octavia spec
 func (spec *OctaviaSpec) Default() {
-	// Set default RabbitMQ configuration and migrate from RabbitMqClusterName if needed
-	// Only migrate from deprecated field if the new field is not already set
+	// Default MessagingBus.Cluster if not set
+	// Migration from deprecated fields is handled by openstack-operator
 	if spec.MessagingBus.Cluster == "" {
-		rabbitmqv1.DefaultRabbitMqConfig(&spec.MessagingBus, spec.RabbitMqClusterName)
+		spec.MessagingBus.Cluster = "rabbitmq"
 	}
 
 	if spec.OctaviaAPI.ContainerImage == "" {
@@ -99,10 +98,10 @@ func (spec *OctaviaSpec) Default() {
 
 // Default - set defaults for this Octavia core spec (this version is used by the OpenStackControlplane webhook)
 func (spec *OctaviaSpecCore) Default() {
-	// Set default RabbitMQ configuration and migrate from RabbitMqClusterName if needed
-	// Only migrate from deprecated field if the new field is not already set
+	// Default MessagingBus.Cluster if not set
+	// Migration from deprecated fields is handled by openstack-operator
 	if spec.MessagingBus.Cluster == "" {
-		rabbitmqv1.DefaultRabbitMqConfig(&spec.MessagingBus, spec.RabbitMqClusterName)
+		spec.MessagingBus.Cluster = "rabbitmq"
 	}
 }
 

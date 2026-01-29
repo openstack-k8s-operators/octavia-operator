@@ -1588,11 +1588,10 @@ spec:
                   e.g. to check logs
                 type: boolean
               rabbitMqClusterName:
-                default: rabbitmq
                 description: |-
                   RabbitMQ instance name
                   Needed to request a transportURL that is created and used in Octavia
-                  Deprecated: use MessagingBus.Cluster instead
+                  Deprecated: Use MessagingBus.Cluster instead
                 type: string
               redisServiceName:
                 default: octavia-redis
@@ -1712,7 +1711,6 @@ spec:
             - databaseInstance
             - octaviaAPI
             - octaviaNetworkAttachment
-            - rabbitMqClusterName
             - secret
             type: object
           status:

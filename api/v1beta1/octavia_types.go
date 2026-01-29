@@ -127,12 +127,11 @@ type OctaviaSpecBase struct {
 	// to connect for the persistence database
 	PersistenceDatabaseAccount string `json:"persistenceDatabaseAccount"`
 
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=rabbitmq
+	// +kubebuilder:validation:Optional
 	// RabbitMQ instance name
 	// Needed to request a transportURL that is created and used in Octavia
-	// Deprecated: use MessagingBus.Cluster instead
-	RabbitMqClusterName string `json:"rabbitMqClusterName" deprecated:"messagingBus.cluster"`
+	// Deprecated: Use MessagingBus.Cluster instead
+	RabbitMqClusterName string `json:"rabbitMqClusterName,omitempty"`
 
 	// +kubebuilder:validation:Optional
 	// MessagingBus configuration (cluster, username, and vhost)

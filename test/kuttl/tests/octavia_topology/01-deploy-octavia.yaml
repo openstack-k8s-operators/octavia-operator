@@ -8,7 +8,8 @@ spec:
   databaseInstance: openstack
   databaseUser: octavia
   serviceUser: octavia
-  rabbitMqClusterName: rabbitmq
+  messagingBus:
+    cluster: rabbitmq
   secret: osp-secret
   preserveJobs: false
   customServiceConfig: |
