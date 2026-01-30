@@ -718,6 +718,28 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	templateParameters["KeystoneInternalURL"] = keystoneInternalURL
 	templateParameters["KeystonePublicURL"] = keystonePublicURL
 	templateParameters["Region"] = keystoneAPI.GetRegion()
+
+	// Check for Application Credentials
+	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
+		acSecretObj, _, err := oko_secret.GetSecret(ctx, helper, instance.Spec.Auth.ApplicationCredentialSecret, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				Log.Info("ApplicationCredential secret not found, waiting", "secret", instance.Spec.Auth.ApplicationCredentialSecret)
+				return fmt.Errorf("%w: %s", ErrACSecretNotFound, instance.Spec.Auth.ApplicationCredentialSecret)
+			}
+			Log.Error(err, "Failed to get ApplicationCredential secret", "secret", instance.Spec.Auth.ApplicationCredentialSecret)
+			return err
+		}
+		acID, okID := acSecretObj.Data[keystonev1.ACIDSecretKey]
+		acSecretData, okSecret := acSecretObj.Data[keystonev1.ACSecretSecretKey]
+		if !okID || len(acID) == 0 || !okSecret || len(acSecretData) == 0 {
+			Log.Info("ApplicationCredential secret missing required keys", "secret", instance.Spec.Auth.ApplicationCredentialSecret)
+			return fmt.Errorf("%w: %s", ErrACSecretMissingKeys, instance.Spec.Auth.ApplicationCredentialSecret)
+		}
+		templateParameters["ApplicationCredentialID"] = string(acID)
+		templateParameters["ApplicationCredentialSecret"] = string(acSecretData)
+		Log.Info("Using ApplicationCredentials auth", "secret", instance.Spec.Auth.ApplicationCredentialSecret)
+	}
 	templateParameters["ServiceRoleName"] = spec.Role
 	templateParameters["LbMgmtNetworkId"] = templateVars.LbMgmtNetworkID
 	templateParameters["LbSecurityGroupId"] = templateVars.LbSecurityGroupID
@@ -848,6 +870,18 @@ func (r *OctaviaAmphoraControllerReconciler) SetupWithManager(mgr ctrl.Manager) 
 		return err
 	}
 
+	// index authAppCredSecretField
+	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &octaviav1.OctaviaAmphoraController{}, authAppCredSecretField, func(rawObj client.Object) []string {
+		// Extract the application credential secret name from the spec, if one is provided
+		cr := rawObj.(*octaviav1.OctaviaAmphoraController)
+		if cr.Spec.Auth.ApplicationCredentialSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.Auth.ApplicationCredentialSecret}
+	}); err != nil {
+		return err
+	}
+
 	svcSecretFn := func(_ context.Context, o client.Object) []reconcile.Request {
 		secret := o.(*corev1.Secret)
 		secretName := secret.GetName()
@@ -904,6 +938,7 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectsForSrc(ctx context.Conte
 		passwordSecretField,
 		caBundleSecretNameField,
 		transportURLSecretField,
+		authAppCredSecretField,
 	}
 
 	for _, field := range allWatchFields {

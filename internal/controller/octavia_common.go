@@ -15,6 +15,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	networkv1 "github.com/openstack-k8s-operators/infra-operator/apis/network/v1beta1"
@@ -27,6 +28,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+)
+
+// Static errors for Application Credential handling
+var (
+	ErrACSecretNotFound    = errors.New("ApplicationCredential secret not found")
+	ErrACSecretMissingKeys = errors.New("ApplicationCredential secret missing required keys")
 )
 
 type conditionUpdater interface {
