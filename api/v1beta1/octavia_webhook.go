@@ -21,6 +21,7 @@ import (
 
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
+	common_webhook "github.com/openstack-k8s-operators/lib-common/modules/common/webhook"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -63,6 +64,12 @@ func (r *Octavia) Default() {
 
 // Default - set defaults for this Octavia spec
 func (spec *OctaviaSpec) Default() {
+	// Default MessagingBus.Cluster if not set
+	// Migration from deprecated fields is handled by openstack-operator
+	if spec.MessagingBus.Cluster == "" {
+		spec.MessagingBus.Cluster = "rabbitmq"
+	}
+
 	if spec.OctaviaAPI.ContainerImage == "" {
 		spec.OctaviaAPI.ContainerImage = octaviaDefaults.APIContainerImageURL
 	}
@@ -91,7 +98,11 @@ func (spec *OctaviaSpec) Default() {
 
 // Default - set defaults for this Octavia core spec (this version is used by the OpenStackControlplane webhook)
 func (spec *OctaviaSpecCore) Default() {
-	// nothing here yet
+	// Default MessagingBus.Cluster if not set
+	// Migration from deprecated fields is handled by openstack-operator
+	if spec.MessagingBus.Cluster == "" {
+		spec.MessagingBus.Cluster = "rabbitmq"
+	}
 }
 
 var _ webhook.Validator = &Octavia{}
@@ -100,26 +111,33 @@ var _ webhook.Validator = &Octavia{}
 func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
 	octavialog.Info("validate create", "name", r.Name)
 
+	var allWarns []string
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	if err := r.Spec.ValidateCreate(basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
+	warns, errs := r.Spec.ValidateCreate(basePath, r.Namespace)
+	allWarns = append(allWarns, warns...)
+	allErrs = append(allErrs, errs...)
 
 	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(
+		return allWarns, apierrors.NewInvalid(
 			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
 			r.Name, allErrs)
 	}
 
-	return nil, nil
+	return allWarns, nil
 }
 
 // ValidateCreate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an octavia spec.
-func (r *OctaviaSpec) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
+func (r *OctaviaSpec) ValidateCreate(basePath *field.Path, namespace string) ([]string, field.ErrorList) {
 	var allErrs field.ErrorList
+	var allWarnings []string
+
+	// Validate deprecated fields using centralized validation
+	warnings, errs := r.OctaviaSpecBase.validateDeprecatedFieldsCreate(basePath)
+	allWarnings = append(allWarnings, warnings...)
+	allErrs = append(allErrs, errs...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -128,11 +146,17 @@ func (r *OctaviaSpec) ValidateCreate(basePath *field.Path, namespace string) fie
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
-	return allErrs
+	return allWarnings, allErrs
 }
 
-func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path, namespace string) field.ErrorList {
+func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path, namespace string) ([]string, field.ErrorList) {
 	var allErrs field.ErrorList
+	var allWarnings []string
+
+	// Validate deprecated fields using centralized validation
+	warnings, errs := r.OctaviaSpecBase.validateDeprecatedFieldsCreate(basePath)
+	allWarnings = append(allWarnings, warnings...)
+	allErrs = append(allErrs, errs...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -141,7 +165,7 @@ func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path, namespace string)
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
-	return allErrs
+	return allWarnings, allErrs
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
@@ -153,26 +177,78 @@ func (r *Octavia) ValidateUpdate(old runtime.Object) (admission.Warnings, error)
 		return nil, apierrors.NewInternalError(fmt.Errorf("unable to convert existing object"))
 	}
 
+	var allWarns []string
 	var allErrs field.ErrorList
 	basePath := field.NewPath("spec")
 
-	if err := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath, r.Namespace); err != nil {
-		allErrs = append(allErrs, err...)
-	}
+	warns, errs := r.Spec.ValidateUpdate(oldOctavia.Spec, basePath, r.Namespace)
+	allWarns = append(allWarns, warns...)
+	allErrs = append(allErrs, errs...)
 
 	if len(allErrs) != 0 {
-		return nil, apierrors.NewInvalid(
+		return allWarns, apierrors.NewInvalid(
 			schema.GroupKind{Group: "octavia.openstack.org", Kind: "Octavia"},
 			r.Name, allErrs)
 	}
 
-	return nil, nil
+	return allWarns, nil
+}
+
+// getDeprecatedFields returns the centralized list of deprecated fields for OctaviaSpecBase
+func (spec *OctaviaSpecBase) getDeprecatedFields(old *OctaviaSpecBase) []common_webhook.DeprecatedFieldUpdate {
+	deprecatedFields := []common_webhook.DeprecatedFieldUpdate{
+		{
+			DeprecatedFieldName: "rabbitMqClusterName",
+			NewFieldPath:        []string{"messagingBus", "cluster"},
+			NewDeprecatedValue:  &spec.RabbitMqClusterName,
+			NewValue:            &spec.MessagingBus.Cluster,
+		},
+	}
+
+	// If old spec is provided (UPDATE operation), add old values
+	if old != nil {
+		deprecatedFields[0].OldDeprecatedValue = &old.RabbitMqClusterName
+	}
+
+	return deprecatedFields
+}
+
+// validateDeprecatedFieldsCreate validates deprecated fields during CREATE operations
+func (spec *OctaviaSpecBase) validateDeprecatedFieldsCreate(basePath *field.Path) ([]string, field.ErrorList) {
+	// Get deprecated fields list (without old values for CREATE)
+	deprecatedFieldsUpdate := spec.getDeprecatedFields(nil)
+
+	// Convert to DeprecatedField list for CREATE validation
+	deprecatedFields := make([]common_webhook.DeprecatedField, len(deprecatedFieldsUpdate))
+	for i, df := range deprecatedFieldsUpdate {
+		deprecatedFields[i] = common_webhook.DeprecatedField{
+			DeprecatedFieldName: df.DeprecatedFieldName,
+			NewFieldPath:        df.NewFieldPath,
+			DeprecatedValue:     df.NewDeprecatedValue,
+			NewValue:            df.NewValue,
+		}
+	}
+
+	return common_webhook.ValidateDeprecatedFieldsCreate(deprecatedFields, basePath), nil
+}
+
+// validateDeprecatedFieldsUpdate validates deprecated fields during UPDATE operations
+func (spec *OctaviaSpecBase) validateDeprecatedFieldsUpdate(old OctaviaSpecBase, basePath *field.Path) ([]string, field.ErrorList) {
+	// Get deprecated fields list with old values
+	deprecatedFields := spec.getDeprecatedFields(&old)
+	return common_webhook.ValidateDeprecatedFieldsUpdate(deprecatedFields, basePath)
 }
 
 // ValidateUpdate - Exported function wrapping non-exported validate functions,
 // this function can be called externally to validate an barbican spec.
-func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, namespace string) field.ErrorList {
+func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, namespace string) ([]string, field.ErrorList) {
 	var allErrs field.ErrorList
+	var allWarnings []string
+
+	// Validate deprecated fields using reflection-based validation
+	warnings, errs := r.OctaviaSpecBase.validateDeprecatedFieldsUpdate(old.OctaviaSpecBase, basePath)
+	allWarnings = append(allWarnings, warnings...)
+	allErrs = append(allErrs, errs...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -181,11 +257,17 @@ func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, name
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
-	return allErrs
+	return allWarnings, allErrs
 }
 
-func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path, namespace string) field.ErrorList {
+func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Path, namespace string) ([]string, field.ErrorList) {
 	var allErrs field.ErrorList
+	var allWarnings []string
+
+	// Validate deprecated fields using reflection-based validation
+	warnings, errs := r.OctaviaSpecBase.validateDeprecatedFieldsUpdate(old.OctaviaSpecBase, basePath)
+	allWarnings = append(allWarnings, warnings...)
+	allErrs = append(allErrs, errs...)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
@@ -194,7 +276,7 @@ func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Pa
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
-	return allErrs
+	return allWarnings, allErrs
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type

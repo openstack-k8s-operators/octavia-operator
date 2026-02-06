@@ -190,6 +190,7 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 		condition.UnknownCondition(condition.DBReadyCondition, condition.InitReason, condition.DBReadyInitMessage),
 		condition.UnknownCondition(condition.DBSyncReadyCondition, condition.InitReason, condition.DBSyncReadyInitMessage),
 		condition.UnknownCondition(condition.RabbitMqTransportURLReadyCondition, condition.InitReason, condition.RabbitMqTransportURLReadyInitMessage),
+		condition.UnknownCondition(octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition, condition.InitReason, octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyInitMessage),
 		condition.UnknownCondition(condition.InputReadyCondition, condition.InitReason, condition.InputReadyInitMessage),
 		condition.UnknownCondition(condition.ServiceConfigReadyCondition, condition.InitReason, condition.ServiceConfigReadyInitMessage),
 		condition.UnknownCondition(condition.ServiceAccountReadyCondition, condition.InitReason, condition.ServiceAccountReadyInitMessage),
@@ -236,14 +237,15 @@ func (r *OctaviaReconciler) Reconcile(ctx context.Context, req ctrl.Request) (re
 
 // fields to index to reconcile when change
 const (
-	passwordSecretField     = ".spec.secret"
-	caBundleSecretNameField = ".spec.tls.caBundleSecretName" // #nosec G101 -- Field path, not a credential
-	tlsAPIInternalField     = ".spec.tls.api.internal.secretName"
-	tlsAPIPublicField       = ".spec.tls.api.public.secretName"
-	tlsOvnField             = ".spec.tls.ovn.secretName"
-	topologyField           = ".spec.topologyRef.Name"
-	transportURLSecretField = ".spec.transportURLSecret"
-	authAppCredSecretField  = ".spec.auth.applicationCredentialSecret" // #nosec G101
+	passwordSecretField                  = ".spec.secret"
+	caBundleSecretNameField              = ".spec.tls.caBundleSecretName" // #nosec G101 -- Field path, not a credential
+	tlsAPIInternalField                  = ".spec.tls.api.internal.secretName"
+	tlsAPIPublicField                    = ".spec.tls.api.public.secretName"
+	tlsOvnField                          = ".spec.tls.ovn.secretName"
+	topologyField                        = ".spec.topologyRef.Name"
+	transportURLSecretField              = ".spec.transportURLSecret"
+	authAppCredSecretField               = ".spec.auth.applicationCredentialSecret" // #nosec G101
+	notificationsTransportURLSecretField = ".spec.notificationsTransportURLSecret"
 )
 
 var (
@@ -256,6 +258,7 @@ var (
 		authAppCredSecretField,
 		topologyField,
 		transportURLSecretField,
+		notificationsTransportURLSecretField,
 	}
 	rsyslogWatchFields = []string{
 		topologyField,
@@ -588,6 +591,45 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		condition.RabbitMqTransportURLReadyCondition,
 		condition.RabbitMqTransportURLReadyMessage)
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
+
+	// Handle notifications transport URL if dedicated notifications bus is configured
+	if instance.Spec.NotificationsBus != nil {
+		notificationsTransportURL, notifOp, notifErr := r.notificationsTransportURLCreateOrUpdate(instance)
+		if notifErr != nil {
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyErrorMessage, notifErr.Error()))
+			return ctrl.Result{}, notifErr
+		}
+
+		if notifOp != controllerutil.OperationResultNone {
+			Log.Info(fmt.Sprintf("Notifications TransportURL %s successfully reconciled - operation: %s", notificationsTransportURL.Name, string(notifOp)))
+		}
+
+		instance.Status.NotificationsTransportURLSecret = notificationsTransportURL.Status.SecretName
+
+		if instance.Status.NotificationsTransportURLSecret == "" {
+			Log.Info(fmt.Sprintf("Waiting for the notifications TransportURL %s secret to be created", notificationsTransportURL.Name))
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
+				condition.RequestedReason,
+				condition.SeverityInfo,
+				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyInitMessage))
+			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
+		}
+		instance.Status.Conditions.MarkTrue(
+			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
+			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyMessage)
+	} else {
+		// No notifications bus configured, clear the status
+		instance.Status.NotificationsTransportURLSecret = ""
+		// Mark condition as ready since notifications bus is not required
+		instance.Status.Conditions.MarkTrue(
+			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
+			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyMessage)
+	}
 
 	err = octavia.EnsureAmphoraCerts(ctx, instance, helper)
 	if err != nil {
@@ -1555,11 +1597,16 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.TenantName = instance.Spec.TenantName
 		deployment.Spec.TenantDomainName = instance.Spec.TenantDomainName
 		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+		deployment.Spec.NotificationsTransportURLSecret = instance.Status.NotificationsTransportURLSecret
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		deployment.Spec.TLS = instance.Spec.OctaviaAPI.TLS
 		deployment.Spec.APITimeout = instance.Spec.APITimeout
 		deployment.Spec.Auth = instance.Spec.Auth
+		// Set NetworkAttachments from parent Octavia CR if not already set in OctaviaAPI spec
+		if len(deployment.Spec.NetworkAttachments) == 0 && instance.Spec.OctaviaNetworkAttachment != "" {
+			deployment.Spec.NetworkAttachments = []string{instance.Spec.OctaviaNetworkAttachment}
+		}
 
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
@@ -1583,9 +1630,46 @@ func (r *OctaviaReconciler) transportURLCreateOrUpdate(
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
-		transportURL.Spec.RabbitmqClusterName = instance.Spec.RabbitMqClusterName
-		err := controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
-		return err
+		transportURL.Spec.RabbitmqClusterName = instance.Spec.MessagingBus.Cluster
+		// Always set Username and Vhost to allow clearing/resetting them
+		// The infra-operator TransportURL controller handles empty values:
+		// - Empty Username: uses default cluster admin credentials
+		// - Empty Vhost: defaults to "/" vhost
+		transportURL.Spec.Username = instance.Spec.MessagingBus.User
+		transportURL.Spec.Vhost = instance.Spec.MessagingBus.Vhost
+		return controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
+	})
+	return transportURL, op, err
+}
+
+func (r *OctaviaReconciler) notificationsTransportURLCreateOrUpdate(
+	instance *octaviav1.Octavia,
+) (*rabbitmqv1.TransportURL,
+	controllerutil.OperationResult, error) {
+	transportURL := &rabbitmqv1.TransportURL{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-octavia-notifications-transport", instance.Name),
+			Namespace: instance.Namespace,
+		},
+	}
+
+	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, transportURL, func() error {
+		// Handle nil NotificationsBus gracefully - use empty/default values
+		if instance.Spec.NotificationsBus != nil {
+			transportURL.Spec.RabbitmqClusterName = instance.Spec.NotificationsBus.Cluster
+			// Always set Username and Vhost to allow clearing/resetting them
+			// The infra-operator TransportURL controller handles empty values:
+			// - Empty Username: uses default cluster admin credentials
+			// - Empty Vhost: defaults to "/" vhost
+			transportURL.Spec.Username = instance.Spec.NotificationsBus.User
+			transportURL.Spec.Vhost = instance.Spec.NotificationsBus.Vhost
+		} else {
+			// If NotificationsBus is nil, clear the transportURL fields
+			transportURL.Spec.RabbitmqClusterName = ""
+			transportURL.Spec.Username = ""
+			transportURL.Spec.Vhost = ""
+		}
+		return controllerutil.SetControllerReference(instance, transportURL, r.Scheme)
 	})
 	return transportURL, op, err
 }
@@ -1650,6 +1734,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.TenantDomainName = instance.Spec.TenantDomainName
 		daemonset.Spec.Secret = instance.Spec.Secret
 		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
+		daemonset.Spec.NotificationsTransportURLSecret = instance.Status.NotificationsTransportURLSecret
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
 		daemonset.Spec.LbMgmtNetworkID = networkInfo.TenantNetworkID
 		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
@@ -1661,6 +1746,10 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
 		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
 		daemonset.Spec.Auth = instance.Spec.Auth
+		// Set NetworkAttachments from parent Octavia CR if not already set in controllerSpec
+		if len(daemonset.Spec.NetworkAttachments) == 0 && instance.Spec.OctaviaNetworkAttachment != "" {
+			daemonset.Spec.NetworkAttachments = []string{instance.Spec.OctaviaNetworkAttachment}
+		}
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err
@@ -1738,6 +1827,10 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway
 		daemonset.Spec.OctaviaProviderSubnetCIDR = networkInfo.ManagementSubnetCIDR
 		daemonset.Spec.OctaviaProviderSubnetExtraCIDRs = networkInfo.ManagementSubnetExtraCIDRs
+		// Set NetworkAttachments from parent Octavia CR if not already set in controllerSpec
+		if len(daemonset.Spec.NetworkAttachments) == 0 && instance.Spec.OctaviaNetworkAttachment != "" {
+			daemonset.Spec.NetworkAttachments = []string{instance.Spec.OctaviaNetworkAttachment}
+		}
 		err := controllerutil.SetControllerReference(instance, daemonset, r.Scheme)
 		if err != nil {
 			return err

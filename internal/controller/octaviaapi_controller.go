@@ -1018,6 +1018,31 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	}
 	transportURL := string(transportURLSecret.Data["transport_url"])
 
+	// Get notifications transport URL if specified
+	var notificationsTransportURL string
+	if instance.Spec.NotificationsTransportURLSecret != "" {
+		notificationsTransportURLSecret, _, err := oko_secret.GetSecret(ctx, h, instance.Spec.NotificationsTransportURLSecret, instance.Namespace)
+		if err != nil {
+			if k8s_errors.IsNotFound(err) {
+				Log.Info(fmt.Sprintf("Notifications TransportURL secret %s not found", instance.Spec.NotificationsTransportURLSecret))
+				instance.Status.Conditions.Set(condition.FalseCondition(
+					condition.InputReadyCondition,
+					condition.ErrorReason,
+					condition.SeverityWarning,
+					condition.InputReadyWaitingMessage))
+				return err
+			}
+			instance.Status.Conditions.Set(condition.FalseCondition(
+				condition.InputReadyCondition,
+				condition.ErrorReason,
+				condition.SeverityWarning,
+				condition.InputReadyErrorMessage,
+				err.Error()))
+			return err
+		}
+		notificationsTransportURL = string(notificationsTransportURLSecret.Data["transport_url"])
+	}
+
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	// TODO(gthiemonge) Check 3rd parameter, it's probably DatabaseCRName
@@ -1110,6 +1135,7 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 
 	templateParameters["Password"] = servicePassword
 	templateParameters["TransportURL"] = transportURL
+	templateParameters["NotificationsTransportURL"] = notificationsTransportURL
 	templateParameters["QuorumQueues"] = string(transportURLSecret.Data["quorumqueues"]) == "true"
 
 	templateParameters["ServiceUser"] = instance.Spec.ServiceUser
