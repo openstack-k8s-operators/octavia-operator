@@ -49,7 +49,7 @@ const (
 	OVNNBDBEndpoint = "ovnnbdbendpoint:1234"
 	OVNSBDBEndpoint = "ovnsbdbendpoint:1234"
 
-	timeout  = time.Second * 25
+	timeout  = time.Second * 45
 	interval = timeout / 100
 )
 
