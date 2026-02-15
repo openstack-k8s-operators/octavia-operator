@@ -313,6 +313,17 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
+	// index notificationsTransportURLSecretField
+	if err := mgr.GetFieldIndexer().IndexField(ctx, &octaviav1.OctaviaAPI{}, notificationsTransportURLSecretField, func(rawObj client.Object) []string {
+		cr := rawObj.(*octaviav1.OctaviaAPI)
+		if cr.Spec.NotificationsTransportURLSecret == "" {
+			return nil
+		}
+		return []string{cr.Spec.NotificationsTransportURLSecret}
+	}); err != nil {
+		return err
+	}
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
