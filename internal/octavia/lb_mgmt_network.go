@@ -1036,8 +1036,36 @@ func EnsureAmphoraManagementNetwork(
 			log.Error(err, "Unable to create router object")
 			return NetworkProvisioningSummary{}, err
 		}
+	}
 
-		if tenantRouterPort != nil {
+	// Add interface to router if not already added
+	if tenantRouterPort != nil {
+		// Check if interface is already added to router
+		listOpts := ports.ListOpts{
+			DeviceID: router.ID,
+		}
+		allPages, err := ports.List(client, listOpts).AllPages(ctx)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Unable to list ports for router %s", router.ID))
+			return NetworkProvisioningSummary{}, err
+		}
+
+		allPorts, err := ports.ExtractPorts(allPages)
+		if err != nil {
+			log.Error(err, "Unable to extract port information from list")
+			return NetworkProvisioningSummary{}, err
+		}
+
+		hasInterface := false
+		for _, port := range allPorts {
+			if port.ID == tenantRouterPort.ID {
+				hasInterface = true
+				break
+			}
+		}
+
+		if !hasInterface {
+			log.Info("Adding interface info to octavia provider router")
 			interfaceOpts := routers.AddInterfaceOpts{
 				PortID: tenantRouterPort.ID,
 			}
@@ -1045,6 +1073,9 @@ func EnsureAmphoraManagementNetwork(
 			if err != nil {
 				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
 			}
+		}
+		else {
+			log.Info("Octavia provider router already has interface info defined")
 		}
 	}
 
