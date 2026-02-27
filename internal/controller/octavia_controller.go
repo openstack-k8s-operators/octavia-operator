@@ -338,10 +338,18 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ospSecretHash, result, err := oko_secret.VerifySecret(
+	// Associate to PasswordSelectors.Service field a password validator to
+	// ensure pwd invalid detected patterns are rejected.
+	validateFields := map[string]oko_secret.Validator{
+		instance.Spec.PasswordSelectors.Service: oko_secret.PasswordValidator{},
+	}
+	ospSecretHash, result, err := oko_secret.VerifySecretFields(
 		ctx,
-		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
-		[]string{instance.Spec.PasswordSelectors.Service},
+		types.NamespacedName{
+			Namespace: instance.Namespace,
+			Name:      instance.Spec.Secret,
+		},
+		validateFields,
 		helper.GetClient(),
 		time.Duration(10)*time.Second,
 	)
@@ -379,10 +387,16 @@ func (r *OctaviaReconciler) reconcileInit(
 	}
 	secretsVars[instance.Spec.Secret] = env.SetValue(ospSecretHash)
 
-	transportURLSecretHash, result, err := oko_secret.VerifySecret(
+	// transportURLFields are not pure password fields. We do not associate a
+	// password validator and we only verify that the entry exists in the
+	// secret
+	transportValidateFields := map[string]oko_secret.Validator{
+		"transport_url": oko_secret.NoOpValidator{},
+	}
+	transportURLSecretHash, result, err := oko_secret.VerifySecretFields(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Status.TransportURLSecret},
-		[]string{"transport_url"},
+		transportValidateFields,
 		helper.GetClient(),
 		time.Duration(10)*time.Second,
 	)
