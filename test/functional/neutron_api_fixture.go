@@ -435,6 +435,7 @@ func (f *NeutronAPIFixture) getPort(w http.ResponseWriter, r *http.Request) {
 		name := query["name"]
 		tenantID := query["tenant_id"]
 		networkID := query["network_id"]
+		deviceID := query["device_id"]
 		for _, port := range f.Ports {
 			if len(name) > 0 && name[0] != port.Name {
 				continue
@@ -443,6 +444,9 @@ func (f *NeutronAPIFixture) getPort(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			if len(networkID) > 0 && networkID[0] != port.NetworkID {
+				continue
+			}
+			if len(deviceID) > 0 && deviceID[0] != port.DeviceID {
 				continue
 			}
 			n.Ports = append(n.Ports, port)
@@ -610,6 +614,12 @@ func (f *NeutronAPIFixture) putRouter(w http.ResponseWriter, r *http.Request) {
 		f.InterfaceInfos[fmt.Sprintf("%s:%s", routerID, subnetID)] = routers.InterfaceInfo{
 			SubnetID: subnetID,
 			PortID:   n.PortID,
+		}
+
+		// Update the port's DeviceID to reflect it's attached to this router
+		if port, ok := f.Ports[n.PortID]; ok {
+			port.DeviceID = routerID
+			f.Ports[n.PortID] = port
 		}
 
 		bytes, err = json.Marshal(&n)
