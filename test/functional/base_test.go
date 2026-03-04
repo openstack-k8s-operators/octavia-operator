@@ -311,3 +311,13 @@ func CreateSSHPubKey() client.Object {
 		"key": "public key",
 	})
 }
+
+// CreateOctaviaInvalidSecret creates a secret with an invalid password for testing
+func CreateOctaviaInvalidSecret(namespace string, name string) *corev1.Secret {
+	return th.CreateSecret(
+		types.NamespacedName{Namespace: namespace, Name: name},
+		map[string][]byte{
+			"OctaviaPassword": []byte("c^sometext02%text%text02$someText&"),
+		},
+	)
+}

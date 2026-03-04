@@ -218,6 +218,31 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+	// An invalid password is provided
+	When("An Octavia instance is created with an invalid password", func() {
+		BeforeEach(func() {
+			// Create the secret containing the wrong password with the expected secret name
+			DeferCleanup(k8sClient.Delete, ctx,
+				CreateOctaviaInvalidSecret(namespace, "invalid-osp-secret"))
+			spec = GetDefaultOctaviaSpec()
+			spec["secret"] = "invalid-osp-secret"
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+			createAndSimulateKeystone(octaviaName)
+		})
+		It("rejects the password and reports InputReadyCondition as False", func() {
+			expectedErrMsg := "Input data error occurred password does not meet the requirements"
+			th.ExpectConditionWithDetails(
+				octaviaName,
+				ConditionGetterFunc(OctaviaConditionGetter),
+				condition.InputReadyCondition,
+				corev1.ConditionFalse,
+				condition.ErrorReason,
+				expectedErrMsg,
+			)
+		})
+	})
 	// TransportURL
 	When("a proper secret is provider, TransportURL is created", func() {
 		BeforeEach(func() {

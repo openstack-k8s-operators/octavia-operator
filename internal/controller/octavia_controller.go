@@ -338,38 +338,32 @@ func (r *OctaviaReconciler) reconcileInit(
 	//
 	// check for required OpenStack secret holding passwords for service/admin user and add hash to the vars map
 	//
-	ospSecretHash, result, err := oko_secret.VerifySecret(
+	// Associate to PasswordSelectors.Service field a password validator to
+	// ensure pwd invalid detected patterns are rejected.
+	validateFields := map[string]oko_secret.Validator{
+		instance.Spec.PasswordSelectors.Service: oko_secret.PasswordValidator{},
+	}
+	ospSecretHash, result, err := oko_secret.VerifySecretFields(
 		ctx,
-		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Spec.Secret},
-		[]string{instance.Spec.PasswordSelectors.Service},
+		types.NamespacedName{
+			Namespace: instance.Namespace,
+			Name:      instance.Spec.Secret,
+		},
+		validateFields,
 		helper.GetClient(),
 		time.Duration(10)*time.Second,
 	)
-
 	if err != nil {
-		if k8s_errors.IsNotFound(err) {
-			// Since the OpenStack secret should have been manually created by the user and referenced in the spec,
-			// we treat this as a warning because it means that the service will not be able to start.
-			Log.Info(fmt.Sprintf("OpenStack secret %s not found", instance.Spec.Secret))
-			instance.Status.Conditions.Set(condition.FalseCondition(
-				condition.InputReadyCondition,
-				condition.ErrorReason,
-				condition.SeverityWarning,
-				condition.InputReadyWaitingMessage))
-			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
-		}
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
 			condition.ErrorReason,
 			condition.SeverityWarning,
 			condition.InputReadyErrorMessage,
 			err.Error()))
-		return ctrl.Result{}, err
+		return result, err
 	} else if (result != ctrl.Result{}) {
-		// We can only get here if the secret is not found, thus we treat this the same
-		// as we do above if there was an actual "not found" error returned.
-		// See https://github.com/openstack-k8s-operators/lib-common/blob/4c240245107747327c5f67256f8d9d76cdd25c7a/modules/common/secret/secret.go#L423-L428
-		// for further details.
+		// Since the OpenStack secret should have been manually created by the user and referenced in the spec,
+		// we treat this as a warning because it means that the service will not be able to start.
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
 			condition.ErrorReason,
@@ -379,10 +373,16 @@ func (r *OctaviaReconciler) reconcileInit(
 	}
 	secretsVars[instance.Spec.Secret] = env.SetValue(ospSecretHash)
 
-	transportURLSecretHash, result, err := oko_secret.VerifySecret(
+	// transportURLFields are not pure password fields. We do not associate a
+	// password validator and we only verify that the entry exists in the
+	// secret
+	transportValidateFields := map[string]oko_secret.Validator{
+		"transport_url": oko_secret.NoOpValidator{},
+	}
+	transportURLSecretHash, result, err := oko_secret.VerifySecretFields(
 		ctx,
 		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Status.TransportURLSecret},
-		[]string{"transport_url"},
+		transportValidateFields,
 		helper.GetClient(),
 		time.Duration(10)*time.Second,
 	)
