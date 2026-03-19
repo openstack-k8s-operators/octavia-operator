@@ -1073,8 +1073,6 @@ func EnsureAmphoraManagementNetwork(
 			if err != nil {
 				log.Error(err, fmt.Sprintf("Unable to add interface port %s to router %s", tenantRouterPort.ID, router.ID))
 			}
-		} else {
-			log.Info("Octavia provider router already has interface info defined")
 		}
 	}
 
