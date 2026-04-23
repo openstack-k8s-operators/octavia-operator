@@ -52,4 +52,7 @@ const (
 
 	// HmConfigMap ...
 	HmConfigMap = "octavia-hmport-map"
+
+	// ACConsumerFinalizer is added to AC secrets that octavia is actively consuming
+	ACConsumerFinalizer = "openstack.org/octaviaapi-ac-consumer"
 )

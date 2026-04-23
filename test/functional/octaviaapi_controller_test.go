@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
@@ -501,6 +502,187 @@ var _ = Describe("OctaviaAPI controller", func() {
 					"auth_type=v3applicationcredential"),
 				)
 			}, timeout, interval).Should(Succeed())
+		})
+	})
+
+	When("ApplicationCredential consumer finalizer is managed", func() {
+		var (
+			acSecretName          string
+			servicePasswordSecret *corev1.Secret
+		)
+
+		BeforeEach(func() {
+			keystoneAPIName := keystone.CreateKeystoneAPI(namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneInternalEndpoint := fmt.Sprintf("http://keystone-for-%s-internal", octaviaAPIName.Name)
+			keystonePublicEndpoint := fmt.Sprintf("http://keystone-for-%s-public", octaviaAPIName.Name)
+			SimulateKeystoneReady(keystoneAPIName, keystonePublicEndpoint, keystoneInternalEndpoint)
+
+			servicePasswordSecret = CreateOctaviaSecret(namespace)
+			DeferCleanup(k8sClient.Delete, ctx, servicePasswordSecret)
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
+
+			acSecretName = "ac-octavia-a1b2c-secret" //nolint:gosec // G101
+			secret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      acSecretName,
+				},
+				Data: map[string][]byte{
+					keystonev1.ACIDSecretKey:     []byte("a1b2ctest-ac-id"),
+					keystonev1.ACSecretSecretKey: []byte("test-ac-secret"),
+				},
+			}
+			DeferCleanup(k8sClient.Delete, ctx, secret)
+			Expect(k8sClient.Create(ctx, secret)).To(Succeed())
+
+			spec["auth"] = map[string]any{
+				"applicationCredentialSecret": acSecretName,
+			}
+			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
+
+			mariaDBDatabaseName := mariadb.CreateMariaDBDatabase(namespace, octavia.DatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase := mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			octaviaAPI := GetOctaviaAPI(octaviaAPIName)
+			apiMariaDBAccount, apiMariaDBSecret := mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.DatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+
+			mariaDBDatabaseName = mariadb.CreateMariaDBDatabase(namespace, octavia.PersistenceDatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase = mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			apiMariaDBAccount, apiMariaDBSecret = mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.PersistenceDatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+		})
+
+		It("should add the consumer finalizer to the AC secret", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should track the consumed AC secret in status", func() {
+			Eventually(func(g Gomega) {
+				o := GetOctaviaAPI(octaviaAPIName)
+				g.Expect(o.Status.ApplicationCredentialSecret).To(Equal(acSecretName))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should move the finalizer from the old to the new secret on rotation", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			newACSecretName := "ac-octavia-x9y8z-secret" //nolint:gosec // G101
+			newSecret := &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: namespace,
+					Name:      newACSecretName,
+				},
+				Data: map[string][]byte{
+					keystonev1.ACIDSecretKey:     []byte("x9y8zrotated-ac-id"),
+					keystonev1.ACSecretSecretKey: []byte("rotated-ac-secret"),
+				},
+			}
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+			Expect(k8sClient.Create(ctx, newSecret)).To(Succeed())
+
+			Eventually(func(g Gomega) {
+				o := GetOctaviaAPI(octaviaAPIName)
+				o.Spec.Auth.ApplicationCredentialSecret = newACSecretName
+				g.Expect(k8sClient.Update(ctx, o)).Should(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      newACSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(octavia.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				o := GetOctaviaAPI(octaviaAPIName)
+				g.Expect(o.Status.ApplicationCredentialSecret).To(Equal(newACSecretName))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should remove the consumer finalizer from AC secret on CR deletion", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      acSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.ACConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			th.DeleteInstance(GetOctaviaAPI(octaviaAPIName))
+
+			secret := th.GetSecret(types.NamespacedName{
+				Namespace: namespace,
+				Name:      acSecretName,
+			})
+			Expect(secret.Finalizers).NotTo(
+				ContainElement(octavia.ACConsumerFinalizer))
 		})
 	})
 })
