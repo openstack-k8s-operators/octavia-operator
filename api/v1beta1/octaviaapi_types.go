@@ -217,6 +217,12 @@ type OctaviaAPIStatus struct {
 	// NetworkAttachment status of the deployment pods
 	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
 
+	// ApplicationCredentialSecret - the AC secret OctaviaAPI is currently
+	// consuming and protecting with the openstack.org/octaviaapi-ac-consumer
+	// finalizer. Tracked so the controller can remove its finalizer from the
+	// old secret when the openstack-operator rotates the reference.
+	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
+
 	// ObservedGeneration - the most recent generation observed for this
 	// service. If the observed generation is less than the spec generation,
 	// then the controller has not processed the latest changes injected by
