@@ -15,7 +15,7 @@ require (
 	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260428063048-3a190112bad3
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/ovn-operator/api v0.6.1-0.20260428063332-55b3554934b5
-	go.uber.org/zap v1.27.1 // indirect
+	go.uber.org/zap v1.28.0 // indirect
 	k8s.io/api v0.31.14
 	k8s.io/apimachinery v0.31.14
 	k8s.io/client-go v0.31.14
