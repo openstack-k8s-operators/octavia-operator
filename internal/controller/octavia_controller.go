@@ -31,6 +31,7 @@ import (
 	rabbitmqv1 "github.com/openstack-k8s-operators/infra-operator/apis/rabbitmq/v1beta1"
 	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/clusterdns"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
@@ -1391,6 +1392,10 @@ func (r *OctaviaReconciler) reconcileAmphoraImages(
 			err.Error()))
 		return ctrl.Result{}, err
 	}
+
+	// Use FQDN to ensure DNS resolution works when Glance validates the import URI
+	// (Glance appends a trailing dot for DNS lookup which requires fully-qualified names)
+	endpoint = strings.Replace(endpoint, ".svc", ".svc."+clusterdns.GetDNSClusterDomain(), 1)
 
 	urlMap, err := r.getLocalImageURLs(endpoint)
 	if err != nil {
