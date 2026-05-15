@@ -1217,13 +1217,14 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 			Labels:             cmLabels,
 		},
 		{
-			Name:          fmt.Sprintf("%s-config-data", instance.Name),
-			Namespace:     instance.Namespace,
-			Type:          util.TemplateTypeConfig,
-			InstanceType:  instance.Kind,
-			CustomData:    customData,
-			ConfigOptions: templateParameters,
-			Labels:        cmLabels,
+			Name:            fmt.Sprintf("%s-config-data", instance.Name),
+			Namespace:       instance.Namespace,
+			Type:            util.TemplateTypeConfig,
+			InstanceType:    instance.Kind,
+			CustomData:      customData,
+			ConfigOptions:   templateParameters,
+			Labels:          cmLabels,
+			CommonTemplates: []string{"ssl.conf"},
 		},
 	}
 	err = oko_secret.EnsureSecrets(ctx, h, instance, cms, envVars)
