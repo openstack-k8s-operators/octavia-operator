@@ -41,6 +41,11 @@ type OctaviaAmphoraControllerSpec struct {
 	// +kubebuilder:validation:Optional
 	// ContainerImage - Amphora Controller Container Image URL
 	ContainerImage string `json:"containerImage,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication, propagated from the parent Octavia CR
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // OctaviaAmphoraControllerSpecCore -
@@ -176,10 +181,6 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// by name
 	TopologyRef *topologyv1.TopoRef `json:"topologyRef,omitempty"`
 
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	// Auth - Parameters related to authentication
-	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // OctaviaAmphoraControllerStatus defines the observed state of the Octavia Amphora Controller
