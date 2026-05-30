@@ -8,13 +8,13 @@ require (
 	github.com/k8snetworkplumbingwg/network-attachment-definition-client v1.7.7
 	github.com/onsi/ginkgo/v2 v2.28.2
 	github.com/onsi/gomega v1.41.0
-	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260513130700-78e1a15a8289
-	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260513130126-175a0958de92
-	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260518125357-72bdd580c587
-	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260515134210-2e2a0d06648c
-	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260513143847-4b70b899997a
+	github.com/openstack-k8s-operators/infra-operator/apis v0.6.1-0.20260528132651-48b751fb6dc8
+	github.com/openstack-k8s-operators/keystone-operator/api v0.6.1-0.20260520090027-4d7b7a01c0bf
+	github.com/openstack-k8s-operators/lib-common/modules/common v0.6.1-0.20260526114926-7ebfadd589db
+	github.com/openstack-k8s-operators/lib-common/modules/openstack v0.6.1-0.20260526114926-7ebfadd589db
+	github.com/openstack-k8s-operators/mariadb-operator/api v0.6.1-0.20260528064220-a039cf4cba9b
 	github.com/openstack-k8s-operators/octavia-operator/api v0.0.0-00010101000000-000000000000
-	github.com/openstack-k8s-operators/ovn-operator/api v0.6.1-0.20260509203137-d009c70c8d50
+	github.com/openstack-k8s-operators/ovn-operator/api v0.6.1-0.20260525151412-a8c7f1a1c023
 	go.uber.org/zap v1.28.0 // indirect
 	k8s.io/api v0.31.14
 	k8s.io/apimachinery v0.31.14
@@ -24,7 +24,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260515134210-2e2a0d06648c
+	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260526114926-7ebfadd589db
 	golang.org/x/crypto v0.48.0
 	gopkg.in/ini.v1 v1.67.1
 	k8s.io/utils v0.0.0-20250820121507-0af2bda4dd1d
@@ -75,7 +75,7 @@ require (
 	github.com/prometheus/common v0.65.0 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/spf13/cobra v1.9.1 // indirect
-	github.com/spf13/pflag v1.0.7 // indirect
+	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect
