@@ -147,6 +147,13 @@ type OctaviaAmphoraControllerSpecCore struct {
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=enabled;disabled;"";
+	// CreateFlavors - when enabled or empty (default), octavia-operator creates Octavia
+	// flavors and flavor profiles. Set to disabled to manage Octavia flavors externally.
+	// Note: Nova compute flavors for amphorae are always created regardless of this setting.
+	CreateFlavors string `json:"createFlavors,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:default=""
 	AmphoraImageOwnerID string `json:"amphoraImageOwnerID,omitempty"`
 

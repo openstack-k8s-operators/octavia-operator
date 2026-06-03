@@ -210,6 +210,13 @@ type OctaviaSpecBase struct {
 	AmphoraCustomFlavors []OctaviaAmphoraFlavor `json:"amphoraCustomFlavors,omitempty"`
 
 	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=enabled;disabled;"";
+	// CreateFlavors - when enabled or empty (default), octavia-operator creates Octavia
+	// flavors and flavor profiles. Set to disabled to manage Octavia flavors externally.
+	// Note: Nova compute flavors for amphorae are always created regardless of this setting.
+	CreateFlavors string `json:"createFlavors,omitempty"`
+
+	// +kubebuilder:validation:Optional
 	// Resources - Compute Resources required by this service (Limits/Requests).
 	// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
