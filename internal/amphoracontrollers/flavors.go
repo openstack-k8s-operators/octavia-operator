@@ -128,14 +128,20 @@ func getOctaviaFlavors(ctx context.Context, lbClient *gophercloud.ServiceClient)
 }
 
 func ensureFlavors(ctx context.Context, osclient *openstack.OpenStack, log *logr.Logger, instance *octaviav1.OctaviaAmphoraController) (string, error) {
+	// Default to enabled if empty or "enabled", only skip if explicitly "disabled"
+	createOctaviaFlavors := instance.Spec.CreateFlavors != "disabled"
+
 	computeClient, err := octavia.GetComputeClient(osclient)
 	if err != nil {
 		return "", fmt.Errorf("error getting compute client: %w", err)
 	}
 
-	lbClient, err := octavia.GetLoadBalancerClient(osclient)
-	if err != nil {
-		return "", fmt.Errorf("error getting loadbalancer client: %w", err)
+	var lbClient *gophercloud.ServiceClient
+	if createOctaviaFlavors {
+		lbClient, err = octavia.GetLoadBalancerClient(osclient)
+		if err != nil {
+			return "", fmt.Errorf("error getting loadbalancer client: %w", err)
+		}
 	}
 
 	amphoraFlavors, err := getAmphoraFlavors(ctx, computeClient)
@@ -196,6 +202,12 @@ func ensureFlavors(ctx context.Context, osclient *openstack.OpenStack, log *logr
 				defaultFlavorID = flavor.ID
 			}
 		}
+	}
+
+	// Skip Octavia flavor profiles and flavors creation if disabled
+	if !createOctaviaFlavors {
+		log.Info("Octavia flavor/flavor profile creation is disabled (createFlavors: disabled)")
+		return defaultFlavorID, nil
 	}
 
 	// Get Octavia FlavorProfiles and Flavors
@@ -295,7 +307,8 @@ func ensureFlavors(ctx context.Context, osclient *openstack.OpenStack, log *logr
 	return defaultFlavorID, nil
 }
 
-// EnsureFlavors - enable that the Nova flavors for the amphora VMs are created
+// EnsureFlavors - ensures that the Nova flavors for the amphora VMs are created.
+// When spec.CreateFlavors is "enabled" or empty (default), it also creates Octavia flavor profiles and flavors.
 //
 // returns the UUID of the default Nova flavor
 func EnsureFlavors(ctx context.Context, instance *octaviav1.OctaviaAmphoraController, log *logr.Logger, helper *helper.Helper) (string, error) {
