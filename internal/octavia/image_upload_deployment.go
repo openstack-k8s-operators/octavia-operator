@@ -117,10 +117,11 @@ func ImageUploadDeployment(
 							Command: []string{
 								"/bin/bash",
 							},
-							Args:         args,
-							Image:        instance.Spec.ApacheContainerImage,
-							VolumeMounts: getVolumeMounts(),
-							Resources:    instance.Spec.Resources,
+							Args:            args,
+							Image:           instance.Spec.ApacheContainerImage,
+							ImagePullPolicy: corev1.PullIfNotPresent,
+							VolumeMounts:    getVolumeMounts(),
+							Resources:       instance.Spec.Resources,
 							// TODO(gthiemonge) do we need probes?
 						},
 					},
@@ -154,8 +155,9 @@ func initContainer(init ImageUploadDetails) []corev1.Container {
 
 	return []corev1.Container{
 		{
-			Name:  "init",
-			Image: init.ContainerImage,
+			Name:            "init",
+			Image:           init.ContainerImage,
+			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
 				RunAsUser: &runAsUser,
 			},
