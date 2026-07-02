@@ -51,6 +51,7 @@ import (
 	k8s_errors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
@@ -324,7 +325,13 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		return err
 	}
 
-	return ctrl.NewControllerManagedBy(mgr).
+	// Check if OVN CRD is available in the cluster
+	_, err := mgr.GetRESTMapper().RESTMapping(
+		schema.GroupKind{Group: "ovn.openstack.org", Kind: "OVNDBCluster"},
+	)
+	ovnCRDAvailable := err == nil
+
+	bldr := ctrl.NewControllerManagedBy(mgr).
 		For(&octaviav1.OctaviaAPI{}).
 		Owns(&keystonev1.KeystoneService{}).
 		Owns(&keystonev1.KeystoneEndpoint{}).
@@ -332,8 +339,13 @@ func (r *OctaviaAPIReconciler) SetupWithManager(ctx context.Context, mgr ctrl.Ma
 		Owns(&corev1.Service{}).
 		Owns(&corev1.Secret{}).
 		Owns(&corev1.ConfigMap{}).
-		Owns(&appsv1.Deployment{}).
-		Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNCRNamespaceMapFunc(crs, mgr.GetClient()))).
+		Owns(&appsv1.Deployment{})
+
+	if ovnCRDAvailable {
+		bldr = bldr.Watches(&ovnclient.OVNDBCluster{}, handler.EnqueueRequestsFromMapFunc(ovnclient.OVNCRNamespaceMapFunc(crs, mgr.GetClient())))
+	}
+
+	return bldr.
 		Watches(
 			&corev1.Secret{},
 			handler.EnqueueRequestsFromMapFunc(r.findObjectsForSrc),
@@ -1138,13 +1150,19 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 	if err != nil {
 		return err
 	}
+	ovnAvailable := true
 	nbCluster, err := ovnclient.GetDBClusterByType(ctx, h, instance.Namespace, map[string]string{}, ovnclient.NBDBType)
 	if err != nil {
-		return err
+		Log.Info("OVN NB DB cluster not found, OVN provider driver will be disabled", "error", err)
+		ovnAvailable = false
 	}
-	sbCluster, err := ovnclient.GetDBClusterByType(ctx, h, instance.Namespace, map[string]string{}, ovnclient.SBDBType)
-	if err != nil {
-		return err
+	var sbCluster *ovnclient.OVNDBCluster
+	if ovnAvailable {
+		sbCluster, err = ovnclient.GetDBClusterByType(ctx, h, instance.Namespace, map[string]string{}, ovnclient.SBDBType)
+		if err != nil {
+			Log.Info("OVN SB DB cluster not found, OVN provider driver will be disabled", "error", err)
+			ovnAvailable = false
+		}
 	}
 
 	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
@@ -1229,16 +1247,19 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 		Log.Info("Using ApplicationCredentials auth", "secret", key)
 	}
 
-	templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
-	if err != nil {
-		return err
-	}
+	if ovnAvailable {
+		templateParameters["NBConnection"], err = nbCluster.GetInternalEndpoint()
+		if err != nil {
+			return err
+		}
 
-	templateParameters["SBConnection"], err = sbCluster.GetInternalEndpoint()
-	if err != nil {
-		return err
+		templateParameters["SBConnection"], err = sbCluster.GetInternalEndpoint()
+		if err != nil {
+			return err
+		}
+		templateParameters["OVNDB_TLS"] = instance.Spec.TLS.Ovn.Enabled()
 	}
-	templateParameters["OVNDB_TLS"] = instance.Spec.TLS.Ovn.Enabled()
+	templateParameters["OVNEnabled"] = ovnAvailable
 
 	templateParameters["TimeOut"] = instance.Spec.APITimeout
 
