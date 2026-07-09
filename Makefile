@@ -48,7 +48,7 @@ endif
 
 # Set the Operator SDK version to use. By default, what is installed on the system is used.
 # This is useful for CI or a project to utilize a specific version of the operator-sdk toolkit.
-OPERATOR_SDK_VERSION ?= v1.41.1
+OPERATOR_SDK_VERSION ?= v1.42.3
 
 # Image URL to use all building/pushing image targets
 DEFAULT_IMG ?= quay.io/openstack-k8s-operators/octavia-operator:latest
@@ -70,7 +70,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
-GOTOOLCHAIN_VERSION ?= go1.24.0
+GOTOOLCHAIN_VERSION ?= go1.26.0
 
 .PHONY: all
 all: build
@@ -117,10 +117,10 @@ tidy: ## Run go mod tidy on every mod file in the repo
 	go mod tidy
 	cd ./api && go mod tidy
 
-GOLANGCI_LINT_VERSION ?= v2.7.2
+GOLANGCI_LINT_VERSION ?= v2.12.2
 .PHONY: golangci-lint
 golangci-lint: vet
-	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
+	test -s $(LOCALBIN)/golangci-lint || curl -sSfL https://golangci-lint.run/install.sh | sh -s $(GOLANGCI_LINT_VERSION)
 	$(LOCALBIN)/golangci-lint run --fix
 
 .PHONY: test
