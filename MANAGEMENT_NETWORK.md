@@ -196,6 +196,50 @@ lines similar to the following (the actual names will vary by suffix):
   octavia-worker-pq55m                                            1/1     Running     0          21h
 ```
 
+## How the NAD Parameters Drive Network Provisioning
+
+The operator parses the `octavia` NetworkAttachmentDefinition to derive all
+Neutron network parameters. Understanding this mapping is essential for
+correct configuration.
+
+Given a NAD with the following IPAM configuration:
+
+```json
+"ipam": {
+    "range": "172.23.0.0/24",
+    "range_start": "172.23.0.30",
+    "range_end": "172.23.0.70",
+    "routes": [{ "dst": "172.24.0.0/16", "gw": "172.23.0.150" }]
+}
+```
+
+The operator derives:
+
+| Parameter | Source | Example Value |
+|---|---|---|
+| Provider subnet CIDR | `range` | `172.23.0.0/24` |
+| Provider allocation pool start | `range_end` + 1 | `172.23.0.71` |
+| Provider allocation pool end | start + 25 | `172.23.0.96` |
+| Predictable IP pool start | allocation pool start + 26 | `172.23.0.97` |
+| Predictable IP pool end | allocation pool start + 51 | `172.23.0.122` |
+| Router gateway IP | `routes[0].gw` | `172.23.0.150` |
+| Tenant subnet CIDR | `routes[0].dst` | `172.24.0.0/16` |
+| Tenant allocation pool start | 5th address of CIDR | `172.24.0.5` |
+| Tenant allocation pool end | 2nd-to-last address of CIDR | `172.24.255.254` |
+
+The IP address space on the provider subnet is divided into three ranges:
+1. **Pod IPs** (`range_start` to `range_end`): Allocated by whereabouts to pods
+   via the NAD.
+2. **Neutron allocation pool** (25 IPs after `range_end`): Used by Neutron for
+   the `octavia-provider-subnet`.
+3. **Predictable IPs** (25 IPs after the Neutron pool): Assigned to health
+   manager and rsyslog pods (see below).
+
+The router gateway IP (`gw`) must fall within the provider subnet CIDR but
+**outside** all three ranges above. Alternatively, the gateway can be specified
+via the `spec.lbMgmtNetwork.lbMgmtRouterGateway` field in the Octavia CR, which
+takes precedence when there are no routes in the NAD.
+
 ## The Octavia Neutron LB Management Network
 
 Once the octavia operator has finished deploying octavia, the details of the
@@ -223,6 +267,19 @@ Octavia amphora instances.
 > The amphora controllers do not have direct access to the `lb-mgmt-net`
 > network. It is accessed through the `octavia` network attachment and a router
 > that the octavia-operator manages.
+
+### Provider Network Details
+
+The `octavia-provider-net` is created as an external network with a `flat`
+network type and a physical network named `octavia`. This physical network name
+corresponds to the NIC mapping configured on the OVN controller
+(`nicMappings: octavia: octbr`).
+
+The operator restricts access to this network by updating the Neutron RBAC
+policy: the default rule that allows all tenants to use the external network is
+changed to grant access only to the service tenant (the project that owns the
+Octavia services). This prevents other tenants from creating ports on the
+provider network.
 
 The subnets can be viewed by running `oc rsh openstackclient openstack subnet list -f yaml`:
 
@@ -357,6 +414,214 @@ The `fixed_ips`, `device_id` and `device_owner` are all of interest:
 * `fixed_ips` will match the IP for the `interfaces_info` of the `octavia-link-router`
 * `device_id` will match the ID for the `octavia-link-router`
 * `device_owner` indicates that OpenStack is using the port as a router interface
+
+### Subnet Host Routes
+
+The operator programmatically configures a host route on the `lb-mgmt-subnet`
+so that amphora VMs know how to reach the control plane pods on the provider
+network. The route's destination is the provider subnet CIDR and the next hop is
+the IP address of the `lb-mgmt-router-port` on the tenant side of the router.
+
+This is the reverse direction of the route defined in the NAD: the NAD route
+tells the pods how to reach the tenant network (via the router gateway on the
+provider side), and the subnet host route tells the amphorae how to reach the
+provider network (via the router port on the tenant side).
+
+## Security Groups
+
+The operator creates four security groups to control traffic on the management
+networks. Two are created in the **service tenant** (for the tenant network) and
+two in the **admin tenant** (for the provider network).
+
+### Management Security Groups
+
+| Security Group | Rules |
+|---|---|
+| `lb-mgmt-sec-grp` | TCP 22 (SSH) IPv4/IPv6, TCP 9443 (amphora agent) IPv4/IPv6 |
+| `lb-health-mgr-sec-grp` | UDP 5555 (heartbeat) IPv4/IPv6, UDP 514 (log offloading) IPv4/IPv6, TCP 514 (log offloading) IPv4/IPv6 |
+
+The SSH rule allows controller access to amphorae for management. The
+amphora agent port (9443) is used for TLS-secured communication between the
+controllers and the amphora agent running inside each load balancer VM.
+
+### Provider Security Groups
+
+| Security Group | Rules |
+|---|---|
+| `lb-prov-sec-grp` | Same rules as `lb-mgmt-sec-grp` |
+| `lb-health-prov-sec-grp` | Same rules as `lb-health-mgr-sec-grp` |
+
+These are created in the admin tenant for the provider network side.
+
+## Route Configuration in Amphora Controller Pods
+
+The amphora controller pods (healthmanager, housekeeping, worker) need routes to
+reach the tenant network where amphorae reside. These routes are configured at
+pod startup by an init container.
+
+### How it works
+
+1. The operator passes the tenant subnet CIDR(s) and the router gateway IP as
+   environment variables to each amphora controller pod:
+   - `MGMT_CIDR`: The primary tenant subnet CIDR (e.g. `172.24.0.0/16`)
+   - `MGMT_GATEWAY`: The router's IP on the provider network (e.g. `172.23.0.150`)
+   - `MGMT_CIDR0`, `MGMT_CIDR1`, ...: Additional CIDRs for availability
+     zone-specific tenant subnets
+
+2. An init container runs with `NET_ADMIN` and `SYS_ADMIN` capabilities. It
+   executes a Python script (`octavia_mgmt_subnet_route.py`) that uses
+   `pyroute2` to add a route on the `octavia` network interface:
+
+   ```
+   ip route add <MGMT_CIDR> via <MGMT_GATEWAY> dev octavia
+   ```
+
+3. This is repeated for each extra CIDR (`MGMT_CIDR0`, `MGMT_CIDR1`, etc.)
+   when availability zones are configured.
+
+These routes ensure that traffic from the controller pods destined for amphora
+VMs on the tenant network is directed through the `octavia-link-router`.
+
+## Predictable IP Allocation for Health Manager and Rsyslog Pods
+
+The health manager pods need stable, well-known IP addresses on the provider
+network so that amphora VMs can send heartbeat messages to them. Similarly,
+rsyslog pods need stable IPs for log forwarding. The operator implements a
+"predictable IP" allocation scheme to achieve this.
+
+### IP Range Allocation
+
+A pool of 25 IP addresses is reserved on the provider subnet, starting
+immediately after the Neutron allocation pool (which itself starts after the NAD
+`range_end`). Using the example NAD values:
+
+```
+NAD range_end:              172.23.0.70
+Neutron pool:               172.23.0.71 - 172.23.0.96   (25 IPs)
+Predictable IP pool:        172.23.0.97 - 172.23.0.122  (25 IPs)
+```
+
+### Allocation Mechanism
+
+1. The operator lists all Kubernetes nodes matching the configured `nodeSelector`
+   (or all nodes if no selector is set).
+2. For each node, it allocates one IP for the health manager (`hm_<node-name>`)
+   and one for rsyslog (`rsyslog_<node-name>`).
+3. Allocations are stored in a ConfigMap named `octavia-hm-ports`. Existing
+   allocations are preserved across reconciliation loops to maintain IP
+   stability.
+
+### Pod IP Configuration
+
+When a health manager pod starts on a given node:
+
+1. The init container reads the node name from the `NODE_NAME` environment
+   variable (sourced from the downward API).
+2. It looks up `hm_<node-name>` in the `octavia-hm-ports` ConfigMap (mounted at
+   `/var/lib/hmports/`).
+3. A Python script (`setipalias.py`) uses `pyroute2` to add the predictable IP
+   as an alias on the `octavia` network interface (with a /32 mask for IPv4 or
+   /128 for IPv6).
+4. Another script (`octavia_hm_advertisement.py`) sends gratuitous ARP (or
+   equivalent IPv6 neighbor advertisement) for the alias IP so that the network
+   learns the new address immediately.
+
+### How Octavia Uses These IPs
+
+The predictable IPs are collected from the ConfigMap and written into the
+`octavia.conf` configuration file:
+
+```ini
+[health_manager]
+controller_ip_port_list=172.23.0.97:5555,172.23.0.98:5555,...
+```
+
+Each amphora sends periodic heartbeat messages (UDP port 5555) to every IP in
+this list, which is how the health manager monitors amphora liveness.
+
+Similarly, rsyslog IPs populate the log target configuration:
+
+```ini
+[amphora_agent]
+admin_log_targets=172.23.0.99:514,172.23.0.100:514,...
+tenant_log_targets=172.23.0.99:514,172.23.0.100:514,...
+```
+
+## Amphora Boot Network and Security Configuration
+
+When the operator provisions Octavia's configuration, it populates the
+`octavia.conf` template with the Neutron resource IDs discovered or created
+during management network setup:
+
+```ini
+[controller_worker]
+amp_boot_network_list=<lb-mgmt-net network ID>
+amp_secgroup_list=<lb-mgmt-sec-grp security group ID>
+amp_image_tag=amphora-image
+amp_ssh_key_name=octavia-ssh-key
+```
+
+- `amp_boot_network_list` is set to the `lb-mgmt-net` tenant network ID, which
+  is the network where new amphora VMs are booted.
+- `amp_secgroup_list` references the `lb-mgmt-sec-grp` security group, applied
+  to each amphora's port.
+- `amp_image_tag` is used to find the amphora image in Glance by tag.
+- `amp_ssh_key_name` references the Nova keypair used for SSH access to
+  amphorae.
+
+## Unmanaged Management Networks (`manageLbMgmtNetworks: false`)
+
+By default, the operator creates and manages all Neutron resources for the
+management network. However, in environments where the networking resources are
+pre-created or managed externally, the operator can be configured to discover
+existing resources instead.
+
+Setting `spec.lbMgmtNetwork.manageLbMgmtNetworks` to `false` in the Octavia CR
+causes the operator to query Neutron for existing resources by their well-known
+names (`lb-mgmt-net`, `lb-mgmt-subnet`, `octavia-link-router`,
+`lb-mgmt-sec-grp`) rather than creating them. The operator will still read the
+NAD for route information and configure pod routes and predictable IPs as
+normal.
+
+This mode is useful when:
+- Networking resources are managed by a separate automation tool.
+- Custom network topologies are required that differ from the operator's
+  defaults.
+- The management network was pre-created during an initial deployment and should
+  not be modified.
+
+## Availability Zone Support
+
+The operator supports creating per-availability-zone management networks for
+deployments that span multiple AZs (e.g. DCN/edge deployments).
+
+### Configuration
+
+The `spec.lbMgmtNetwork` section of the Octavia CR accepts:
+
+- `availabilityZones`: A list of availability zone names for Neutron resource
+  placement.
+- `availabilityZoneCIDRs`: A map of availability zone names to CIDRs (e.g.
+  `{"az1": "172.34.0.0/24", "az2": "172.35.0.0/24"}`).
+- `createDefaultLbMgmtNetwork`: When `false`, skips creating the default
+  (non-AZ) `lb-mgmt-net`. Useful in DCN mode where only AZ-specific networks
+  are needed.
+
+### Resources Created Per AZ
+
+For each availability zone with a configured CIDR, the operator creates:
+
+- A tenant network: `lb-mgmt-<az>-net`
+- A tenant subnet: `lb-mgmt-<az>-subnet` (with the AZ-specific CIDR)
+- A router port: `lb-mgmt-<az>-router-port` (connected to the shared
+  `octavia-link-router`)
+- Host routes on the AZ subnet pointing to the provider network via the
+  AZ-specific router port
+
+All AZ networks share the same `octavia-link-router` and
+`octavia-provider-net`. The extra CIDRs are passed to controller pods as
+`MGMT_CIDR0`, `MGMT_CIDR1`, etc., so routes are added for each AZ's tenant
+subnet.
 
 ## Running the Octavia Amphora Controller Pods on specific Nodes
 

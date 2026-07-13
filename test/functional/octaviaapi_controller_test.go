@@ -150,6 +150,34 @@ var _ = Describe("OctaviaAPI controller", func() {
 			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(namespace))
 			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
 
+			// Create OVNDBClusters before OctaviaAPI so the controller
+			// finds them on the first reconcile and enables OVN
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
 			spec["customServiceConfig"] = "[DEFAULT]\ndebug=True\n"
 			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
 
@@ -177,32 +205,6 @@ var _ = Describe("OctaviaAPI controller", func() {
 				}, mariadbv1.MariaDBAccountSpec{})
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
-
-			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.NBDBType,
-					}})
-			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
-
-			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.SBDBType,
-					}})
-			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
 		})
 
 		It("should set Service Config Ready Condition", func() {
@@ -429,6 +431,34 @@ var _ = Describe("OctaviaAPI controller", func() {
 				"applicationCredentialSecret": acSecretName,
 			}
 
+			// Create OVNDBClusters before OctaviaAPI so the controller
+			// finds them on the first reconcile and enables OVN
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
 			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
 
 			mariaDBDatabaseName := mariadb.CreateMariaDBDatabase(namespace, octavia.DatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
@@ -455,32 +485,6 @@ var _ = Describe("OctaviaAPI controller", func() {
 				}, mariadbv1.MariaDBAccountSpec{})
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
-
-			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.NBDBType,
-					}})
-			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
-
-			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.SBDBType,
-					}})
-			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
 		})
 
 		It("should render ApplicationCredential auth in octavia.conf", func() {
@@ -539,6 +543,35 @@ var _ = Describe("OctaviaAPI controller", func() {
 			spec["auth"] = map[string]any{
 				"applicationCredentialSecret": acSecretName,
 			}
+
+			// Create OVNDBClusters before OctaviaAPI so the controller
+			// finds them on the first reconcile and enables OVN
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
 			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
 
 			mariaDBDatabaseName := mariadb.CreateMariaDBDatabase(namespace, octavia.DatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
@@ -565,32 +598,6 @@ var _ = Describe("OctaviaAPI controller", func() {
 				}, mariadbv1.MariaDBAccountSpec{})
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
-
-			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.NBDBType,
-					}})
-			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
-
-			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
-				ovnv1.OVNDBClusterSpec{
-					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
-						DBType: ovnv1.SBDBType,
-					}})
-			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
-			DeferCleanup(k8sClient.Delete, ctx, ovndb)
-			Eventually(func(g Gomega) {
-				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
-				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
-			}).Should(Succeed())
-			ovn.SimulateOVNDBClusterReady(ovndbCluster)
 		})
 
 		It("should add the consumer finalizer to the AC secret", func() {
