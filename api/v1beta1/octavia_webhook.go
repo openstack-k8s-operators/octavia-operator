@@ -27,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/validation/field"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
-	"sigs.k8s.io/controller-runtime/pkg/webhook"
 	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
@@ -52,8 +51,6 @@ func SetupOctaviaDefaults(defaults OctaviaDefaults) {
 	octaviaDefaults = defaults
 	octavialog.Info("Octavia defaults initialized", "defaults", defaults)
 }
-
-var _ webhook.Defaulter = &Octavia{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *Octavia) Default() {
@@ -104,8 +101,6 @@ func (spec *OctaviaSpecCore) Default() {
 		spec.MessagingBus.Cluster = "rabbitmq"
 	}
 }
-
-var _ webhook.Validator = &Octavia{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for the type
 func (r *Octavia) ValidateCreate() (admission.Warnings, error) {
