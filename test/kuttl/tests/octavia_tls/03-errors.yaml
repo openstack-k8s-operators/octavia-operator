@@ -1,0 +1,56 @@
+#
+# Check for:
+#
+# No OctaviaAPI CR
+# No Deployment for OctaviaAPI CR
+# No Pods in octavia Deployment
+# No Octavia Services
+#
+apiVersion: octavia.openstack.org/v1beta1
+kind: Octavia
+metadata:
+  finalizers:
+  - openstack.org/octavia
+  name: octavia
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: octavia-api
+---
+# the openshift annotations can't be checked through the deployment above
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    openshift.io/scc: anyuid
+  labels:
+    service: octavia
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    endpoint: internal
+    service: octavia
+  name: octavia-internal
+spec:
+  ports:
+    - name: octavia-internal
+  selector:
+    service: octavia
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    endpoint: public
+    service: octavia
+  name: octavia-public
+spec:
+  ports:
+    - name: octavia-public
+  selector:
+    service: octavia
+  type: ClusterIP
