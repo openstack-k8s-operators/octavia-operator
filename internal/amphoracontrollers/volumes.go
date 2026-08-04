@@ -27,12 +27,12 @@ const (
 
 var (
 	// Files get mounted as root:root, but process is running as octavia
-	configMode int32 = 0644
+	configMode int32 = 0440
 )
 
 // GetVolumes returns the volumes required for amphora controller pods
 func GetVolumes(name string) []corev1.Volume {
-	var config0640AccessMode int32 = 0640
+	var config0440AccessMode int32 = 0440
 	return append(
 		octavia.GetVolumes(name),
 		corev1.Volume{
@@ -42,7 +42,7 @@ func GetVolumes(name string) []corev1.Volume {
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: octavia.HmConfigMap,
 					},
-					DefaultMode: &config0640AccessMode,
+					DefaultMode: &config0440AccessMode,
 				},
 			},
 		},
