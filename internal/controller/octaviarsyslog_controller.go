@@ -71,7 +71,7 @@ func (r *OctaviaRsyslogReconciler) GetLogger(ctx context.Context) logr.Logger {
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviarsyslogs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=octavia.openstack.org,resources=octaviarsyslogs/finalizers,verbs=update
 // +kubebuilder:rbac:groups=k8s.cni.cncf.io,resources=network-attachment-definitions,verbs=get;list;watch
-// +kubebuilder:rbac:groups="security.openshift.io",resourceNames=anyuid;privileged,resources=securitycontextconstraints,verbs=use
+// +kubebuilder:rbac:groups="security.openshift.io",resourceNames=anyuid;privileged;nonroot-v2,resources=securitycontextconstraints,verbs=use
 // +kubebuilder:rbac:groups="",resources=serviceaccounts,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=roles,verbs=get;list;watch;create;update
 // +kubebuilder:rbac:groups="rbac.authorization.k8s.io",resources=rolebindings,verbs=get;list;watch;create;update
