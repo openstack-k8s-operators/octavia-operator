@@ -16,13 +16,17 @@ limitations under the License.
 package octavia
 
 import (
+	"fmt"
+	"slices"
+
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // GetVolumes - service volumes
 func GetVolumes(name string) []corev1.Volume {
 	var scriptsVolumeDefaultMode int32 = 0755
-	var config0640AccessMode int32 = 0640
+	var config0440AccessMode int32 = 0440
 
 	return []corev1.Volume{
 		{
@@ -38,17 +42,12 @@ func GetVolumes(name string) []corev1.Volume {
 			Name: "config-data",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0640AccessMode,
+					DefaultMode: &config0440AccessMode,
 					SecretName:  name + "-config-data",
 				},
 			},
 		},
-		{
-			Name: "config-data-merged",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
-			},
-		},
+		volume.WritableDirVolume("config-data-merged"),
 	}
 }
 
@@ -73,8 +72,11 @@ func GetInitVolumeMounts() []corev1.VolumeMount {
 	}
 }
 
-// GetVolumeMounts - general VolumeMounts
-func GetVolumeMounts(serviceName string) []corev1.VolumeMount {
+// GetVolumeMounts - general VolumeMounts. Sources the final-path mounts from
+// the same "config-data-merged" EmptyDir the init container writes into --
+// the crudini merge itself is unchanged, only kolla's staging-to-final copy
+// step is replaced with these SubPath mounts.
+func GetVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
 			Name:      "scripts",
@@ -83,14 +85,41 @@ func GetVolumeMounts(serviceName string) []corev1.VolumeMount {
 		},
 		{
 			Name:      "config-data-merged",
-			MountPath: "/var/lib/config-data/merged",
-			ReadOnly:  false,
+			MountPath: "/etc/octavia/octavia.conf",
+			SubPath:   "octavia.conf",
+			ReadOnly:  true,
 		},
 		{
 			Name:      "config-data-merged",
-			MountPath: "/var/lib/kolla/config_files/config.json",
-			SubPath:   serviceName + "-config.json",
+			MountPath: "/etc/octavia/octavia.conf.d/custom.conf",
+			SubPath:   "custom.conf",
+			ReadOnly:  true,
+		},
+		{
+			Name:      "config-data-merged",
+			MountPath: "/etc/my.cnf",
+			SubPath:   "my.cnf",
 			ReadOnly:  true,
 		},
 	}
+}
+
+// GetConfigOverwriteVolumeMounts returns SubPath mounts that place each
+// DefaultConfigOverwrite key as an individual file under basePath, sourced
+// from the "config-data-merged" EmptyDir. Mirrors kolla's optional
+// policy.yaml-style overwrite copy without assuming the key always exists.
+func GetConfigOverwriteVolumeMounts(overwriteKeys []string, basePath string) []corev1.VolumeMount {
+	mounts := make([]corev1.VolumeMount, 0, len(overwriteKeys))
+	sorted := make([]string, len(overwriteKeys))
+	copy(sorted, overwriteKeys)
+	slices.Sort(sorted)
+	for _, key := range sorted {
+		mounts = append(mounts, corev1.VolumeMount{
+			Name:      "config-data-merged",
+			MountPath: fmt.Sprintf("%s/%s", basePath, key),
+			SubPath:   key,
+			ReadOnly:  true,
+		})
+	}
+	return mounts
 }

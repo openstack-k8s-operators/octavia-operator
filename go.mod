@@ -24,6 +24,7 @@ require (
 
 require (
 	github.com/google/uuid v1.6.0
+	github.com/openstack-k8s-operators/lib-common/modules/serviceuser v0.0.0-00010101000000-000000000000
 	github.com/openstack-k8s-operators/lib-common/modules/test v0.6.1-0.20260725150835-623a52fe0391
 	golang.org/x/crypto v0.54.0
 	gopkg.in/ini.v1 v1.67.3
@@ -144,3 +145,7 @@ replace k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250318190949-c8a335a
 
 // pin to avoid yaml module conflict (go.yaml.in/yaml/v3 vs gopkg.in/yaml.v3)
 replace github.com/google/gnostic-models => github.com/google/gnostic-models v0.6.9 //allow-merging
+
+replace github.com/openstack-k8s-operators/lib-common/modules/common => github.com/stuggi/lib-common/modules/common v0.0.0-20260807111253-08c9a0504119
+
+replace github.com/openstack-k8s-operators/lib-common/modules/serviceuser => github.com/stuggi/lib-common/modules/serviceuser v0.0.0-20260807111253-08c9a0504119

@@ -20,6 +20,10 @@ import (
 
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
+	"github.com/openstack-k8s-operators/lib-common/modules/serviceuser"
+
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,20 +42,15 @@ const (
 )
 
 func getVolumes(name string) []corev1.Volume {
-	var config0640AccessMode int32 = 0640
+	var config0440AccessMode int32 = 0440
 
 	return []corev1.Volume{
-		{
-			Name: "amphora-image",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
-			},
-		},
+		volume.WritableDirVolume("amphora-image"),
 		{
 			Name: "httpd-config",
 			VolumeSource: corev1.VolumeSource{
 				Secret: &corev1.SecretVolumeSource{
-					DefaultMode: &config0640AccessMode,
+					DefaultMode: &config0440AccessMode,
 					SecretName:  name + "-config-data",
 				},
 			},
@@ -111,6 +110,7 @@ func ImageUploadDeployment(
 				Spec: corev1.PodSpec{
 					ServiceAccountName:           instance.RbacResourceName(),
 					AutomountServiceAccountToken: ptr.To(false),
+					SecurityContext:              pod.RestrictivePodSecurityContext(serviceuser.OctaviaUID, serviceuser.OctaviaGID),
 					Containers: []corev1.Container{
 						{
 							Name: "octavia-amphora-httpd",
@@ -120,6 +120,7 @@ func ImageUploadDeployment(
 							Args:            args,
 							Image:           instance.Spec.ApacheContainerImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
+							SecurityContext: pod.RestrictiveSecurityContext(serviceuser.OctaviaUID, serviceuser.OctaviaGID),
 							VolumeMounts:    getVolumeMounts(),
 							Resources:       instance.Spec.Resources,
 							// TODO(gthiemonge) do we need probes?
@@ -145,6 +146,12 @@ func ImageUploadDeployment(
 }
 
 func initContainer(init ImageUploadDetails) []corev1.Container {
+	// Kept on root: this container's actual copy logic lives in
+	// AmphoraImageContainerImage's own default entrypoint (not this repo's
+	// code), and there's no visibility into whether it can read its bundled
+	// amphora image as a non-root UID. Unlike the main container's own
+	// cp/run-httpd command below, this isn't something we can verify safe to
+	// change without a real cluster.
 	runAsUser := int64(0)
 	envs := []corev1.EnvVar{
 		{
@@ -159,7 +166,8 @@ func initContainer(init ImageUploadDetails) []corev1.Container {
 			Image:           init.ContainerImage,
 			ImagePullPolicy: corev1.PullIfNotPresent,
 			SecurityContext: &corev1.SecurityContext{
-				RunAsUser: &runAsUser,
+				RunAsUser:    &runAsUser,
+				RunAsNonRoot: ptr.To(false),
 			},
 			Env:          envs,
 			VolumeMounts: getInitVolumeMounts(),
