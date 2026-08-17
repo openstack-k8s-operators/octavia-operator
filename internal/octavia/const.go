@@ -55,4 +55,6 @@ const (
 
 	// ACConsumerFinalizer is added to AC secrets that octavia is actively consuming
 	ACConsumerFinalizer = "openstack.org/octaviaapi-ac-consumer"
+	// TransportConsumerFinalizer is added to transport URL secrets that octavia is actively consuming
+	TransportConsumerFinalizer = "openstack.org/octavia-transport-consumer"
 )

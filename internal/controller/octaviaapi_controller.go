@@ -35,6 +35,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/object"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
@@ -68,8 +69,9 @@ import (
 // OctaviaAPIReconciler reconciles a OctaviaAPI object
 type OctaviaAPIReconciler struct {
 	client.Client
-	Kclient kubernetes.Interface
-	Scheme  *runtime.Scheme
+	Kclient   kubernetes.Interface
+	Scheme    *runtime.Scheme
+	APIReader client.Reader
 }
 
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
@@ -476,7 +478,7 @@ func (r *OctaviaAPIReconciler) reconcileDelete(ctx context.Context, instance *oc
 		instance.Status.ApplicationCredentialSecret,
 		instance.Spec.Auth.ApplicationCredentialSecret,
 	} {
-		if err := keystonev1.RemoveACSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
 			secretName, octavia.ACConsumerFinalizer); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -797,9 +799,8 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	// The old secret's finalizer is removed later (after all services deploy)
 	// so that rapid rotations don't revoke a credential still in use by pods.
 	if instance.Spec.Auth.ApplicationCredentialSecret != "" {
-		if err := keystonev1.ManageACSecretFinalizer(ctx, helper, instance.Namespace,
+		if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
 			instance.Spec.Auth.ApplicationCredentialSecret,
-			"",
 			octavia.ACConsumerFinalizer); err != nil {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.ServiceConfigReadyCondition,
@@ -940,6 +941,9 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 		return ctrlResult, nil
 	}
 
+	expectedHash := instance.Annotations["openstack.org/input-secret-hash"]
+
+	ready := false
 	deploy := depl.GetDeployment()
 	if deploy.Generation == deploy.Status.ObservedGeneration {
 		instance.Status.ReadyCount = deploy.Status.ReadyReplicas
@@ -975,14 +979,20 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 
 			return ctrl.Result{}, err
 		}
-		// Mark the Deployment as Ready only if the number of Replicas is equals
-		// to the Deployed instances (ReadyCount), and the the Status.Replicas
-		// match Status.ReadyReplicas. If a deployment update is in progress,
-		// Replicas > ReadyReplicas.
-		// In addition, make sure the controller sees the last Generation
-		// by comparing it with the ObservedGeneration.
+
 		if deployment.IsReady(deploy) {
+			ready, err = deployment.IsReadyForInput(ctx, r.APIReader,
+				types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace},
+				inputHash)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if ready {
 			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+			if expectedHash != "" {
+				instance.Status.AppliedInputSecretHash = expectedHash
+			}
 		} else {
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.DeploymentReadyCondition,
@@ -993,23 +1003,30 @@ func (r *OctaviaAPIReconciler) reconcileNormal(ctx context.Context, instance *oc
 	}
 	// create Deployment - end
 
-	// Manage the old AC secret's finalizer and status tracking.
-	// On rotation (old != new), only remove the old secret's finalizer after
-	// all sub-services are ready with the new credentials. This prevents
-	// premature revocation during rapid rotations.
-	isRotation := instance.Status.ApplicationCredentialSecret != "" && instance.Status.ApplicationCredentialSecret != instance.Spec.Auth.ApplicationCredentialSecret
+	acSecretName, err := object.FinalizeSecretRotation(
+		ctx, helper, instance.Namespace,
+		instance.Status.ApplicationCredentialSecret,
+		instance.Spec.Auth.ApplicationCredentialSecret,
+		octavia.ACConsumerFinalizer,
+		ready,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	instance.Status.ApplicationCredentialSecret = acSecretName
 
-	if isRotation {
-		allServicesReady := instance.Status.Conditions.AllSubConditionIsTrue()
-		if allServicesReady {
-			if err := keystonev1.RemoveACSecretConsumerFinalizer(ctx, helper, instance.Namespace,
-				instance.Status.ApplicationCredentialSecret, octavia.ACConsumerFinalizer); err != nil {
-				return ctrl.Result{}, err
-			}
-			instance.Status.ApplicationCredentialSecret = instance.Spec.Auth.ApplicationCredentialSecret
-		}
-	} else {
-		instance.Status.ApplicationCredentialSecret = instance.Spec.Auth.ApplicationCredentialSecret
+	// Self-heal consumer finalizers stranded on secrets superseded during
+	// rapid rotation (A -> B -> C before the workload became ready):
+	// FinalizeSecretRotation only ever releases the single tracked "old"
+	// secret, so any intermediate secret's finalizer would otherwise leak.
+	// keep enumerates every secret that legitimately still holds the
+	// finalizer; all others in the namespace are pruned.
+	if err := object.PruneSecretConsumerFinalizers(
+		ctx, helper, instance.Namespace, octavia.ACConsumerFinalizer,
+		instance.Status.ApplicationCredentialSecret,
+		instance.Spec.Auth.ApplicationCredentialSecret,
+	); err != nil {
+		return ctrl.Result{}, err
 	}
 
 	// We reached the end of the Reconcile, update the Ready condition based on
