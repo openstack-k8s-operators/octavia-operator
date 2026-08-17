@@ -22,7 +22,9 @@ import (
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/deployment"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/helper"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -85,6 +87,35 @@ func ensureTopology(
 		)
 	}
 	return topology, nil
+}
+
+func isDaemonSetReadyForInput(
+	ctx context.Context,
+	reader client.Reader,
+	name types.NamespacedName,
+	configHash string,
+) (bool, error) {
+	ds := &appsv1.DaemonSet{}
+	if err := reader.Get(ctx, name, ds); err != nil {
+		return false, err
+	}
+
+	if ds.Status.DesiredNumberScheduled == 0 ||
+		ds.Status.NumberReady != ds.Status.DesiredNumberScheduled ||
+		ds.Status.UpdatedNumberScheduled != ds.Status.DesiredNumberScheduled ||
+		ds.Generation != ds.Status.ObservedGeneration {
+		return false, nil
+	}
+
+	for _, c := range ds.Spec.Template.Spec.Containers {
+		for _, e := range c.Env {
+			if e.Name == deployment.ConfigHashEnvVar && e.Value == configHash {
+				return true, nil
+			}
+		}
+	}
+
+	return false, nil
 }
 
 // PodLabelingConfig contains configuration for pod labeling

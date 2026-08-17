@@ -65,8 +65,9 @@ import (
 // OctaviaAmphoraControllerReconciler reconciles an OctaviaAmmphoraController object
 type OctaviaAmphoraControllerReconciler struct {
 	client.Client
-	Kclient kubernetes.Interface
-	Scheme  *runtime.Scheme
+	Kclient   kubernetes.Interface
+	Scheme    *runtime.Scheme
+	APIReader client.Reader
 }
 
 // OctaviaTemplateVars structure that contains generated parameters for the service config files
@@ -460,6 +461,8 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 		return ctrlResult, nil
 	}
 
+	expectedHash := instance.Annotations["openstack.org/input-secret-hash"]
+
 	if dset.GetDaemonSet().Generation == dset.GetDaemonSet().Status.ObservedGeneration {
 		instance.Status.DesiredNumberScheduled = dset.GetDaemonSet().Status.DesiredNumberScheduled
 		// TODO(gthiemonge) change for NumberReady?
@@ -492,8 +495,20 @@ func (r *OctaviaAmphoraControllerReconciler) reconcileNormal(ctx context.Context
 			return ctrl.Result{RequeueAfter: time.Duration(1) * time.Second}, nil
 		}
 
+		ready := false
 		if instance.Status.ReadyCount == instance.Status.DesiredNumberScheduled {
+			ready, err = isDaemonSetReadyForInput(ctx, r.APIReader,
+				types.NamespacedName{Name: dset.GetDaemonSet().Name, Namespace: dset.GetDaemonSet().Namespace},
+				inputHash)
+			if err != nil {
+				return ctrl.Result{}, err
+			}
+		}
+		if ready {
 			instance.Status.Conditions.MarkTrue(condition.DeploymentReadyCondition, condition.DeploymentReadyMessage)
+			if expectedHash != "" {
+				instance.Status.AppliedInputSecretHash = expectedHash
+			}
 		}
 	}
 	// create DaemonSet - end
