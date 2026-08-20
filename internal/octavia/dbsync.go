@@ -19,6 +19,8 @@ import (
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,11 +38,15 @@ func DbSyncJob(
 	labels map[string]string,
 	annotations map[string]string,
 ) *batchv1.Job {
-	volumeMounts := GetVolumeMounts("db-sync")
+	volumeMounts := GetVolumeMounts()
+	overwriteKeys := make([]string, 0, len(instance.Spec.DefaultConfigOverwrite))
+	for key := range instance.Spec.DefaultConfigOverwrite {
+		overwriteKeys = append(overwriteKeys, key)
+	}
+	volumeMounts = append(volumeMounts, GetConfigOverwriteVolumeMounts(overwriteKeys, "/etc/octavia")...)
 	volumes := GetVolumes(instance.Name)
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 
 	// add CA cert if defined
 	if instance.Spec.OctaviaAPI.TLS.CaBundleSecretName != "" {
@@ -65,17 +71,18 @@ func DbSyncJob(
 					Annotations: annotations,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						FSGroup: ptr.To(OctaviaUID),
-					},
+					SecurityContext:              pod.RestrictivePodSecurityContext(users.OctaviaUID, users.OctaviaGID),
 					RestartPolicy:                corev1.RestartPolicyOnFailure,
 					ServiceAccountName:           instance.RbacResourceName(),
 					AutomountServiceAccountToken: ptr.To(false),
 					Containers: []corev1.Container{
 						{
-							Name:            ServiceName + "-db-sync",
+							Name: ServiceName + "-db-sync",
+							Command: []string{
+								"/usr/local/bin/container-scripts/bootstrap.sh",
+							},
 							Image:           instance.Spec.OctaviaAPI.ContainerImage,
-							SecurityContext: GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:    volumeMounts,
 						},
@@ -84,7 +91,7 @@ func DbSyncJob(
 						{
 							Name:            "init",
 							Image:           instance.Spec.OctaviaAPI.ContainerImage,
-							SecurityContext: GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Command: []string{
 								"/bin/bash",
 							},

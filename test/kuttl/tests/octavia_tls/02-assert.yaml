@@ -98,11 +98,10 @@ spec:
               topologyKey: kubernetes.io/hostname
             weight: 100
       containers:
-      - args:
-        - -c
-        - /usr/local/bin/kolla_start
-        command:
-        - /bin/bash
+      - command:
+        - /usr/sbin/httpd
+        args:
+        - -DFOREGROUND
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -129,37 +128,58 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
-        - mountPath: /var/lib/config-data/merged
-          name: config-data-merged
-        - mountPath: /var/lib/kolla/config_files/config.json
+        - mountPath: /etc/octavia/octavia.conf
           name: config-data-merged
           readOnly: true
-          subPath: octavia-api-config.json
+          subPath: octavia.conf
+        - mountPath: /etc/octavia/octavia.conf.d/custom.conf
+          name: config-data-merged
+          readOnly: true
+          subPath: custom.conf
+        - mountPath: /etc/my.cnf
+          name: config-data-merged
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /run/octavia
           name: octavia-run
+        - mountPath: /etc/httpd/conf/httpd.conf
+          name: config-data-merged
+          readOnly: true
+          subPath: httpd.conf
+        - mountPath: /etc/httpd/conf.d/ssl.conf
+          name: config-data-merged
+          readOnly: true
+          subPath: ssl.conf
+        - mountPath: /run/httpd
+          name: run-httpd
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
           subPath: tls-ca-bundle.pem
-        - mountPath: /var/lib/config-data/tls/certs/internal.crt
+        - mountPath: /etc/pki/tls/certs/internal.crt
           name: internal-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/internal.key
+        - mountPath: /etc/pki/tls/private/internal.key
           name: internal-tls-certs
           readOnly: true
           subPath: tls.key
-        - mountPath: /var/lib/config-data/tls/certs/public.crt
+        - mountPath: /etc/pki/tls/certs/public.crt
           name: public-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/public.key
+        - mountPath: /etc/pki/tls/private/public.key
           name: public-tls-certs
           readOnly: true
           subPath: tls.key
-      - env:
+      - command:
+        - /usr/bin/octavia-driver-agent
+        - --config-file
+        - /etc/octavia/octavia.conf
+        - --config-dir
+        - /etc/octavia/octavia.conf.d
+        env:
         - name: CONFIG_HASH
-        - name: KOLLA_CONFIG_STRATEGY
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -186,31 +206,37 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
-        - mountPath: /var/lib/config-data/merged
-          name: config-data-merged
-        - mountPath: /var/lib/kolla/config_files/config.json
+        - mountPath: /etc/octavia/octavia.conf
           name: config-data-merged
           readOnly: true
-          subPath: octavia-driver-agent-config.json
+          subPath: octavia.conf
+        - mountPath: /etc/octavia/octavia.conf.d/custom.conf
+          name: config-data-merged
+          readOnly: true
+          subPath: custom.conf
+        - mountPath: /etc/my.cnf
+          name: config-data-merged
+          readOnly: true
+          subPath: my.cnf
         - mountPath: /run/octavia
           name: octavia-run
         - mountPath: /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           name: combined-ca-bundle
           readOnly: true
           subPath: tls-ca-bundle.pem
-        - mountPath: /var/lib/config-data/tls/certs/internal.crt
+        - mountPath: /etc/pki/tls/certs/internal.crt
           name: internal-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/internal.key
+        - mountPath: /etc/pki/tls/private/internal.key
           name: internal-tls-certs
           readOnly: true
           subPath: tls.key
-        - mountPath: /var/lib/config-data/tls/certs/public.crt
+        - mountPath: /etc/pki/tls/certs/public.crt
           name: public-tls-certs
           readOnly: true
           subPath: tls.crt
-        - mountPath: /var/lib/config-data/tls/private/public.key
+        - mountPath: /etc/pki/tls/private/public.key
           name: public-tls-certs
           readOnly: true
           subPath: tls.key
@@ -243,11 +269,13 @@ spec:
       - name: config-data
         secret:
           secretName: octavia-api-config-data
-          defaultMode: 416
+          defaultMode: 288
       - emptyDir: {}
         name: config-data-merged
       - emptyDir: {}
         name: octavia-run
+      - emptyDir: {}
+        name: run-httpd
       - name: combined-ca-bundle
         secret:
           secretName: combined-ca-bundle
@@ -269,7 +297,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   annotations:
-    openshift.io/scc: anyuid
+    openshift.io/scc: nonroot-v2
   labels:
     service: octavia
 ---

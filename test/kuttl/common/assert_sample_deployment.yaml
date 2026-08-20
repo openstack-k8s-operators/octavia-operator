@@ -100,11 +100,10 @@ spec:
             weight: 100
       automountServiceAccountToken: false
       containers:
-      - args:
-        - -c
-        - /usr/local/bin/kolla_start
-        command:
-        - /bin/bash
+      - command:
+        - /usr/sbin/httpd
+        args:
+        - -DFOREGROUND
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -131,9 +130,14 @@ spec:
           runAsUser: 42437
           runAsGroup: 42437
           runAsNonRoot: true
-      - env:
+      - command:
+        - /usr/bin/octavia-driver-agent
+        - --config-file
+        - /etc/octavia/octavia.conf
+        - --config-dir
+        - /etc/octavia/octavia.conf.d
+        env:
         - name: CONFIG_HASH
-        - name: KOLLA_CONFIG_STRATEGY
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -181,7 +185,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   annotations:
-    openshift.io/scc: anyuid
+    openshift.io/scc: nonroot-v2
   labels:
     service: octavia
 ---

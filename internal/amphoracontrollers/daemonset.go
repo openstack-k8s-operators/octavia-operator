@@ -24,6 +24,8 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
+	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
 
@@ -32,6 +34,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
 )
+
+// controllerBinaryName maps an OctaviaAmphoraController role to the real
+// octavia-<role> binary name -- health-manager is the one exception whose
+// binary name doesn't match its role string exactly.
+func controllerBinaryName(role string) string {
+	if role == octaviav1.HealthManager {
+		return "octavia-health-manager"
+	}
+	return "octavia-" + role
+}
 
 const (
 	// InitContainerCommand -
@@ -55,8 +67,13 @@ func DaemonSet(
 	certsSecretName := fmt.Sprintf("%s-certs-secret", parentOctaviaName)
 	volumes = append(volumes, GetCertVolume(certsSecretName)...)
 
-	volumeMounts := octavia.GetVolumeMounts(serviceName)
+	volumeMounts := octavia.GetVolumeMounts()
 	volumeMounts = append(volumeMounts, GetCertVolumeMount()...)
+	overwriteKeys := make([]string, 0, len(instance.Spec.DefaultConfigOverwrite))
+	for key := range instance.Spec.DefaultConfigOverwrite {
+		overwriteKeys = append(overwriteKeys, key)
+	}
+	volumeMounts = append(volumeMounts, octavia.GetConfigOverwriteVolumeMounts(overwriteKeys, "/etc/octavia")...)
 
 	livenessProbe := &corev1.Probe{
 		// TODO might need tuning
@@ -89,7 +106,6 @@ func DaemonSet(
 
 	envVars := map[string]env.Setter{}
 
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 	envVars["NODE_NAME"] = env.DownwardAPI("spec.nodeName")
 
@@ -155,17 +171,21 @@ func DaemonSet(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						FSGroup: ptr.To(octavia.OctaviaUID),
-					},
+					SecurityContext:               pod.RestrictivePodSecurityContext(users.OctaviaUID, users.OctaviaGID),
 					TerminationGracePeriodSeconds: &terminationGracePeriodSeconds,
 					ServiceAccountName:            instance.Spec.ServiceAccount,
 					AutomountServiceAccountToken:  ptr.To(false),
 					Containers: []corev1.Container{
 						{
-							Name:            serviceName,
+							Name: serviceName,
+							Command: []string{
+								"/usr/bin/" + controllerBinaryName(instance.Spec.Role),
+								"--config-file", "/usr/share/octavia/octavia-dist.conf",
+								"--config-file", "/etc/octavia/octavia.conf",
+								"--config-dir", "/etc/octavia/octavia.conf.d",
+							},
 							Image:           instance.Spec.ContainerImage,
-							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:    volumeMounts,
 							Resources:       instance.Spec.Resources,
@@ -179,10 +199,11 @@ func DaemonSet(
 							Image: instance.Spec.ContainerImage,
 							SecurityContext: &corev1.SecurityContext{
 								Capabilities: &corev1.Capabilities{
+									Drop: []corev1.Capability{"ALL"},
 									Add:  capabilities,
-									Drop: []corev1.Capability{},
 								},
-								RunAsUser: ptr.To(int64(0)),
+								RunAsUser:    ptr.To(int64(0)),
+								RunAsNonRoot: ptr.To(false),
 							},
 							Command: []string{
 								"/bin/bash",

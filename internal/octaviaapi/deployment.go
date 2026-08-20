@@ -23,8 +23,11 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/affinity"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/env"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/pod"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/tls"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
+	"github.com/openstack-k8s-operators/lib-common/modules/users"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
 
@@ -36,9 +39,6 @@ import (
 )
 
 const (
-	// ServiceCommand -
-	ServiceCommand = "/usr/local/bin/kolla_start"
-
 	// InitContainerCommand -
 	InitContainerCommand = "/usr/local/bin/container-scripts/init.sh"
 )
@@ -65,7 +65,6 @@ func Deployment(
 		InitialDelaySeconds: 5,
 	}
 
-	args := []string{"-c", ServiceCommand}
 	//
 	// https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 	//
@@ -85,8 +84,33 @@ func Deployment(
 
 	// create Volume and VolumeMounts
 	volumes := getVolumes(instance.Name)
-	volumeMounts := getVolumeMounts("octavia-api")
-	volumeMountsDriverAgent := getVolumeMounts("octavia-driver-agent")
+	volumeMounts := getVolumeMounts()
+	volumeMountsDriverAgent := getVolumeMounts()
+
+	overwriteKeys := make([]string, 0, len(instance.Spec.DefaultConfigOverwrite))
+	for key := range instance.Spec.DefaultConfigOverwrite {
+		overwriteKeys = append(overwriteKeys, key)
+	}
+	overwriteMounts := octavia.GetConfigOverwriteVolumeMounts(overwriteKeys, "/etc/octavia")
+	volumeMounts = append(volumeMounts, overwriteMounts...)
+	volumeMountsDriverAgent = append(volumeMountsDriverAgent, overwriteMounts...)
+
+	volumes = append(volumes, volume.WritableDirVolume(volume.RunHttpdVolumeName))
+	volumeMounts = append(volumeMounts,
+		corev1.VolumeMount{
+			Name:      "config-data-merged",
+			MountPath: "/etc/httpd/conf/httpd.conf",
+			SubPath:   "httpd.conf",
+			ReadOnly:  true,
+		},
+		corev1.VolumeMount{
+			Name:      "config-data-merged",
+			MountPath: "/etc/httpd/conf.d/ssl.conf",
+			SubPath:   "ssl.conf",
+			ReadOnly:  true,
+		},
+		volume.WritableDirVolumeMount(volume.RunHttpdVolumeName, volume.RunHttpdMountPath),
+	)
 
 	// add CA cert if defined
 	if instance.Spec.TLS.CaBundleSecretName != "" {
@@ -110,6 +134,10 @@ func Deployment(
 			if err != nil {
 				return nil, err
 			}
+			certMount := fmt.Sprintf("/etc/pki/tls/certs/%s.crt", endpt.String())
+			keyMount := fmt.Sprintf("/etc/pki/tls/private/%s.key", endpt.String())
+			svc.CertMount = &certMount
+			svc.KeyMount = &keyMount
 			volumes = append(volumes, svc.CreateVolume(endpt.String()))
 			volumeMounts = append(volumeMounts, svc.CreateVolumeMounts(endpt.String())...)
 			volumeMountsDriverAgent = append(volumeMountsDriverAgent, svc.CreateVolumeMounts(endpt.String())...)
@@ -127,12 +155,10 @@ func Deployment(
 	}
 
 	envVars := map[string]env.Setter{}
-	envVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	envVars["CONFIG_HASH"] = env.SetValue(configHash)
 
 	// TODO: reduce code duplication.
 	agentEnvVars := map[string]env.Setter{}
-	agentEnvVars["KOLLA_CONFIG_STRATEGY"] = env.SetValue("COPY_ALWAYS")
 	agentEnvVars["CONFIG_HASH"] = env.SetValue(configHash)
 
 	serviceName := fmt.Sprintf("%s-api", octavia.ServiceName)
@@ -158,20 +184,18 @@ func Deployment(
 					Labels:      labels,
 				},
 				Spec: corev1.PodSpec{
-					SecurityContext: &corev1.PodSecurityContext{
-						FSGroup: ptr.To(octavia.OctaviaUID),
-					},
+					SecurityContext:              pod.RestrictivePodSecurityContext(users.OctaviaUID, users.OctaviaGID),
 					ServiceAccountName:           instance.Spec.ServiceAccount,
 					AutomountServiceAccountToken: ptr.To(false),
 					Containers: []corev1.Container{
 						{
 							Name: serviceName,
 							Command: []string{
-								"/bin/bash",
+								"/usr/sbin/httpd",
 							},
-							Args:            args,
+							Args:            []string{"-DFOREGROUND"},
 							Image:           instance.Spec.ContainerImage,
-							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
 							VolumeMounts:    volumeMounts,
 							Resources:       instance.Spec.Resources,
@@ -179,9 +203,14 @@ func Deployment(
 							LivenessProbe:   livenessProbe,
 						},
 						{
-							Name:            fmt.Sprintf("%s-provider-agent", serviceName),
+							Name: fmt.Sprintf("%s-provider-agent", serviceName),
+							Command: []string{
+								"/usr/bin/octavia-driver-agent",
+								"--config-file", "/etc/octavia/octavia.conf",
+								"--config-dir", "/etc/octavia/octavia.conf.d",
+							},
 							Image:           instance.Spec.ContainerImage,
-							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, agentEnvVars),
 							VolumeMounts:    volumeMountsDriverAgent,
 							Resources:       instance.Spec.Resources,
@@ -193,7 +222,7 @@ func Deployment(
 						{
 							Name:            "init",
 							Image:           instance.Spec.ContainerImage,
-							SecurityContext: octavia.GetOctaviaSecurityContext(),
+							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Command: []string{
 								"/bin/bash",
 							},

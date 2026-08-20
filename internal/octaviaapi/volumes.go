@@ -16,36 +16,23 @@ limitations under the License.
 package octaviaapi
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
 	corev1 "k8s.io/api/core/v1"
 )
 
 // getVolumes - service volumes
 func getVolumes(name string) []corev1.Volume {
-
-	volumes := []corev1.Volume{
-		{
-			Name: "octavia-run",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{Medium: ""},
-			},
-		},
-	}
-
-	return append(octavia.GetVolumes(name), volumes...)
+	return append(octavia.GetVolumes(name),
+		volume.WritableDirVolume("octavia-run"),
+	)
 }
 
 // getVolumeMounts - general VolumeMounts
-func getVolumeMounts(serviceName string) []corev1.VolumeMount {
-
+func getVolumeMounts() []corev1.VolumeMount {
 	// The API pod has an extra volume so the API and the provider agent can
 	// communicate with each other.
-	volumeMounts := []corev1.VolumeMount{
-		{
-			Name:      "octavia-run",
-			MountPath: "/run/octavia",
-			ReadOnly:  false,
-		},
-	}
-	return append(octavia.GetVolumeMounts(serviceName), volumeMounts...)
+	return append(octavia.GetVolumeMounts(),
+		volume.WritableDirVolumeMount("octavia-run", "/run/octavia"),
+	)
 }
