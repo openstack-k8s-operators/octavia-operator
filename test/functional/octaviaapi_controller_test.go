@@ -404,6 +404,138 @@ var _ = Describe("OctaviaAPI controller", func() {
 
 	// Deployment
 
+	When("OVN TLS is enabled", func() {
+		const ovnCertSecretName = "octavia-ovndb-tls-certs" //nolint:gosec // G101 -- Test constant, not a credential
+
+		BeforeEach(func() {
+			keystoneAPIName := keystone.CreateKeystoneAPI(namespace)
+			DeferCleanup(keystone.DeleteKeystoneAPI, keystoneAPIName)
+			keystoneInternalEndpoint := fmt.Sprintf("http://keystone-for-%s-internal", octaviaAPIName.Name)
+			keystonePublicEndpoint := fmt.Sprintf("http://keystone-for-%s-public", octaviaAPIName.Name)
+			SimulateKeystoneReady(keystoneAPIName, keystonePublicEndpoint, keystoneInternalEndpoint)
+
+			DeferCleanup(k8sClient.Delete, ctx, CreateOctaviaSecret(namespace))
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(transportURLSecretName))
+
+			// Secret holding the OvnDb client cert consumed via the TLS.Ovn spec
+			ovnCertSecret := th.CreateSecret(
+				types.NamespacedName{Namespace: namespace, Name: ovnCertSecretName},
+				map[string][]byte{
+					"tls.crt": []byte("ovndb cert data"),
+					"tls.key": []byte("ovndb key data"),
+					"ca.crt":  []byte("ovndb ca cert data"),
+				},
+			)
+			DeferCleanup(k8sClient.Delete, ctx, ovnCertSecret)
+			spec["tls"] = map[string]any{
+				"ovn": map[string]any{
+					"secretName": ovnCertSecretName,
+				},
+			}
+
+			// Create OVNDBClusters before OctaviaAPI so the controller
+			// finds them on the first reconcile and enables OVN
+			ovndbCluster := ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.NBDBType,
+					}})
+			ovndb := ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNNBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			ovndbCluster = ovn.CreateOVNDBCluster(nil, namespace,
+				ovnv1.OVNDBClusterSpec{
+					OVNDBClusterSpecCore: ovnv1.OVNDBClusterSpecCore{
+						DBType: ovnv1.SBDBType,
+					}})
+			ovndb = ovn.GetOVNDBCluster(ovndbCluster)
+			DeferCleanup(k8sClient.Delete, ctx, ovndb)
+			Eventually(func(g Gomega) {
+				ovndb.Status.InternalDBAddress = OVNSBDBEndpoint
+				g.Expect(k8sClient.Status().Update(ctx, ovndb)).To(Succeed())
+			}).Should(Succeed())
+			ovn.SimulateOVNDBClusterReady(ovndbCluster)
+
+			DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, spec))
+
+			mariaDBDatabaseName := mariadb.CreateMariaDBDatabase(namespace, octavia.DatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase := mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			octaviaAPI := GetOctaviaAPI(octaviaAPIName)
+			apiMariaDBAccount, apiMariaDBSecret := mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.DatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+
+			mariaDBDatabaseName = mariadb.CreateMariaDBDatabase(namespace, octavia.PersistenceDatabaseCRName, mariadbv1.MariaDBDatabaseSpec{})
+			mariaDBDatabase = mariadb.GetMariaDBDatabase(mariaDBDatabaseName)
+			DeferCleanup(k8sClient.Delete, ctx, mariaDBDatabase)
+
+			apiMariaDBAccount, apiMariaDBSecret = mariadb.CreateMariaDBAccountAndSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      octaviaAPI.Spec.PersistenceDatabaseAccount,
+				}, mariadbv1.MariaDBAccountSpec{})
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBAccount)
+			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
+		})
+
+		It("should mount the OvnDb certs at the paths referenced in octavia.conf", func() {
+			octaviaAPI := GetOctaviaAPI(octaviaAPIName)
+			mariadb.SimulateMariaDBAccountCompleted(types.NamespacedName{
+				Namespace: namespace,
+				Name:      octaviaAPI.Spec.DatabaseAccount,
+			})
+			mariadb.SimulateMariaDBAccountCompleted(types.NamespacedName{
+				Namespace: namespace,
+				Name:      octaviaAPI.Spec.PersistenceDatabaseAccount,
+			})
+			mariadb.SimulateMariaDBDatabaseCompleted(types.NamespacedName{
+				Namespace: namespace,
+				Name:      octavia.DatabaseCRName,
+			})
+			mariadb.SimulateMariaDBDatabaseCompleted(types.NamespacedName{
+				Namespace: namespace,
+				Name:      octavia.PersistenceDatabaseCRName,
+			})
+
+			// The mount dst must match the ovn_{nb,sb}_* paths in the
+			// octavia.conf template so the certs land where the config
+			// (and both consuming containers) expect them.
+			expectedMounts := map[string]string{
+				"/etc/pki/tls/certs/ovndb.crt":   "tls.crt",
+				"/etc/pki/tls/private/ovndb.key": "tls.key",
+				"/etc/pki/tls/certs/ovndbca.crt": "ca.crt",
+			}
+
+			Eventually(func(g Gomega) {
+				deployment := th.GetDeployment(types.NamespacedName{
+					Namespace: namespace,
+					Name:      "octavia-api",
+				})
+				for _, container := range deployment.Spec.Template.Spec.Containers {
+					mounts := map[string]string{}
+					for _, vm := range container.VolumeMounts {
+						mounts[vm.MountPath] = vm.SubPath
+					}
+					for path, subPath := range expectedMounts {
+						g.Expect(mounts).To(HaveKeyWithValue(path, subPath),
+							fmt.Sprintf("container %q missing OvnDb cert mount %q", container.Name, path))
+					}
+				}
+			}, timeout, interval).Should(Succeed())
+		})
+	})
+
 	When("an ApplicationCredential is created for Octavia", func() {
 		var keystoneAPIName types.NamespacedName
 
