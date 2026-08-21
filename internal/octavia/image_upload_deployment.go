@@ -36,11 +36,6 @@ type ImageUploadDetails struct {
 	VolumeMounts   []corev1.VolumeMount
 }
 
-const (
-	// ServiceCommand -
-	ServiceCommand = "cp -f /usr/local/apache2/conf/httpd.conf /etc/httpd/conf/httpd.conf && /usr/bin/run-httpd"
-)
-
 func getVolumes(name string) []corev1.Volume {
 	var config0440AccessMode int32 = 0440
 
@@ -78,7 +73,7 @@ func getVolumeMounts() []corev1.VolumeMount {
 		volume.WritableDirVolumeMount(volume.RunHttpdVolumeName, volume.RunHttpdMountPath),
 		{
 			Name:      "httpd-config",
-			MountPath: "/usr/local/apache2/conf/httpd.conf",
+			MountPath: "/etc/httpd/conf/httpd.conf",
 			SubPath:   "httpd.conf",
 			ReadOnly:  true,
 		},
@@ -91,8 +86,6 @@ func ImageUploadDeployment(
 	labels map[string]string,
 ) *appsv1.Deployment {
 	initVolumeMounts := getInitVolumeMounts()
-
-	args := []string{"-c", ServiceCommand}
 
 	serviceName := fmt.Sprintf("%s-image-upload", ServiceName)
 
@@ -117,9 +110,11 @@ func ImageUploadDeployment(
 						{
 							Name: "octavia-amphora-httpd",
 							Command: []string{
-								"/bin/bash",
+								"/usr/sbin/httpd",
 							},
-							Args:            args,
+							Args: []string{
+								"-DFOREGROUND",
+							},
 							Image:           instance.Spec.ApacheContainerImage,
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
