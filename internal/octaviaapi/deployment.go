@@ -147,7 +147,12 @@ func Deployment(
 	if instance.Spec.TLS.Ovn.Enabled() {
 		svc := tls.Service{
 			SecretName: *instance.Spec.TLS.Ovn.SecretName,
-			CaMount:    ptr.To("/var/lib/config-data/tls/certs/ovndbca.crt"),
+			// ovn_{nb,sb}_certificate/private_key/ca_cert in octavia.conf
+			// point directly here -- mount at the final paths, not the
+			// kolla-era staging paths CertMount/KeyMount default to.
+			CertMount: ptr.To("/etc/pki/tls/certs/ovndb.crt"),
+			KeyMount:  ptr.To("/etc/pki/tls/private/ovndb.key"),
+			CaMount:   ptr.To("/etc/pki/tls/certs/ovndbca.crt"),
 		}
 		volumes = append(volumes, svc.CreateVolume("ovndb"))
 		volumeMounts = append(volumeMounts, svc.CreateVolumeMounts("ovndb")...)
