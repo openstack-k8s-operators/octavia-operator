@@ -42,6 +42,7 @@ func getVolumes(name string) []corev1.Volume {
 	return []corev1.Volume{
 		volume.WritableDirVolume("amphora-image"),
 		volume.WritableDirVolume(volume.RunHttpdVolumeName),
+		volume.WritableDirVolume(volume.VarLogHttpdVolumeName),
 		{
 			Name: "httpd-config",
 			VolumeSource: corev1.VolumeSource{
@@ -71,6 +72,11 @@ func getVolumeMounts() []corev1.VolumeMount {
 			MountPath: "/usr/local/apache2/htdocs",
 		},
 		volume.WritableDirVolumeMount(volume.RunHttpdVolumeName, volume.RunHttpdMountPath),
+		// httpd runs as a non-root, non-gid-0 user, but /var/log/httpd in the
+		// image is only writable by gid 0. Mount a writable dir so httpd (and
+		// the image's mod_security.conf SecDebugLog) can write there instead of
+		// failing to start with "AH00526 ... Failed to open debug log file".
+		volume.WritableDirVolumeMount(volume.VarLogHttpdVolumeName, volume.VarLogHttpdMountPath),
 		{
 			Name:      "httpd-config",
 			MountPath: "/etc/httpd/conf/httpd.conf",
