@@ -34,6 +34,7 @@ import (
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
@@ -116,6 +117,48 @@ func createAndSimulateOctaviaAPI(octaviaName types.NamespacedName) {
 	}
 	DeferCleanup(th.DeleteInstance, CreateOctaviaAPI(octaviaAPIName, GetDefaultOctaviaAPISpec()))
 	SimulateOctaviaAPIReady(octaviaAPIName)
+}
+
+// simulateOctaviaWorkloadReady drives every sub-service the Octavia operator
+// manages (the OctaviaAPI Deployment and the health-manager, housekeeping and
+// worker amphora-controller DaemonSets) to a Ready state for the currently
+// rolled generation. The amphora sub-controllers are not registered in the
+// functional suite, so their status is never reconciled and must be simulated
+// here. The applied input-secret hash is set to the operator's expected value
+// (a hash of the transport and notifications secret names in order) so that
+// allServicesReady becomes true and the operator can finalize a transport URL
+// teardown (e.g. when notifications are disabled). It is safe to call
+// repeatedly inside an Eventually: each config roll bumps the sub-CR
+// generations, so the observed generation and hash must be re-applied until the
+// operator settles.
+func simulateOctaviaWorkloadReady(g Gomega, octaviaName types.NamespacedName, transportSecret string, notifSecret string) {
+	expectedHash, err := util.ObjectHash([]string{transportSecret, notifSecret})
+	g.Expect(err).ShouldNot(HaveOccurred())
+
+	apiName := types.NamespacedName{
+		Namespace: octaviaName.Namespace,
+		Name:      fmt.Sprintf("%s-api", octaviaName.Name),
+	}
+	api := &octaviav1.OctaviaAPI{}
+	g.Expect(k8sClient.Get(ctx, apiName, api)).To(Succeed())
+	api.Status.ObservedGeneration = api.Generation
+	api.Status.AppliedInputSecretHash = expectedHash
+	api.Status.ReadyCount = 1
+	g.Expect(k8sClient.Status().Update(ctx, api)).To(Succeed())
+
+	for _, role := range []string{octaviav1.HealthManager, octaviav1.Housekeeping, octaviav1.Worker} {
+		acName := types.NamespacedName{
+			Namespace: octaviaName.Namespace,
+			Name:      fmt.Sprintf("%s-%s", octaviaName.Name, role),
+		}
+		ac := &octaviav1.OctaviaAmphoraController{}
+		g.Expect(k8sClient.Get(ctx, acName, ac)).To(Succeed())
+		ac.Status.ObservedGeneration = ac.Generation
+		ac.Status.AppliedInputSecretHash = expectedHash
+		ac.Status.ReadyCount = 1
+		ac.Status.DesiredNumberScheduled = 1
+		g.Expect(k8sClient.Status().Update(ctx, ac)).To(Succeed())
+	}
 }
 
 var _ = Describe("Octavia controller", func() {
@@ -335,6 +378,80 @@ var _ = Describe("Octavia controller", func() {
 				condition.RabbitMqTransportURLReadyCondition,
 				corev1.ConditionTrue,
 			)
+		})
+	})
+
+	When("TransportURL consumer finalizer is managed", func() {
+		BeforeEach(func() {
+			DeferCleanup(th.DeleteInstance, CreateOctavia(octaviaName, spec))
+
+			createAndSimulateOctaviaSecrets(octaviaName)
+			createAndSimulateTransportURL(transportURLName, transportURLSecretName)
+		})
+
+		It("should add the consumer finalizer to the transport secret", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(transportURLSecretName)
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should remove the consumer finalizer from transport secret on CR deletion", func() {
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(transportURLSecretName)
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				o := GetOctavia(octaviaName)
+				g.Expect(o.Status.TransportURLSecret).ToNot(BeEmpty())
+			}, timeout, interval).Should(Succeed())
+
+			th.DeleteInstance(GetOctavia(octaviaName))
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(transportURLSecretName)
+				g.Expect(secret.Finalizers).NotTo(
+					ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should move the finalizer from the old to the new secret on transport rotation", func() {
+			newSecretName := "rabbitmq-secret-rotated"
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(transportURLSecretName)
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			newSecret := th.CreateSecret(
+				types.NamespacedName{
+					Namespace: namespace,
+					Name:      newSecretName,
+				},
+				map[string][]byte{
+					"transport_url": []byte("rabbit://rotated-user:rotated-pass@rabbitmq/fake"),
+				},
+			)
+			DeferCleanup(k8sClient.Delete, ctx, newSecret)
+
+			Eventually(func(g Gomega) {
+				transport := infra.GetTransportURL(transportURLName)
+				transport.Status.SecretName = newSecretName
+				g.Expect(k8sClient.Status().Update(ctx, transport)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      newSecretName,
+				})
+				g.Expect(secret.Finalizers).To(
+					ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
 		})
 	})
 
@@ -1435,8 +1552,36 @@ var _ = Describe("Octavia controller", func() {
 				Namespace: namespace,
 				Name:      "rabbitmq-notifications-secret",
 			}
-			createAndSimulateTransportURL(notificationsTransportURLName, notificationsTransportURLSecretName)
+			// Create and simulate the notifications TransportURL. Cleanup uses
+			// th.DeleteInstance (tolerant of NotFound) because disabling
+			// notifications makes the operator delete this TransportURL itself.
+			DeferCleanup(th.DeleteInstance, CreateTransportURL(notificationsTransportURLName))
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(notificationsTransportURLSecretName))
+			infra.SimulateTransportURLReady(notificationsTransportURLName)
+			Eventually(func(g Gomega) {
+				transportURL := infra.GetTransportURL(notificationsTransportURLName)
+				transportURL.Status.SecretName = notificationsTransportURLSecretName.Name
+				g.Expect(k8sClient.Status().Update(ctx, transportURL)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
 			createAndSimulateDB(spec)
+
+			// Drive the reconcile all the way to workload creation so the
+			// notifications teardown path (gated on allServicesReady) can be
+			// exercised: the DB sync must complete and the management network
+			// (which needs a NAD and a node) must be reconciled.
+			DeferCleanup(k8sClient.Delete, ctx, CreateNAD(types.NamespacedName{
+				Name:      spec["octaviaNetworkAttachment"].(string),
+				Namespace: namespace,
+			}))
+			DeferCleanup(k8sClient.Delete, ctx, CreateNode(types.NamespacedName{
+				Namespace: namespace,
+				Name:      "node1",
+			}))
+			octaviaDBSyncName := types.NamespacedName{
+				Namespace: namespace,
+				Name:      octaviaName.Name + "-db-sync",
+			}
+			th.SimulateJobSuccess(octaviaDBSyncName)
 
 			// Wait for the Octavia instance to have the NotificationsTransportURLSecret set
 			Eventually(func(g Gomega) {
@@ -1464,11 +1609,17 @@ var _ = Describe("Octavia controller", func() {
 				g.Expect(k8sClient.Update(ctx, octavia)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 
-			// Wait for notifications to be disabled
+			// Disabling notifications regenerates the workload config so its
+			// input hash changes and every sub-deployment rolls. The operator
+			// only tears down the notifications transport URL once that rollout
+			// completes (allServicesReady). Re-simulate the full readiness chain
+			// for the rolled generation each iteration until the notifications
+			// transport secret reference is cleared.
 			Eventually(func(g Gomega) {
+				simulateOctaviaWorkloadReady(g, octaviaName, RabbitmqSecretName, "")
 				octavia := GetOctavia(octaviaName)
 				g.Expect(octavia.Status.NotificationsTransportURLSecret).To(BeEmpty())
-			}, timeout, interval).Should(Succeed())
+			}, 2*timeout, interval).Should(Succeed())
 		})
 	})
 

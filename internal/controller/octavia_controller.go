@@ -39,6 +39,7 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/job"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/labels"
 	nad "github.com/openstack-k8s-operators/lib-common/modules/common/networkattachment"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/object"
 	common_rbac "github.com/openstack-k8s-operators/lib-common/modules/common/rbac"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
@@ -69,8 +70,9 @@ import (
 // OctaviaReconciler reconciles an Octavia object
 type OctaviaReconciler struct {
 	client.Client
-	Kclient kubernetes.Interface
-	Scheme  *runtime.Scheme
+	Kclient   kubernetes.Interface
+	Scheme    *runtime.Scheme
+	APIReader client.Reader
 }
 
 // GetLogger returns a logger object with a prefix of "controller.name" and additional controller context fields
@@ -314,6 +316,34 @@ func (r *OctaviaReconciler) reconcileDelete(ctx context.Context, instance *octav
 		}
 	}
 
+	// Collect transport secrets from both status fields and live TransportURL
+	// CRs. During secret rotation the status fields point to the old secret
+	// while the TransportURL CR already references the new one, so we need the
+	// union of both sources to avoid leaking a finalizer on the new secret.
+	transportSecrets := []string{
+		instance.Status.TransportURLSecret,
+		instance.Status.NotificationsTransportURLSecret,
+	}
+	for _, tuName := range []string{
+		fmt.Sprintf("%s-octavia-transport", instance.Name),
+		fmt.Sprintf("%s-octavia-notifications-transport", instance.Name),
+	} {
+		tu := &rabbitmqv1.TransportURL{}
+		if err := r.Get(ctx, types.NamespacedName{Name: tuName, Namespace: instance.Namespace}, tu); err != nil {
+			if !k8s_errors.IsNotFound(err) {
+				return ctrl.Result{}, err
+			}
+		} else {
+			transportSecrets = append(transportSecrets, tu.Status.SecretName)
+		}
+	}
+	for _, secretName := range transportSecrets {
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			secretName, octavia.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+	}
+
 	// We did all the cleanup on the objects we created so we can remove the
 	// finalizer from ourselves to allow the deletion
 	controllerutil.RemoveFinalizer(instance, helper.GetFinalizer())
@@ -329,6 +359,7 @@ func (r *OctaviaReconciler) reconcileInit(
 	helper *helper.Helper,
 	serviceLabels map[string]string,
 	serviceAnnotations map[string]string,
+	transportURLSecretName string,
 ) (ctrl.Result, error) {
 	Log := r.GetLogger(ctx)
 	Log.Info("Reconciling Service init")
@@ -382,7 +413,7 @@ func (r *OctaviaReconciler) reconcileInit(
 	}
 	transportURLSecretHash, result, err := oko_secret.VerifySecretFields(
 		ctx,
-		types.NamespacedName{Namespace: instance.Namespace, Name: instance.Status.TransportURLSecret},
+		types.NamespacedName{Namespace: instance.Namespace, Name: transportURLSecretName},
 		transportValidateFields,
 		helper.GetClient(),
 		time.Duration(10)*time.Second,
@@ -391,7 +422,7 @@ func (r *OctaviaReconciler) reconcileInit(
 		if k8s_errors.IsNotFound(err) {
 			// Since the TransportURL secret is automatically created by this controller earlier in
 			// the reconcile loop, we treat this as an info.
-			Log.Info(fmt.Sprintf("TransportURL secret %s not found", instance.Status.TransportURLSecret))
+			Log.Info(fmt.Sprintf("TransportURL secret %s not found", transportURLSecretName))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				condition.InputReadyCondition,
 				condition.RequestedReason,
@@ -414,7 +445,7 @@ func (r *OctaviaReconciler) reconcileInit(
 			condition.InputReadyWaitingMessage))
 		return result, err
 	}
-	secretsVars[instance.Status.TransportURLSecret] = env.SetValue(transportURLSecretHash)
+	secretsVars[transportURLSecretName] = env.SetValue(transportURLSecretHash)
 
 	octaviaDb, persistenceDb, result, err := r.ensureDB(ctx, helper, instance)
 	if err != nil {
@@ -572,9 +603,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		Log.Info(fmt.Sprintf("TransportURL %s successfully reconciled - operation: %s", transportURL.Name, string(op)))
 	}
 
-	instance.Status.TransportURLSecret = transportURL.Status.SecretName
+	currentTransportSecret := transportURL.Status.SecretName
 
-	if instance.Status.TransportURLSecret == "" {
+	if currentTransportSecret == "" {
 		Log.Info(fmt.Sprintf("Waiting for the TransportURL %s secret to be created", transportURL.Name))
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			condition.InputReadyCondition,
@@ -583,12 +614,27 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			condition.InputReadyWaitingMessage))
 		return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 	}
+
+	// Set status early for first-time setup so PatchInstance persists it
+	// even on early returns. During rotation (old != current), the status
+	// is only updated by FinalizeSecretRotation at end of reconcile.
+	if instance.Status.TransportURLSecret == "" ||
+		instance.Status.TransportURLSecret == currentTransportSecret {
+		instance.Status.TransportURLSecret = currentTransportSecret
+	}
+
+	if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+		currentTransportSecret, octavia.TransportConsumerFinalizer); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	instance.Status.Conditions.MarkTrue(
 		condition.RabbitMqTransportURLReadyCondition,
 		condition.RabbitMqTransportURLReadyMessage)
 	instance.Status.Conditions.MarkTrue(condition.InputReadyCondition, condition.InputReadyMessage)
 
 	// Handle notifications transport URL if dedicated notifications bus is configured
+	var currentNotifSecret string
 	if instance.Spec.NotificationsBus != nil {
 		notificationsTransportURL, notifOp, notifErr := r.notificationsTransportURLCreateOrUpdate(instance)
 		if notifErr != nil {
@@ -604,9 +650,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			Log.Info(fmt.Sprintf("Notifications TransportURL %s successfully reconciled - operation: %s", notificationsTransportURL.Name, string(notifOp)))
 		}
 
-		instance.Status.NotificationsTransportURLSecret = notificationsTransportURL.Status.SecretName
+		currentNotifSecret = notificationsTransportURL.Status.SecretName
 
-		if instance.Status.NotificationsTransportURLSecret == "" {
+		if currentNotifSecret == "" {
 			Log.Info(fmt.Sprintf("Waiting for the notifications TransportURL %s secret to be created", notificationsTransportURL.Name))
 			instance.Status.Conditions.Set(condition.FalseCondition(
 				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
@@ -615,16 +661,33 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 				octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyInitMessage))
 			return ctrl.Result{RequeueAfter: time.Duration(10) * time.Second}, nil
 		}
+
+		// Set status early for first-time setup so PatchInstance persists it
+		// even on early returns. During rotation (old != current), the status
+		// is only updated by FinalizeSecretRotation at end of reconcile.
+		if instance.Status.NotificationsTransportURLSecret == "" ||
+			instance.Status.NotificationsTransportURLSecret == currentNotifSecret {
+			instance.Status.NotificationsTransportURLSecret = currentNotifSecret
+		}
+
+		if err := object.ManageSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			currentNotifSecret, octavia.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+
 		instance.Status.Conditions.MarkTrue(
 			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
 			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyMessage)
 	} else {
-		// No notifications bus configured, clear the status
-		instance.Status.NotificationsTransportURLSecret = ""
-		// Mark condition as ready since notifications bus is not required
-		instance.Status.Conditions.MarkTrue(
-			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition,
-			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyMessage)
+		// Notifications bus disabled. The config regenerated below no longer
+		// references the notifications transport URL, so the workload input
+		// hash changes and the deployments roll. Defer teardown of the
+		// TransportURL and its consumer finalizer until that rollout is
+		// complete (allServicesReady at end of reconcile), otherwise the
+		// RabbitMQ user backing the secret would be revoked while pods still
+		// use it.
+		instance.Status.Conditions.Remove(
+			octaviav1.OctaviaRabbitMqNotificationsTransportURLReadyCondition)
 	}
 
 	err = octavia.EnsureAmphoraCerts(ctx, instance, helper)
@@ -700,7 +763,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	instance.Status.Conditions.MarkTrue(condition.NetworkAttachmentsReadyCondition, condition.NetworkAttachmentsReadyMessage)
 
 	// Handle service init
-	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels, serviceAnnotations)
+	ctrlResult, err := r.reconcileInit(ctx, instance, helper, serviceLabels, serviceAnnotations, currentTransportSecret)
 	if err != nil {
 		return ctrlResult, err
 	} else if (ctrlResult != ctrl.Result{}) {
@@ -724,10 +787,15 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		return ctrlResult, nil
 	}
 
+	expectedInputHash, err := util.ObjectHash([]string{currentTransportSecret, currentNotifSecret})
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
 	Log.Info(fmt.Sprintf("Calling for deploy for API with %s", instance.Status.DatabaseHostname))
 
 	// TODO(beagles): look into adding condition types/messages in a common file
-	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance)
+	octaviaAPI, op, err := r.apiDeploymentCreateOrUpdate(instance, currentTransportSecret, currentNotifSecret, expectedInputHash)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			octaviav1.OctaviaAPIReadyCondition,
@@ -737,33 +805,22 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	// Check the underlying OctaviaAPI condition according to the
-	// ObservedGeneration
-	apiObsGen, err := r.checkOctaviaAPIGeneration(ctx, instance)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			octaviav1.OctaviaAPIReadyCondition,
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			octaviav1.OctaviaAPIReadyErrorMessage,
-			err.Error()))
-		return ctrlResult, nil
-	}
-	if !apiObsGen {
+	apiReady := octaviaAPI.Generation == octaviaAPI.Status.ObservedGeneration &&
+		octaviaAPI.Status.AppliedInputSecretHash == expectedInputHash
+	if !apiReady {
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			octaviav1.OctaviaAPIReadyCondition,
 			condition.InitReason,
 			octaviav1.OctaviaAPIReadyInitMessage,
 		))
 	} else {
-		// Mirror OctaviaAPI status' ReadyCount to this parent CR
 		instance.Status.OctaviaAPIReadyCount = octaviaAPI.Status.ReadyCount
 		conditionStatus := octaviaAPI.Status.Conditions.Mirror(octaviav1.OctaviaAPIReadyCondition)
 		if conditionStatus != nil {
 			instance.Status.Conditions.Set(conditionStatus)
 		}
 	}
-	if op != controllerutil.OperationResultNone && apiObsGen {
+	if op != controllerutil.OperationResultNone && apiReady {
 		Log.Info(fmt.Sprintf("Deployment %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
@@ -947,7 +1004,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	}
 
 	octaviaHealthManager, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		ampImageOwnerID, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager)
+		ampImageOwnerID, instance.Spec.OctaviaHealthManager, octaviav1.HealthManager, currentTransportSecret, currentNotifSecret, expectedInputHash)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
@@ -957,19 +1014,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	// Even if we trigger three deployments, the Amphora subCR is only one, no
-	// need to call this functions three times in the same reconciliation loop
-	ampObsGen, err := r.checkAmphoraGeneration(ctx, instance)
-	if err != nil {
-		instance.Status.Conditions.Set(condition.FalseCondition(
-			amphoraControllerReadyCondition(octaviav1.HealthManager),
-			condition.ErrorReason,
-			condition.SeverityWarning,
-			amphoraControllerErrorMessage(octaviav1.HealthManager),
-			err.Error()))
-		return ctrlResult, nil
-	}
-	if !ampObsGen {
+	hmReady := octaviaHealthManager.Generation == octaviaHealthManager.Status.ObservedGeneration &&
+		octaviaHealthManager.Status.AppliedInputSecretHash == expectedInputHash
+	if !hmReady {
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.HealthManager),
 			condition.InitReason,
@@ -983,7 +1030,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		}
 	}
 
-	if op != controllerutil.OperationResultNone && ampObsGen {
+	if op != controllerutil.OperationResultNone && hmReady {
 		Log.Info(fmt.Sprintf("Deployment of OctaviaHealthManager for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
@@ -1005,11 +1052,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if !ampObsGen {
+	rsyslogGenReady := octaviaRsyslog.Generation == octaviaRsyslog.Status.ObservedGeneration
+	if !rsyslogGenReady {
 		instance.Status.Conditions.Set(condition.UnknownCondition(
-			amphoraControllerReadyCondition(octaviav1.Worker),
+			octaviav1.OctaviaRsyslogReadyCondition,
 			condition.InitReason,
-			"%s", amphoraControllerErrorMessage(octaviav1.Worker),
+			"OctaviaRsyslog not started",
 		))
 	} else {
 		instance.Status.OctaviaRsyslogReadyCount = octaviaRsyslog.Status.ReadyCount
@@ -1018,13 +1066,13 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			instance.Status.Conditions.Set(conditionStatus)
 		}
 	}
-	if op != controllerutil.OperationResultNone && ampObsGen {
+	if op != controllerutil.OperationResultNone && rsyslogGenReady {
 		Log.Info(fmt.Sprintf("Deployment of OctaviaRsyslog for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	// Skip the other amphora controller pods until the health managers are all up and running.
 	octaviaHousekeeping, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		ampImageOwnerID, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping)
+		ampImageOwnerID, instance.Spec.OctaviaHousekeeping, octaviav1.Housekeeping, currentTransportSecret, currentNotifSecret, expectedInputHash)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
@@ -1034,7 +1082,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if !ampObsGen {
+	hkReady := octaviaHousekeeping.Generation == octaviaHousekeeping.Status.ObservedGeneration &&
+		octaviaHousekeeping.Status.AppliedInputSecretHash == expectedInputHash
+	if !hkReady {
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Housekeeping),
 			condition.InitReason,
@@ -1048,12 +1098,12 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 		}
 	}
 
-	if op != controllerutil.OperationResultNone && ampObsGen {
+	if op != controllerutil.OperationResultNone && hkReady {
 		Log.Info(fmt.Sprintf("Deployment of OctaviaHousekeeping for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
 	octaviaWorker, op, err := r.amphoraControllerDaemonSetCreateOrUpdate(instance, networkInfo,
-		ampImageOwnerID, instance.Spec.OctaviaWorker, octaviav1.Worker)
+		ampImageOwnerID, instance.Spec.OctaviaWorker, octaviav1.Worker, currentTransportSecret, currentNotifSecret, expectedInputHash)
 	if err != nil {
 		instance.Status.Conditions.Set(condition.FalseCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
@@ -1063,7 +1113,9 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			err.Error()))
 		return ctrl.Result{}, err
 	}
-	if !ampObsGen {
+	wkReady := octaviaWorker.Generation == octaviaWorker.Status.ObservedGeneration &&
+		octaviaWorker.Status.AppliedInputSecretHash == expectedInputHash
+	if !wkReady {
 		instance.Status.Conditions.Set(condition.UnknownCondition(
 			amphoraControllerReadyCondition(octaviav1.Worker),
 			condition.InitReason,
@@ -1076,7 +1128,7 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 			instance.Status.Conditions.Set(conditionStatus)
 		}
 	}
-	if op != controllerutil.OperationResultNone && ampObsGen {
+	if op != controllerutil.OperationResultNone && wkReady {
 		Log.Info(fmt.Sprintf("Deployment of OctaviaWorker for %s successfully reconciled - operation: %s", instance.Name, string(op)))
 	}
 
@@ -1126,6 +1178,63 @@ func (r *OctaviaReconciler) reconcileNormal(ctx context.Context, instance *octav
 	instance.Status.Conditions.MarkTrue(condition.CreateServiceReadyCondition, condition.CreateServiceReadyMessage)
 
 	// create Deployment - end
+
+	allServicesReady := apiReady && hmReady && hkReady && wkReady
+
+	transportSecretName, err := object.FinalizeSecretRotation(
+		ctx, helper, instance.Namespace,
+		instance.Status.TransportURLSecret,
+		currentTransportSecret,
+		octavia.TransportConsumerFinalizer,
+		allServicesReady,
+	)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+	instance.Status.TransportURLSecret = transportSecretName
+
+	// Finalize notifications transport URL rotation
+	if currentNotifSecret != "" {
+		notifSecretName, err := object.FinalizeSecretRotation(
+			ctx, helper, instance.Namespace,
+			instance.Status.NotificationsTransportURLSecret,
+			currentNotifSecret,
+			octavia.TransportConsumerFinalizer,
+			allServicesReady,
+		)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		instance.Status.NotificationsTransportURLSecret = notifSecretName
+	} else if instance.Status.NotificationsTransportURLSecret != "" && allServicesReady {
+		// Notifications bus disabled and the deployments have rolled out a
+		// config that no longer references it: now it is safe to release the
+		// consumer finalizer and delete the notifications TransportURL.
+		if err := object.RemoveSecretConsumerFinalizer(ctx, helper, instance.Namespace,
+			instance.Status.NotificationsTransportURLSecret, octavia.TransportConsumerFinalizer); err != nil {
+			return ctrl.Result{}, err
+		}
+		notificationsTransportURLName := fmt.Sprintf("%s-octavia-notifications-transport", instance.Name)
+		if err := r.transportURLDeleted(ctx, instance, notificationsTransportURLName); err != nil {
+			Log.Error(err, fmt.Sprintf("Could not delete notification TransportURL %s", notificationsTransportURLName))
+			return ctrl.Result{}, err
+		}
+		instance.Status.NotificationsTransportURLSecret = ""
+	}
+
+	// Self-heal consumer finalizers stranded on secrets superseded during
+	// rapid rotation (A -> B -> C before the workload became ready):
+	// FinalizeSecretRotation only ever releases the single tracked "old"
+	// secret, so any intermediate secret's finalizer would otherwise leak.
+	// keep enumerates every secret that legitimately still holds the
+	// finalizer; all others in the namespace are pruned.
+	if err := object.PruneSecretConsumerFinalizers(
+		ctx, helper, instance.Namespace, octavia.TransportConsumerFinalizer,
+		instance.Status.TransportURLSecret, currentTransportSecret,
+		instance.Status.NotificationsTransportURLSecret, currentNotifSecret,
+	); err != nil {
+		return ctrl.Result{}, err
+	}
 
 	// We reached the end of the Reconcile, update the Ready condition based on
 	// the sub conditions
@@ -1569,7 +1678,7 @@ func (r *OctaviaReconciler) createHashOfInputHashes(
 	return hash, changed, nil
 }
 
-func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octavia) (*octaviav1.OctaviaAPI, controllerutil.OperationResult, error) {
+func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octavia, transportURLSecretName string, notificationsTransportURLSecretName string, expectedInputHash string) (*octaviav1.OctaviaAPI, controllerutil.OperationResult, error) {
 	deployment := &octaviav1.OctaviaAPI{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("%s-api", instance.Name),
@@ -1588,6 +1697,10 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, deployment, func() error {
+		if deployment.Annotations == nil {
+			deployment.Annotations = make(map[string]string)
+		}
+		deployment.Annotations["openstack.org/input-secret-hash"] = expectedInputHash
 		deployment.Spec = instance.Spec.OctaviaAPI
 		deployment.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
 		deployment.Spec.DatabaseHostname = instance.Status.DatabaseHostname
@@ -1596,8 +1709,8 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		deployment.Spec.ServiceUser = instance.Spec.ServiceUser
 		deployment.Spec.TenantName = instance.Spec.TenantName
 		deployment.Spec.TenantDomainName = instance.Spec.TenantDomainName
-		deployment.Spec.TransportURLSecret = instance.Status.TransportURLSecret
-		deployment.Spec.NotificationsTransportURLSecret = instance.Status.NotificationsTransportURLSecret
+		deployment.Spec.TransportURLSecret = transportURLSecretName
+		deployment.Spec.NotificationsTransportURLSecret = notificationsTransportURLSecretName
 		deployment.Spec.Secret = instance.Spec.Secret
 		deployment.Spec.ServiceAccount = instance.RbacResourceName()
 		deployment.Spec.TLS = instance.Spec.OctaviaAPI.TLS
@@ -1607,7 +1720,6 @@ func (r *OctaviaReconciler) apiDeploymentCreateOrUpdate(instance *octaviav1.Octa
 		if len(deployment.Spec.NetworkAttachments) == 0 && instance.Spec.OctaviaNetworkAttachment != "" {
 			deployment.Spec.NetworkAttachments = []string{instance.Spec.OctaviaNetworkAttachment}
 		}
-
 		err := controllerutil.SetControllerReference(instance, deployment, r.Scheme)
 		if err != nil {
 			return err
@@ -1674,6 +1786,33 @@ func (r *OctaviaReconciler) notificationsTransportURLCreateOrUpdate(
 	return transportURL, op, err
 }
 
+func (r *OctaviaReconciler) transportURLDeleted(
+	ctx context.Context,
+	instance *octaviav1.Octavia,
+	transportURLName string,
+) error {
+	Log := r.GetLogger(ctx)
+	transportURL := &rabbitmqv1.TransportURL{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      transportURLName,
+			Namespace: instance.Namespace,
+		},
+	}
+
+	err := r.Delete(ctx, transportURL)
+	if err != nil {
+		if k8s_errors.IsNotFound(err) {
+			return nil
+		}
+		Log.Info(fmt.Sprintf("Could not delete TransportURL %s err: %s", transportURLName, err))
+		return err
+	}
+
+	Log.Info("Deleted transportURL", ":", transportURLName)
+
+	return nil
+}
+
 func getRedisHosts(
 	ctx context.Context,
 	instance *octaviav1.Octavia,
@@ -1702,6 +1841,9 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	ampImageOwnerID string,
 	controllerSpec octaviav1.OctaviaAmphoraControllerSpec,
 	role string,
+	transportURLSecretName string,
+	notificationsTransportURLSecretName string,
+	expectedInputHash string,
 ) (*octaviav1.OctaviaAmphoraController,
 	controllerutil.OperationResult, error) {
 
@@ -1723,6 +1865,10 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 	}
 
 	op, err := controllerutil.CreateOrUpdate(context.TODO(), r.Client, daemonset, func() error {
+		if daemonset.Annotations == nil {
+			daemonset.Annotations = make(map[string]string)
+		}
+		daemonset.Annotations["openstack.org/input-secret-hash"] = expectedInputHash
 		daemonset.Spec = controllerSpec
 		daemonset.Spec.Role = role
 		daemonset.Spec.DatabaseInstance = instance.Spec.DatabaseInstance
@@ -1733,8 +1879,8 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.TenantName = instance.Spec.TenantName
 		daemonset.Spec.TenantDomainName = instance.Spec.TenantDomainName
 		daemonset.Spec.Secret = instance.Spec.Secret
-		daemonset.Spec.TransportURLSecret = instance.Status.TransportURLSecret
-		daemonset.Spec.NotificationsTransportURLSecret = instance.Status.NotificationsTransportURLSecret
+		daemonset.Spec.TransportURLSecret = transportURLSecretName
+		daemonset.Spec.NotificationsTransportURLSecret = notificationsTransportURLSecretName
 		daemonset.Spec.ServiceAccount = instance.RbacResourceName()
 		daemonset.Spec.LbMgmtNetworkID = networkInfo.TenantNetworkID
 		daemonset.Spec.LbSecurityGroupID = networkInfo.SecurityGroupID
@@ -1840,48 +1986,4 @@ func (r *OctaviaReconciler) octaviaRsyslogDaemonSetCreateOrUpdate(
 	})
 
 	return daemonset, op, err
-}
-
-// checkOctaviaAPIGeneration -
-func (r *OctaviaReconciler) checkOctaviaAPIGeneration(
-	ctx context.Context,
-	instance *octaviav1.Octavia,
-) (bool, error) {
-	Log := r.GetLogger(ctx)
-	api := &octaviav1.OctaviaAPIList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-	}
-	if err := r.List(context.Background(), api, listOpts...); err != nil {
-		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
-		return false, err
-	}
-	for _, item := range api.Items {
-		if item.Generation != item.Status.ObservedGeneration {
-			return false, nil
-		}
-	}
-	return true, nil
-}
-
-// checkAmphoraGeneration -
-func (r *OctaviaReconciler) checkAmphoraGeneration(
-	ctx context.Context,
-	instance *octaviav1.Octavia,
-) (bool, error) {
-	Log := r.GetLogger(ctx)
-	amph := &octaviav1.OctaviaAmphoraControllerList{}
-	listOpts := []client.ListOption{
-		client.InNamespace(instance.Namespace),
-	}
-	if err := r.List(context.Background(), amph, listOpts...); err != nil {
-		Log.Error(err, "Unable to retrieve OctaviaAPI %w")
-		return false, err
-	}
-	for _, item := range amph.Items {
-		if item.Generation != item.Status.ObservedGeneration {
-			return false, nil
-		}
-	}
-	return true, nil
 }
