@@ -211,7 +211,6 @@ func Deployment(
 							Name: fmt.Sprintf("%s-provider-agent", serviceName),
 							Command: []string{
 								"/usr/bin/octavia-driver-agent",
-								"--config-file", "/etc/octavia/octavia.conf",
 								"--config-dir", "/etc/octavia/octavia.conf.d",
 							},
 							Image:           instance.Spec.ContainerImage,

@@ -1144,15 +1144,15 @@ func (r *OctaviaAPIReconciler) generateServiceSecrets(
 		tlsCfg = &tls.Service{}
 	}
 
-	// customData hold any customization for the service.
-	// custom.conf is going to /etc/<service>/<service>.conf.d
+	// customData holds any customization for the service.
+	// Custom config is placed in /etc/<service>/<service>.conf.d.
 	// all other files get placed into /etc/<service> to allow overwrite of e.g. logging.conf or policy.json
-	// TODO: make sure custom.conf can not be overwritten
+	// TODO: make sure custom config cannot be overwritten
 	customData := map[string]string{
-		common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
-		"my.cnf":                           db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
+		"my.cnf": db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
 	}
 	maps.Copy(customData, instance.Spec.DefaultConfigOverwrite)
+	customData[octavia.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 
 	keystoneAPI, err := keystonev1.GetKeystoneAPI(ctx, h, instance.Namespace, map[string]string{})
 	if err != nil {

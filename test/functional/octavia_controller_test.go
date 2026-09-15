@@ -698,7 +698,7 @@ var _ = Describe("Octavia controller", func() {
 			)
 		})
 
-		It("should create the octavia.conf file in a Secret", func() {
+		It("should create the 00-config.conf file in a Secret", func() {
 			instance := GetOctavia(octaviaName)
 
 			configData := th.GetSecret(
@@ -706,7 +706,7 @@ var _ = Describe("Octavia controller", func() {
 					Namespace: octaviaName.Namespace,
 					Name:      fmt.Sprintf("%s-config-data", octaviaName.Name)})
 			Expect(configData).ShouldNot(BeNil())
-			conf := string(configData.Data["octavia.conf"])
+			conf := string(configData.Data[octavia.DefaultsConfigFileName])
 			Expect(conf).Should(
 				ContainSubstring(
 					fmt.Sprintf(
@@ -1475,7 +1475,7 @@ var _ = Describe("Octavia controller", func() {
 					Namespace: octaviaName.Namespace,
 					Name:      fmt.Sprintf("%s-config-data", octaviaName.Name)})
 			Expect(configData).ShouldNot(BeNil())
-			conf := string(configData.Data["octavia.conf"])
+			conf := string(configData.Data[octavia.DefaultsConfigFileName])
 			Expect(conf).Should(
 				ContainSubstring(fmt.Sprintf(
 					"project_name=%s\n", spec["tenantName"])))

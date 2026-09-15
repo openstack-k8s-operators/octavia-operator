@@ -632,10 +632,10 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 	}
 
 	customData := map[string]string{
-		common.CustomServiceConfigFileName: instance.Spec.CustomServiceConfig,
-		"my.cnf":                           db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
+		"my.cnf": db.GetDatabaseClientConfig(tlsCfg), //(mschuppert) for now just get the default my.cnf
 	}
 	maps.Copy(customData, instance.Spec.DefaultConfigOverwrite)
+	customData[octavia.CustomServiceConfigFileName] = instance.Spec.CustomServiceConfig
 
 	databaseAccount, dbSecret, err := mariadbv1.GetAccountAndSecret(
 		ctx, helper, instance.Spec.DatabaseAccount, instance.Namespace)

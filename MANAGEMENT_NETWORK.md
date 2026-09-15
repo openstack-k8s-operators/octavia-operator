@@ -529,7 +529,7 @@ When a health manager pod starts on a given node:
 ### How Octavia Uses These IPs
 
 The predictable IPs are collected from the ConfigMap and written into the
-`octavia.conf` configuration file:
+Octavia configuration directory:
 
 ```ini
 [health_manager]
@@ -550,7 +550,7 @@ tenant_log_targets=172.23.0.99:514,172.23.0.100:514,...
 ## Amphora Boot Network and Security Configuration
 
 When the operator provisions Octavia's configuration, it populates the
-`octavia.conf` template with the Neutron resource IDs discovered or created
+`01-config.conf` template with the Neutron resource IDs discovered or created
 during management network setup:
 
 ```ini

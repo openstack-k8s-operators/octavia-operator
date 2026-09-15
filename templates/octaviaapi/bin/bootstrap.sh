@@ -15,7 +15,7 @@
 # under the License.
 set -ex
 
-OPTS="--config-file /etc/octavia/octavia.conf"
+OPTS="--config-dir /etc/octavia/octavia.conf.d"
 octavia-db-manage ${OPTS} upgrade head
 octavia-db-manage ${OPTS} upgrade_persistence
 
