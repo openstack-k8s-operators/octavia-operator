@@ -15,4 +15,4 @@
 # under the License.
 set -ex
 
-exec /usr/bin/$1 --config-file /usr/share/octavia/octavia-dist.conf --config-file /etc/octavia/octavia.conf --config-dir /etc/octavia/octavia.conf.d/
+exec /usr/bin/$1 --config-file /usr/share/octavia/octavia-dist.conf --config-dir /etc/octavia/octavia.conf.d/
