@@ -73,9 +73,7 @@ func GetInitVolumeMounts() []corev1.VolumeMount {
 }
 
 // GetVolumeMounts - general VolumeMounts. Sources the final-path mounts from
-// the same "config-data-merged" EmptyDir the init container writes into --
-// the crudini merge itself is unchanged, only kolla's staging-to-final copy
-// step is replaced with these SubPath mounts.
+// the same "config-data-merged" EmptyDir the init container writes into.
 func GetVolumeMounts() []corev1.VolumeMount {
 	return []corev1.VolumeMount{
 		{
@@ -85,14 +83,7 @@ func GetVolumeMounts() []corev1.VolumeMount {
 		},
 		{
 			Name:      "config-data-merged",
-			MountPath: "/etc/octavia/octavia.conf",
-			SubPath:   "octavia.conf",
-			ReadOnly:  true,
-		},
-		{
-			Name:      "config-data-merged",
-			MountPath: "/etc/octavia/octavia.conf.d/custom.conf",
-			SubPath:   "custom.conf",
+			MountPath: "/etc/octavia",
 			ReadOnly:  true,
 		},
 		{

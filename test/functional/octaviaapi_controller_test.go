@@ -216,13 +216,13 @@ var _ = Describe("OctaviaAPI controller", func() {
 			)
 		})
 
-		It("should create the octavia.conf file in a Secret", func() {
+		It("should create the 01-config.conf file in a Secret", func() {
 			configData := th.GetSecret(
 				types.NamespacedName{
 					Namespace: octaviaAPIName.Namespace,
 					Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
 			Expect(configData).ShouldNot(BeNil())
-			conf := string(configData.Data["octavia.conf"])
+			conf := string(configData.Data[octavia.ServiceConfigFileName])
 			// TODO(gthiemonge) bind_host is currently hardcoded
 			Expect(conf).ShouldNot(
 				ContainSubstring("bind_host=\n"))
@@ -324,8 +324,8 @@ var _ = Describe("OctaviaAPI controller", func() {
 				Namespace: octaviaAPIName.Namespace,
 				Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
 			Expect(configSecret).ShouldNot(BeNil())
-			Expect(configSecret.Data).Should(HaveKey("octavia.conf"))
-			configData := string(configSecret.Data["octavia.conf"])
+			Expect(configSecret.Data).Should(HaveKey(octavia.ServiceConfigFileName))
+			configData := string(configSecret.Data[octavia.ServiceConfigFileName])
 
 			// Parse the INI file to properly access sections
 			cfg, err := ini.Load([]byte(configData))
@@ -368,7 +368,7 @@ var _ = Describe("OctaviaAPI controller", func() {
 					Namespace: octaviaAPIName.Namespace,
 					Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
 			Expect(configData).ShouldNot(BeNil())
-			conf := string(configData.Data["custom.conf"])
+			conf := string(configData.Data[octavia.CustomServiceConfigFileName])
 			Expect(conf).Should(
 				ContainSubstring("[DEFAULT]\ndebug=True\n"))
 		})
@@ -387,7 +387,7 @@ var _ = Describe("OctaviaAPI controller", func() {
 				confSecret := th.GetSecret(secret)
 				g.Expect(confSecret).ShouldNot(BeNil())
 
-				conf := string(confSecret.Data["octavia.conf"])
+				conf := string(confSecret.Data[octavia.ServiceConfigFileName])
 				g.Expect(string(conf)).Should(
 					ContainSubstring("auth_url=%s", newInternalEndpoint))
 			}, timeout, interval).Should(Succeed())
@@ -619,14 +619,14 @@ var _ = Describe("OctaviaAPI controller", func() {
 			DeferCleanup(k8sClient.Delete, ctx, apiMariaDBSecret)
 		})
 
-		It("should render ApplicationCredential auth in octavia.conf", func() {
+		It("should render ApplicationCredential auth in 01-config.conf", func() {
 			Eventually(func(g Gomega) {
 				cfgSecret := th.GetSecret(types.NamespacedName{
 					Namespace: octaviaAPIName.Namespace,
 					Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
 				g.Expect(cfgSecret).NotTo(BeNil())
 
-				conf := string(cfgSecret.Data["octavia.conf"])
+				conf := string(cfgSecret.Data[octavia.ServiceConfigFileName])
 
 				g.Expect(conf).To(ContainSubstring(
 					"application_credential_id=test-ac-id"),
