@@ -39,6 +39,7 @@ import (
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 
 	networkv1 "github.com/k8snetworkplumbingwg/network-attachment-definition-client/pkg/apis/k8s.cni.cncf.io/v1"
+	redisv1 "github.com/openstack-k8s-operators/infra-operator/apis/redis/v1beta1"
 	topologyv1 "github.com/openstack-k8s-operators/infra-operator/apis/topology/v1beta1"
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	oko_secret "github.com/openstack-k8s-operators/lib-common/modules/common/secret"
@@ -790,7 +791,12 @@ func (r *OctaviaAmphoraControllerReconciler) generateServiceSecrets(
 		templateParameters["JobboardBackendHosts"] = ""
 		templateParameters["GracefulShutdownTimeout"] = 600
 	}
-	if tlsCfg != nil {
+	// Configure Redis/jobboard TLS based on whether Redis actually has TLS enabled.
+	// Check the Redis CR dynamically to detect if TLS is configured.
+	// If Redis CR is not available, default to true (assume TLS enabled) as that's
+	// the typical configuration.
+	redisUseTLS := checkRedisHasTLS(ctx, helper, spec.RedisServiceName, instance.Namespace)
+	if redisUseTLS {
 		templateParameters["JobboardBackendSSLOptions"] = "ssl:true"
 	} else {
 		templateParameters["JobboardBackendSSLOptions"] = ""
@@ -1037,4 +1043,33 @@ func (r *OctaviaAmphoraControllerReconciler) findObjectForSrc(ctx context.Contex
 	}
 
 	return requests
+}
+
+func checkRedisHasTLS(
+	ctx context.Context,
+	helper *helper.Helper,
+	redisName string,
+	namespace string,
+) bool {
+	// Default to true (assume TLS enabled) for backwards compatibility
+	// This handles cases where:
+	// 1. RedisServiceName is not set (old CR before field was added)
+	// 2. Redis CR cannot be queried
+	if redisName == "" {
+		return true
+	}
+	// Query the Redis CR to check if TLS is enabled
+	redis := &redisv1.Redis{}
+	err := helper.GetClient().Get(ctx, types.NamespacedName{
+		Name:      redisName,
+		Namespace: namespace,
+	}, redis)
+	if err != nil {
+		// Default to true (assume TLS enabled) when we can't query the Redis CR
+		// This is the safe default as Redis typically has TLS enabled
+		return true
+	}
+	// Check the Status.TLSSupport field which reflects the actual running state
+	// The field is a string that can be "True" or "False"
+	return redis.Status.TLSSupport == "True"
 }

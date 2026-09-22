@@ -162,6 +162,10 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// List of Redis Hosts
 	RedisHosts []string `json:"redisHosts,omitempty"`
 
+	// +kubebuilder:validation:Optional
+	// RedisServiceName - name of the Redis service for TLS detection
+	RedisServiceName string `json:"redisServiceName,omitempty"`
+
 	// +operator-sdk:csv:customresourcedefinitions:type=spec
 	// TLS - Parameters related to the TLS
 	TLS tls.Ca `json:"tls,omitempty"`
