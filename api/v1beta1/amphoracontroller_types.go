@@ -206,6 +206,11 @@ type OctaviaAmphoraControllerStatus struct {
 	// NetworkAttachment status of the deployment pods
 	NetworkAttachments map[string][]string `json:"networkAttachments,omitempty"`
 
+	// AppliedInputSecretHash - hash of the input secret names that have been
+	// fully rolled out. The parent controller uses this to gate condition
+	// mirroring and secret rotation finalization.
+	AppliedInputSecretHash string `json:"appliedInputSecretHash,omitempty"`
+
 	// ObservedGeneration - the most recent generation observed for this
 	// service. If the observed generation is less than the spec generation,
 	// then the controller has not processed the latest changes injected by

@@ -248,17 +248,19 @@ func main() {
 	}
 
 	if err := (&controller.OctaviaReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Kclient: kclient,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Kclient:   kclient,
+		APIReader: mgr.GetAPIReader(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Octavia")
 		os.Exit(1)
 	}
 	if err := (&controller.OctaviaAPIReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Kclient: kclient,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Kclient:   kclient,
+		APIReader: mgr.GetAPIReader(),
 	}).SetupWithManager(context.Background(), mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OctaviaAPI")
 		os.Exit(1)
@@ -273,9 +275,10 @@ func main() {
 	}
 
 	if err = (&controller.OctaviaAmphoraControllerReconciler{
-		Client:  mgr.GetClient(),
-		Scheme:  mgr.GetScheme(),
-		Kclient: kclient,
+		Client:    mgr.GetClient(),
+		Scheme:    mgr.GetScheme(),
+		Kclient:   kclient,
+		APIReader: mgr.GetAPIReader(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "OctaviaAmphoraController")
 		os.Exit(1)
