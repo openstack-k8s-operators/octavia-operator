@@ -128,14 +128,9 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
-        - mountPath: /etc/octavia/octavia.conf
+        - mountPath: /etc/octavia
           name: config-data-merged
           readOnly: true
-          subPath: octavia.conf
-        - mountPath: /etc/octavia/octavia.conf.d/custom.conf
-          name: config-data-merged
-          readOnly: true
-          subPath: custom.conf
         - mountPath: /etc/my.cnf
           name: config-data-merged
           readOnly: true
@@ -174,8 +169,6 @@ spec:
           subPath: tls.key
       - command:
         - /usr/bin/octavia-driver-agent
-        - --config-file
-        - /etc/octavia/octavia.conf
         - --config-dir
         - /etc/octavia/octavia.conf.d
         env:
@@ -206,14 +199,9 @@ spec:
         - mountPath: /usr/local/bin/container-scripts
           name: scripts
           readOnly: true
-        - mountPath: /etc/octavia/octavia.conf
+        - mountPath: /etc/octavia
           name: config-data-merged
           readOnly: true
-          subPath: octavia.conf
-        - mountPath: /etc/octavia/octavia.conf.d/custom.conf
-          name: config-data-merged
-          readOnly: true
-          subPath: custom.conf
         - mountPath: /etc/my.cnf
           name: config-data-merged
           readOnly: true

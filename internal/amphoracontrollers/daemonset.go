@@ -180,8 +180,6 @@ func DaemonSet(
 							Name: serviceName,
 							Command: []string{
 								"/usr/bin/" + controllerBinaryName(instance.Spec.Role),
-								"--config-file", "/usr/share/octavia/octavia-dist.conf",
-								"--config-file", "/etc/octavia/octavia.conf",
 								"--config-dir", "/etc/octavia/octavia.conf.d",
 							},
 							Image:           instance.Spec.ContainerImage,
