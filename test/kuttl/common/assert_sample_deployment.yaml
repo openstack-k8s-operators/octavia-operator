@@ -275,10 +275,20 @@ commands:
       fi
       exit 0
   - script: |
-      n_matches=$(oc get secrets -n $NAMESPACE octavia-worker-config-data -o jsonpath="{$.data['octavia\.conf']}" | base64 -d |
-          grep -e '^jobboard_enabled = true$' \
+      config=$(oc get secrets -n $NAMESPACE octavia-worker-config-data -o jsonpath="{$.data['octavia\.conf']}" | base64 -d)
+      n_matches=$(echo "$config" | grep -e '^jobboard_enabled = true$' \
                -e '^jobboard_backend_hosts = octavia-redis-redis-0\.octavia-redis-redis\.' | wc -l)
       if [ "$n_matches" != 2 ]; then
         exit 1
       fi
+      # Verify Redis TLS detection: Redis has no TLS, so SSL options should be empty
+      if echo "$config" | grep -q "^jobboard_redis_backend_ssl_options = ssl:true$"; then
+        echo "ERROR: jobboard_redis_backend_ssl_options should be empty when Redis has no TLS"
+        exit 1
+      fi
+      if ! echo "$config" | grep -q "^jobboard_redis_backend_ssl_options = $"; then
+        echo "ERROR: jobboard_redis_backend_ssl_options line not found or has unexpected format"
+        exit 1
+      fi
+      echo "SUCCESS: Redis TLS correctly detected as disabled"
       exit 0

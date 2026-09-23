@@ -1,0 +1,11 @@
+---
+# Create Redis instance WITHOUT TLS for octavia_scale test
+# This tests that Redis TLS detection works when Redis has no TLS
+apiVersion: redis.openstack.org/v1beta1
+kind: Redis
+metadata:
+  name: octavia-redis
+spec:
+  replicas: 1
+  # No TLS configuration (Spec.TLS.SecretName not set)
+  storageRequest: 1G

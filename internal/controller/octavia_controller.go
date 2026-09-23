@@ -1892,6 +1892,7 @@ func (r *OctaviaReconciler) amphoraControllerDaemonSetCreateOrUpdate(
 		daemonset.Spec.AmphoraCustomFlavors = instance.Spec.AmphoraCustomFlavors
 		daemonset.Spec.CreateFlavors = instance.Spec.CreateFlavors
 		daemonset.Spec.RedisHosts = instance.Status.RedisHosts
+		daemonset.Spec.RedisServiceName = instance.Spec.RedisServiceName
 		daemonset.Spec.TLS = instance.Spec.OctaviaAPI.TLS.Ca
 		daemonset.Spec.AmphoraImageOwnerID = ampImageOwnerID
 		daemonset.Spec.OctaviaProviderSubnetGateway = networkInfo.ManagementSubnetGateway

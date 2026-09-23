@@ -1,0 +1,49 @@
+---
+# Create Redis instance WITH TLS for octavia_tls test
+# This tests that Redis TLS detection works when Redis has TLS configured
+apiVersion: redis.openstack.org/v1beta1
+kind: Redis
+metadata:
+  name: octavia-redis
+spec:
+  replicas: 1
+  # Configure TLS
+  tls:
+    secretName: redis-tls-certs
+  storageRequest: 1G
+---
+# TLS secret for Redis (matches the format expected by Redis operator)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-tls-certs
+type: kubernetes.io/tls
+stringData:
+  tls.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDXTCCAkWgAwIBAgIUVLiMY8NRqYWmF7p/w0wl1jPpYkgwDQYJKoZIhvcNAQEL
+    BQAwPjELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQ8wDQYDVQQHDAZJcnZpbmUx
+    ETAPBgNVBAoMCFJlZGlzIENBMB4XDTI0MDEwMTAwMDAwMFoXDTI1MDEwMTAwMDAw
+    MFowPjELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQ8wDQYDVQQHDAZJcnZpbmUx
+    ETAPBgNVBAoMCFJlZGlzIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+    AQEAtestcertificatefortestingpurposesonlynotvalidforrealuse1234567890ABCD
+    EFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH
+    IJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLM
+    NOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMN
+    -----END CERTIFICATE-----
+  tls.key: |
+    -----BEGIN PRIVATE KEY-----
+    MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC1testkeyfortest
+    ingpurposesonlynotvalidforrealuse1234567890ABCDEFGHIJKLMNOPQRSTUVWXYZa
+    bcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef
+    ghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ
+    -----END PRIVATE KEY-----
+  ca.crt: |
+    -----BEGIN CERTIFICATE-----
+    MIIDXTCCAkWgAwIBAgIUVLiMY8NRqYWmF7p/w0wl1jPpYkgwDQYJKoZIhvcNAQEL
+    BQAwPjELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQ8wDQYDVQQHDAZJcnZpbmUx
+    ETAPBgNVBAoMCFJlZGlzIENBMB4XDTI0MDEwMTAwMDAwMFoXDTI1MDEwMTAwMDAw
+    MFowPjELMAkGA1UEBhMCVVMxCzAJBgNVBAgMAkNBMQ8wDQYDVQQHDAZJcnZpbmUx
+    ETAPBgNVBAoMCFJlZGlzIENBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKC
+    AQEAtestcacertificatefortestingpurposesonlynotvalidforrealuse12345678
+    -----END CERTIFICATE-----
