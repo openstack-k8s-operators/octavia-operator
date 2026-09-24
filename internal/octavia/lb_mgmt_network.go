@@ -258,7 +258,34 @@ func ensureNetwork(ctx context.Context, client *gophercloud.ServiceClient, creat
 	return foundNetwork, nil
 }
 
-func ensureNetworkExt(ctx context.Context, client *gophercloud.ServiceClient, createOpts networks.CreateOpts, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
+// providerSegment builds the Neutron provider segment for the Octavia provider
+// network from the LbMgmtNetwork spec. It defaults to a flat network on the
+// "octavia" physical network (the historical in-cluster behaviour). When
+// ProviderNetworkType is "vlan" it builds a VLAN segment, used to route the
+// management network through dedicated Networker nodes.
+func providerSegment(netDetails *octaviav1.OctaviaLbMgmtNetworks) ([]provider.Segment, error) {
+	networkType := netDetails.ProviderNetworkType
+	if networkType == "" {
+		networkType = "flat"
+	}
+	physicalNetwork := netDetails.ProviderPhysicalNetwork
+	if physicalNetwork == "" {
+		physicalNetwork = LbProvPhysicalNet
+	}
+	segment := provider.Segment{
+		NetworkType:     networkType,
+		PhysicalNetwork: physicalNetwork,
+	}
+	if networkType == "vlan" {
+		if netDetails.ProviderSegmentationID <= 0 {
+			return nil, fmt.Errorf("%w: got %d", ErrInvalidProviderSegmentationID, netDetails.ProviderSegmentationID)
+		}
+		segment.SegmentationID = netDetails.ProviderSegmentationID
+	}
+	return []provider.Segment{segment}, nil
+}
+
+func ensureNetworkExt(ctx context.Context, client *gophercloud.ServiceClient, createOpts networks.CreateOpts, netDetails *octaviav1.OctaviaLbMgmtNetworks, log *logr.Logger, serviceTenantID string) (*networks.Network, error) {
 	foundNetwork, err := getNetworkExt(ctx, client, createOpts.Name, serviceTenantID)
 	if err != nil {
 		return nil, err
@@ -266,11 +293,9 @@ func ensureNetworkExt(ctx context.Context, client *gophercloud.ServiceClient, cr
 
 	extTrue := true
 	if foundNetwork == nil {
-		segment := []provider.Segment{
-			{
-				NetworkType:     "flat",
-				PhysicalNetwork: LbProvPhysicalNet,
-			},
+		segment, err := providerSegment(netDetails)
+		if err != nil {
+			return nil, err
 		}
 
 		providerOpts := provider.CreateOptsExt{
@@ -355,7 +380,7 @@ func ensureProvNetwork(ctx context.Context, client *gophercloud.ServiceClient, n
 		TenantID:              serviceTenantID,
 		AvailabilityZoneHints: netDetails.AvailabilityZones,
 	}
-	provNet, err := ensureNetworkExt(ctx, client, createOpts, log, serviceTenantID)
+	provNet, err := ensureNetworkExt(ctx, client, createOpts, netDetails, log, serviceTenantID)
 	if err != nil {
 		return nil, err
 	}

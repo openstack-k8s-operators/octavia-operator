@@ -295,6 +295,30 @@ type OctaviaLbMgmtNetworks struct {
 	// +kubebuilder:validation:Optional
 	// AvailabilityZoneCIDRs are the CIDRs of each management network associated with an Availability Zone (ex: {"az":"172.34.0.0/24", ...})
 	AvailabilityZoneCIDRs map[string]string `json:"availabilityZoneCIDRs,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Enum=flat;vlan
+	// +kubebuilder:default=flat
+	// ProviderNetworkType is the Neutron provider network type for the Octavia
+	// provider network. "flat" (default) preserves the in-cluster behaviour;
+	// "vlan" creates a VLAN provider network, e.g. to route the management
+	// network through dedicated Networker nodes.
+	ProviderNetworkType string `json:"providerNetworkType,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:default=octavia
+	// ProviderPhysicalNetwork is the Neutron physical network name backing the
+	// Octavia provider network. Defaults to "octavia" (the in-cluster NIC
+	// mapping); set it to the datacentre physnet when using a VLAN provider
+	// network extended to Networker nodes.
+	ProviderPhysicalNetwork string `json:"providerPhysicalNetwork,omitempty"`
+
+	// +kubebuilder:validation:Optional
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:validation:Maximum=4094
+	// ProviderSegmentationID is the VLAN ID for the Octavia provider network.
+	// Required when ProviderNetworkType is "vlan"; ignored when "flat".
+	ProviderSegmentationID int `json:"providerSegmentationID,omitempty"`
 }
 
 // OctaviaAmphoraFlavor Settings for custom Amphora flavors
