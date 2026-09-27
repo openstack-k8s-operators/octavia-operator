@@ -328,3 +328,18 @@ spec:
   selector:
     service: octavia
   type: ClusterIP
+---
+# Verify Redis TLS detection in TLS test
+apiVersion: kuttl.dev/v1beta1
+kind: TestAssert
+commands:
+  - script: |
+      # Verify Redis TLS detection: Redis has TLS, so SSL options should be "ssl:true"
+      config=$(oc get secrets -n $NAMESPACE octavia-worker-config-data -o jsonpath="{$.data['octavia\.conf']}" | base64 -d)
+      if ! echo "$config" | grep -q "^jobboard_redis_backend_ssl_options = ssl:true$"; then
+        echo "ERROR: jobboard_redis_backend_ssl_options should be 'ssl:true' when Redis has TLS"
+        echo "Found: $(echo "$config" | grep jobboard_redis_backend_ssl_options)"
+        exit 1
+      fi
+      echo "SUCCESS: Redis TLS correctly detected as enabled"
+      exit 0

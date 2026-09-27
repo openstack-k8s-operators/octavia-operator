@@ -10,6 +10,8 @@ spec:
     cluster: rabbitmq
   secret: osp-secret
   preserveJobs: false
+  # Configure Redis with TLS for testing
+  redisServiceName: octavia-redis
   customServiceConfig: |
     [DEFAULT]
     debug = true
