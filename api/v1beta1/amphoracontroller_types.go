@@ -97,7 +97,7 @@ type OctaviaAmphoraControllerSpecCore struct {
 	// +kubebuilder:default="# add your customization here"
 	// CustomServiceConfig - customize the service config using this parameter to change service defaults,
 	// or overwrite rendered information using raw OpenStack config format. The content gets added to
-	// to /etc/<service>/<service>.conf.d directory as custom.conf file.
+	// /etc/<service>/<service>.conf.d as a priority-ordered config file.
 	CustomServiceConfig string `json:"customServiceConfig,omitempty"`
 
 	// +kubebuilder:validation:Optional

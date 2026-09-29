@@ -15,13 +15,16 @@
 # under the License.
 set -ex
 
-# expect that the common.sh is in the same dir as the calling script
-SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-. ${SCRIPTPATH}/common.sh --source-only
+MERGEPATH=/var/lib/config-data/merged
 
-# Merge all templates from config CM
+# Clear existing targets in case the init container restarts.
+rm -rf ${MERGEPATH}/*
+
+# Copy all templates from the config secret.
 for dir in /var/lib/config-data/default; do
-    merge_config_dir ${dir}
+    for conf in $(find ${dir} -type f); do
+        cp -f ${conf} ${MERGEPATH}/
+    done
 done
 
 # Network configuration

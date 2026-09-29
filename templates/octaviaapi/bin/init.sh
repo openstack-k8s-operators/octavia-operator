@@ -15,20 +15,25 @@
 # under the License.
 set -ex
 
-# This script generates the octavia.conf/logging.conf file and
-# copies the result to the ephemeral /var/lib/config-data/merged volume.
-
-SVC_CFG=/etc/octavia/octavia.conf
-SVC_CFG_MERGED=/var/lib/config-data/merged/octavia.conf
+MERGEPATH=/var/lib/config-data/merged
 
 # expect that the common.sh is in the same dir as the calling script
 SCRIPTPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
 . ${SCRIPTPATH}/common.sh --source-only
 
-# Copy default service config from container image as base
-cp -a ${SVC_CFG} ${SVC_CFG_MERGED}
+# Clear existing targets in case the init container restarts.
+rm -rf ${MERGEPATH}/*
 
-# Merge all templates from config CM
+# Preserve packaged top-level files because the merged volume replaces
+# /etc/octavia in the service container.
+for f in $(find /etc/octavia -maxdepth 1 -type f); do
+    target=$(basename ${f})
+    cp -f ${f} ${MERGEPATH}/${target}
+done
+
+mkdir -p ${MERGEPATH}/octavia.conf.d
+chmod 0775 ${MERGEPATH}/octavia.conf.d
+
 for dir in /var/lib/config-data/default; do
-    merge_config_dir ${dir}
+    copy_config_dir ${dir}
 done

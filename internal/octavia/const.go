@@ -57,4 +57,13 @@ const (
 	ACConsumerFinalizer = "openstack.org/octaviaapi-ac-consumer"
 	// TransportConsumerFinalizer is added to transport URL secrets that octavia is actively consuming
 	TransportConsumerFinalizer = "openstack.org/octavia-transport-consumer"
+
+	// DefaultsConfigFileName is the parent controller configuration.
+	DefaultsConfigFileName = "00-config.conf"
+	// ServiceConfigFileName is the configuration generated for a service.
+	ServiceConfigFileName = "01-config.conf"
+	// CustomConfigFileName is the custom configuration inherited by the top-level CR.
+	CustomConfigFileName = "02-config.conf"
+	// CustomServiceConfigFileName is the custom configuration defined for a sub-CR.
+	CustomServiceConfigFileName = "03-config.conf"
 )
