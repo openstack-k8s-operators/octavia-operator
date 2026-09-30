@@ -16,6 +16,7 @@ limitations under the License.
 package octaviarsyslog
 
 import (
+	"github.com/openstack-k8s-operators/lib-common/modules/common/volume"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
 	corev1 "k8s.io/api/core/v1"
 )
@@ -45,6 +46,7 @@ func GetVolumes(name string) []corev1.Volume {
 				},
 			},
 		},
+		volume.WritableDirVolume("rsyslog-state"),
 	)
 }
 

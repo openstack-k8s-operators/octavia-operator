@@ -79,6 +79,11 @@ func DaemonSet(
 			SubPath:   "09-octavia-listener.conf",
 			ReadOnly:  true,
 		},
+		corev1.VolumeMount{
+			Name:      "rsyslog-state",
+			MountPath: "/var/lib/rsyslog",
+			ReadOnly:  false,
+		},
 	)
 
 	livenessProbe := &corev1.Probe{
@@ -135,6 +140,14 @@ func DaemonSet(
 		}
 	}
 
+	daemonsetSecurityContext := pod.RestrictivePodSecurityContext(users.OctaviaUID, users.OctaviaGID)
+	daemonsetSecurityContext.Sysctls = []corev1.Sysctl{
+		{
+			Name:  "net.ipv4.ip_unprivileged_port_start",
+			Value: "514",
+		},
+	}
+
 	daemonset := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      serviceName,
@@ -152,7 +165,7 @@ func DaemonSet(
 				Spec: corev1.PodSpec{
 					ServiceAccountName:           instance.Spec.ServiceAccount,
 					AutomountServiceAccountToken: ptr.To(false),
-					SecurityContext:              pod.RestrictivePodSecurityContext(users.OctaviaUID, users.OctaviaGID),
+					SecurityContext:              daemonsetSecurityContext,
 					Containers: []corev1.Container{
 						{
 							Name: serviceName,
