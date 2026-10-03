@@ -1,0 +1,93 @@
+---
+- job:
+    name: octavia-operator-tempest-multinode
+    parent: podified-multinode-edpm-deployment-crc
+    timeout: 18000
+    dependencies: ["openstack-k8s-operators-content-provider"]
+    irrelevant-files:
+      - .*/*.md
+      - ^.github/.*$
+      - .ci-operator.yaml
+      - .dockerignore
+      - .gitignore
+      - .golangci.yaml
+      - .pre-commit-config.yaml
+      - .prow_ci.env
+      - ^LICENSE.*$
+      - ^OWNERS$
+      - ^OWNERS_ALIASES$
+      - ^PROJECT$
+      - .*go.(mod|sum|work).*
+      - ^kuttl-test.yaml$
+      - ^renovate.json$
+      - ^config/samples/.*$
+      - ^docs?/.*
+      - ^hack/.*$
+      - ^tests?/functional/.*$
+      - ^tests?/kuttl/.*$
+    vars:
+      cifmw_edpm_deploy_nova_compute_extra_config: |
+        [DEFAULT]
+        force_config_drive = false
+      cifmw_test_operator_tempest_container: openstack-tempest-all
+      cifmw_run_test_role: test_operator
+      cifmw_test_operator_tempest_network_attachments:
+        - ctlplane
+      cifmw_test_operator_tempest_tempestconf_config:
+          overrides: |
+            compute-feature-enabled.vnc_console true
+            validation.run_validation true
+            identity.v3_endpoint_type public
+            identity.v2_admin_endpoint_type public
+            load_balancer.enable_security_groups True
+            load_balancer.admin_role swiftoperator
+            load_balancer.member_role swiftoperator
+            load_balancer.observer_role swiftoperator
+            load_balancer.global_observer_role swiftoperator
+            load_balancer.test_server_remote_url https://tarballs.opendev.org/openstack/octavia-tempest-plugin/test-server/test_server-x86_64.master.bin
+            enforce_scope.octavia False
+            auth.tempest_roles ''
+      cifmw_test_operator_tempest_workflow:
+        - stepName: multi-thread-testing
+          tempestRun:
+            concurrency: 4
+            includeList: |
+              octavia_tempest_plugin.tests.api.v2.*
+              octavia_tempest_plugin.tests.scenario
+            excludeList: |
+              octavia_tempest_plugin.tests.scenario.v2.test_ipv6_traffic_ops
+      cifmw_test_operator_timeout: 86400
+      cifmw_edpm_prepare_kustomizations:
+        - apiVersion: kustomize.config.k8s.io/v1beta1
+          kind: Kustomization
+          namespace: openstack
+          patches:
+            - target:
+                kind: OpenStackControlPlane
+              patch: |-
+                apiVersion: core.openstack.org/v1beta1
+                kind: OpenStackControlPlane
+                metadata:
+                  name: unused
+                spec:
+                  octavia:
+                    enabled: true
+                    template:
+                      amphoraImageContainerImage: quay.io/gthiemonge/octavia-amphora-image
+                      octaviaAPI:
+                        networkAttachments:
+                          - internalapi
+                      octaviaHousekeeping:
+                        networkAttachments:
+                          - octavia
+                      octaviaHealthManager:
+                        networkAttachments:
+                          - octavia
+                      octaviaWorker:
+                        networkAttachments:
+                          - octavia
+                  ovn:
+                    template:
+                      ovnController:
+                        nicMappings:
+                          octavia: octbr
