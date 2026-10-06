@@ -46,6 +46,11 @@ type OctaviaAPISpec struct {
 	// +kubebuilder:validation:Required
 	// Octavia Container Image URL
 	ContainerImage string `json:"containerImage"`
+
+	// +kubebuilder:validation:Optional
+	// +operator-sdk:csv:customresourcedefinitions:type=spec
+	// Auth - Parameters related to authentication, propagated from the parent Octavia CR
+	Auth AuthSpec `json:"auth,omitempty"`
 }
 
 // OctaviaAPISpecCore -
@@ -159,11 +164,6 @@ type OctaviaAPISpecCore struct {
 	TLS OctaviaApiTLS `json:"tls,omitempty"`
 
 	// +kubebuilder:validation:Optional
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	// Auth - Parameters related to authentication
-	Auth AuthSpec `json:"auth,omitempty"`
-
-	// +kubebuilder:validation:Optional
 	// APITimeout for HAProxy and Apache defaults to OctaviaSpecCore APITimeout (seconds)
 	APITimeout int `json:"apiTimeout"`
 
@@ -195,13 +195,6 @@ type APIOverrideSpec struct {
 	Service map[service.Endpoint]service.RoutedOverrideSpec `json:"service,omitempty"`
 }
 
-// AuthSpec defines authentication parameters
-type AuthSpec struct {
-	// +kubebuilder:validation:Optional
-	// +operator-sdk:csv:customresourcedefinitions:type=spec
-	// ApplicationCredentialSecret - Secret containing Application Credential ID and Secret
-	ApplicationCredentialSecret string `json:"applicationCredentialSecret,omitempty"`
-}
 
 // OctaviaAPIStatus defines the observed state of OctaviaAPI
 type OctaviaAPIStatus struct {
