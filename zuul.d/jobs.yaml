@@ -1,10 +1,11 @@
 ---
+
 - job:
     name: octavia-operator-tempest-multinode
     parent: podified-multinode-edpm-deployment-crc
     timeout: 18000
     dependencies: ["openstack-k8s-operators-content-provider"]
-    irrelevant-files:
+    irrelevant-files: &irrelevant_files
       - .*/*.md
       - ^.github/.*$
       - .ci-operator.yaml
@@ -25,7 +26,7 @@
       - ^hack/.*$
       - ^tests?/functional/.*$
       - ^tests?/kuttl/.*$
-    vars:
+    vars: &cifmw_vars
       cifmw_edpm_deploy_nova_compute_extra_config: |
         [DEFAULT]
         force_config_drive = false
@@ -95,3 +96,26 @@
                       ovnController:
                         nicMappings:
                           octavia: octbr
+
+- job:
+    name: octavia-s2i-content-provider
+    parent: s2i-openstack-container-content-provider
+    description: |
+      Build s2i Octavia service images for octavia-s2i-test jobs.
+    required-projects:
+      - name: openstack-k8s-operators/s2i-openstack-containers
+        override-checkout: main
+    vars:
+      s2i_ci_images:
+        - octavia/octavia-api
+        - octavia/octavia-worker
+        - octavia/rsyslog
+
+- job:
+    name: octavia-s2i-test
+    parent: s2i-test-base
+    nodeset: centos-10-2x-centos-9-xxl-crc-cloud-ocp-4-22-1-3xl
+    description: |
+      Validate an Octavia deployment.
+    irrelevant-files: *irrelevant_files
+    vars: *cifmw_vars
