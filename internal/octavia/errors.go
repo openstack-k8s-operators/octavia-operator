@@ -41,10 +41,11 @@ var (
 	ErrSettingUserRole                = errors.New("error when setting role to user in project")
 
 	// Network-related errors
-	ErrCannotFindNetwork           = errors.New("cannot find network")
-	ErrRouterNotUp                 = errors.New("router is not up")
-	ErrPredictableIPAllocation     = errors.New("predictable IPs: cannot allocate IP addresses")
-	ErrPredictableIPOutOfAddresses = errors.New("predictable IPs: out of available addresses")
-	ErrCannotAllocateIPAddresses   = errors.New("cannot allocate IP addresses")
-	ErrCannotFindGatewayInfo       = errors.New("cannot find gateway information in network attachment")
+	ErrCannotFindNetwork             = errors.New("cannot find network")
+	ErrRouterNotUp                   = errors.New("router is not up")
+	ErrPredictableIPAllocation       = errors.New("predictable IPs: cannot allocate IP addresses")
+	ErrPredictableIPOutOfAddresses   = errors.New("predictable IPs: out of available addresses")
+	ErrCannotAllocateIPAddresses     = errors.New("cannot allocate IP addresses")
+	ErrCannotFindGatewayInfo         = errors.New("cannot find gateway information in network attachment")
+	ErrInvalidProviderSegmentationID = errors.New("providerSegmentationID must be a valid VLAN ID when providerNetworkType is \"vlan\"")
 )
