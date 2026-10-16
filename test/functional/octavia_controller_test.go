@@ -488,12 +488,16 @@ var _ = Describe("Octavia controller", func() {
 			}, timeout, interval).Should(Succeed())
 
 			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(notificationsTransportURLSecretName))
-			infra.SimulateTransportURLReady(notificationsTransportURLName)
 
-			// Update the TransportURL status to use the correct secret name
+			// Set the expected secret name before marking the TransportURL ready.
+			// SimulateTransportURLReady derives a secret name from the RabbitMQ
+			// cluster, which would let the Octavia controller observe the wrong
+			// name before this test can replace it.
 			Eventually(func(g Gomega) {
 				transportURL := infra.GetTransportURL(notificationsTransportURLName)
 				transportURL.Status.SecretName = notificationsTransportURLSecretName.Name
+				transportURL.Status.ObservedGeneration = transportURL.Generation
+				transportURL.Status.Conditions.MarkTrue("TransportURLReady", "Ready")
 				g.Expect(k8sClient.Status().Update(ctx, transportURL)).To(Succeed())
 			}, timeout, interval).Should(Succeed())
 		})
