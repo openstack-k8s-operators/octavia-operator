@@ -457,6 +457,7 @@ var _ = Describe("Octavia controller", func() {
 
 	When("NotificationsBus is specified", func() {
 		var notificationsTransportURLName types.NamespacedName
+		var initialNotificationsTransportURLSecretName types.NamespacedName
 		var notificationsTransportURLSecretName types.NamespacedName
 
 		BeforeEach(func() {
@@ -480,6 +481,13 @@ var _ = Describe("Octavia controller", func() {
 				Namespace: namespace,
 				Name:      "octavia-notifications-transport-secret",
 			}
+			// SimulateTransportURLReady derives this name from the RabbitMQ
+			// cluster.  Create it so the controller can complete the initial
+			// reconcile before the test rotates to the final secret below.
+			initialNotificationsTransportURLSecretName = types.NamespacedName{
+				Namespace: namespace,
+				Name:      "rabbitmq-notifications-secret",
+			}
 
 			// The controller creates the TransportURL, we just need to create the secret and simulate it being ready
 			Eventually(func(g Gomega) {
@@ -487,10 +495,22 @@ var _ = Describe("Octavia controller", func() {
 				g.Expect(transportURL).ToNot(BeNil())
 			}, timeout, interval).Should(Succeed())
 
+			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(initialNotificationsTransportURLSecretName))
 			DeferCleanup(k8sClient.Delete, ctx, CreateTransportURLSecret(notificationsTransportURLSecretName))
 			infra.SimulateTransportURLReady(notificationsTransportURLName)
 
-			// Update the TransportURL status to use the correct secret name
+			// Wait until the controller has consumed the helper-derived secret
+			// before changing the TransportURL status.  This makes the next status
+			// update a real secret rotation rather than racing initial setup.
+			Eventually(func(g Gomega) {
+				instance := GetOctavia(octaviaName)
+				g.Expect(instance.Status.NotificationsTransportURLSecret).To(Equal(initialNotificationsTransportURLSecretName.Name))
+
+				secret := th.GetSecret(initialNotificationsTransportURLSecretName)
+				g.Expect(secret.Finalizers).To(ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			// Rotate from the helper-derived secret to the fixture's final secret.
 			Eventually(func(g Gomega) {
 				transportURL := infra.GetTransportURL(notificationsTransportURLName)
 				transportURL.Status.SecretName = notificationsTransportURLSecretName.Name
@@ -516,10 +536,33 @@ var _ = Describe("Octavia controller", func() {
 			)
 		})
 
-		It("should set NotificationsTransportURLSecret in Octavia status", func() {
+		It("should retain the old NotificationsTransportURLSecret during rotation", func() {
 			Eventually(func(g Gomega) {
-				octavia := GetOctavia(octaviaName)
-				g.Expect(octavia.Status.NotificationsTransportURLSecret).To(Equal("octavia-notifications-transport-secret"))
+				instance := GetOctavia(octaviaName)
+				g.Expect(instance.Status.NotificationsTransportURLSecret).To(Equal(initialNotificationsTransportURLSecretName.Name))
+
+				secret := th.GetSecret(notificationsTransportURLSecretName)
+				g.Expect(secret.Finalizers).To(ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+		})
+
+		It("should remove finalizers from both notification secrets on CR deletion", func() {
+			Eventually(func(g Gomega) {
+				oldSecret := th.GetSecret(initialNotificationsTransportURLSecretName)
+				g.Expect(oldSecret.Finalizers).To(ContainElement(octavia.TransportConsumerFinalizer))
+
+				newSecret := th.GetSecret(notificationsTransportURLSecretName)
+				g.Expect(newSecret.Finalizers).To(ContainElement(octavia.TransportConsumerFinalizer))
+			}, timeout, interval).Should(Succeed())
+
+			th.DeleteInstance(GetOctavia(octaviaName))
+
+			Eventually(func(g Gomega) {
+				oldSecret := th.GetSecret(initialNotificationsTransportURLSecretName)
+				g.Expect(oldSecret.Finalizers).NotTo(ContainElement(octavia.TransportConsumerFinalizer))
+
+				newSecret := th.GetSecret(notificationsTransportURLSecretName)
+				g.Expect(newSecret.Finalizers).NotTo(ContainElement(octavia.TransportConsumerFinalizer))
 			}, timeout, interval).Should(Succeed())
 		})
 	})
