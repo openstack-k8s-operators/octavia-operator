@@ -29,22 +29,22 @@ const (
 	// Container image fall-back defaults
 
 	// OctaviaAPIContainerImage is the fall-back container image for OctaviaAPI
-	OctaviaAPIContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified"
+	OctaviaAPIContainerImage = "quay.io/openstack-s2i-containers/openstack-octavia-api:master-latest"
 
 	// OctaviaHousekeepingContainerImage is the fall-back container image for OctaviaHousekeeping
-	OctaviaHousekeepingContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-housekeeping:current-podified"
+	OctaviaHousekeepingContainerImage = "quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest"
 
 	// OctaviaHealthManagerContainerImage is the fall-back container image for OctaviaHealthManager
-	OctaviaHealthManagerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-health-manager:current-podified"
+	OctaviaHealthManagerContainerImage = "quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest"
 
 	// OctaviaWorkerContainerImage is the fall-back container image for OctaviaWorker
-	OctaviaWorkerContainerImage = "quay.io/podified-antelope-centos9/openstack-octavia-worker:current-podified"
+	OctaviaWorkerContainerImage = "quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest"
 
 	// ApacheImage - default fall-back image for Apache
 	ApacheContainerImage = "registry.redhat.io/ubi9/httpd-24:latest"
 
 	// OctaviaRsyslogContainer image is the fall-back container image for OctaviaRsyslog
-	RsyslogContainerImage = "quay.io/podified-antelope-centos9/openstack-rsyslog:current-podified"
+	RsyslogContainerImage = "quay.io/openstack-s2i-containers/openstack-rsyslog:master-latest"
 
 	// Octavia API timeout
 	APITimeout = 120
