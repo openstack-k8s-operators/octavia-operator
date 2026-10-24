@@ -25,7 +25,7 @@ spec:
     role: housekeeping
     secret: osp-secret
     preserveJobs: false
-    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-housekeeping:current-podified
+    containerImage: quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest
     customServiceConfig: |
       [DEFAULT]
       debug = true
@@ -38,7 +38,7 @@ spec:
     role: healthmanager
     secret: osp-secret
     preserveJobs: false
-    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-health-manager:current-podified
+    containerImage: quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest
     customServiceConfig: |
       [DEFAULT]
       debug = true
@@ -51,7 +51,7 @@ spec:
     role: worker
     secret: osp-secret
     preserveJobs: false
-    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-worker:current-podified
+    containerImage: quay.io/openstack-s2i-containers/openstack-octavia-worker:master-latest
     customServiceConfig: |
       [DEFAULT]
       debug = true
@@ -63,7 +63,7 @@ spec:
     serviceAccount: octavia
     secret: osp-secret
     preserveJobs: false
-    containerImage: quay.io/podified-antelope-centos9/openstack-octavia-api:current-podified
+    containerImage: quay.io/openstack-s2i-containers/openstack-octavia-api:master-latest
     customServiceConfig: |
       [DEFAULT]
       debug = true
