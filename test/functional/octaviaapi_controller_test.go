@@ -522,6 +522,13 @@ var _ = Describe("OctaviaAPI controller", func() {
 					Namespace: namespace,
 					Name:      "octavia-api",
 				})
+				g.Expect(deployment.Spec.Template.Spec.Containers).To(HaveLen(2))
+				apiContainer := deployment.Spec.Template.Spec.Containers[0]
+				g.Expect(apiContainer.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+				g.Expect(apiContainer.Args).To(Equal([]string{"--single-child", "--", "/usr/sbin/httpd", "-DFOREGROUND"}))
+				agentContainer := deployment.Spec.Template.Spec.Containers[1]
+				g.Expect(agentContainer.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+				g.Expect(agentContainer.Args).To(Equal([]string{"--single-child", "--", "/usr/bin/octavia-driver-agent", "--config-dir", "/etc/octavia/octavia.conf.d"}))
 				for _, container := range deployment.Spec.Template.Spec.Containers {
 					mounts := map[string]string{}
 					for _, vm := range container.VolumeMounts {
