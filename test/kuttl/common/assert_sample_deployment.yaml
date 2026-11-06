@@ -196,7 +196,7 @@ metadata:
   name: octavia-internal
 spec:
   ports:
-    - name: octavia-internal
+    - name: internal
   selector:
     service: octavia
   type: ClusterIP
@@ -210,7 +210,7 @@ metadata:
   name: octavia-public
 spec:
   ports:
-    - name: octavia-public
+    - name: public
   selector:
     service: octavia
   type: ClusterIP

@@ -138,6 +138,9 @@ func (r *OctaviaSpec) ValidateCreate(basePath *field.Path, namespace string) ([]
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
@@ -155,6 +158,9 @@ func (r *OctaviaSpecCore) ValidateCreate(basePath *field.Path, namespace string)
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
 
@@ -249,6 +255,9 @@ func (r *OctaviaSpec) ValidateUpdate(old OctaviaSpec, basePath *field.Path, name
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
 
 	allErrs = append(allErrs, r.ValidateOctaviaTopology(basePath, namespace)...)
 
@@ -266,6 +275,9 @@ func (r *OctaviaSpecCore) ValidateUpdate(old OctaviaSpecCore, basePath *field.Pa
 
 	// validate the service override key is valid
 	allErrs = append(allErrs, service.ValidateRoutedOverrides(
+		basePath.Child("octaviaAPI").Child("override").Child("service"),
+		r.OctaviaAPI.Override.Service)...)
+	allErrs = append(allErrs, validateServicePortNames(
 		basePath.Child("octaviaAPI").Child("override").Child("service"),
 		r.OctaviaAPI.Override.Service)...)
 
@@ -394,4 +406,10 @@ func (spec *OctaviaSpec) ValidateOctaviaTopology(basePath *field.Path, namespace
 	allErrs = append(allErrs, spec.OctaviaWorker.ValidateTopology(wPath, namespace)...)
 
 	return allErrs
+}
+
+// validateServicePortNames rejects service port names, endpointURLs and ports
+// in the override that don't match the bare endpoint type.
+func validateServicePortNames(basePath *field.Path, overrides map[service.Endpoint]service.RoutedOverrideSpec) field.ErrorList {
+	return common_webhook.ValidatePortNameOverrides(basePath, overrides, common_webhook.DefaultServicePortNames())
 }
