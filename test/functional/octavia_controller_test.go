@@ -37,7 +37,9 @@ import (
 	"github.com/openstack-k8s-operators/lib-common/modules/common/util"
 	mariadbv1 "github.com/openstack-k8s-operators/mariadb-operator/api/v1beta1"
 	octaviav1 "github.com/openstack-k8s-operators/octavia-operator/api/v1beta1"
+	"github.com/openstack-k8s-operators/octavia-operator/internal/amphoracontrollers"
 	"github.com/openstack-k8s-operators/octavia-operator/internal/octavia"
+	"github.com/openstack-k8s-operators/octavia-operator/internal/octaviarsyslog"
 	ovnv1 "github.com/openstack-k8s-operators/ovn-operator/api/v1beta1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -1666,4 +1668,35 @@ var _ = Describe("Octavia controller", func() {
 		})
 	})
 
+})
+
+var _ = Describe("Octavia dumb-init commands", func() {
+	DescribeTable("wraps amphora controller commands", func(role, binary string) {
+		instance := &octaviav1.OctaviaAmphoraController{}
+		instance.Spec.Role = role
+		container := amphoracontrollers.DaemonSet(instance, "", nil, nil, nil).Spec.Template.Spec.Containers[0]
+		Expect(container.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+		Expect(container.Args).To(Equal([]string{
+			"--single-child",
+			"--",
+			"/usr/bin/" + binary,
+			"--config-dir", "/etc/octavia/octavia.conf.d",
+		}))
+	},
+		Entry("health manager", octaviav1.HealthManager, "octavia-health-manager"),
+		Entry("housekeeping", octaviav1.Housekeeping, "octavia-housekeeping"),
+		Entry("worker", octaviav1.Worker, "octavia-worker"),
+	)
+
+	It("wraps the rsyslog command", func() {
+		instance := &octaviav1.OctaviaRsyslog{}
+		container := octaviarsyslog.DaemonSet(instance, "", nil, nil, nil).Spec.Template.Spec.Containers[0]
+		Expect(container.Command).To(Equal([]string{"/usr/bin/dumb-init"}))
+		Expect(container.Args).To(Equal([]string{
+			"--single-child",
+			"--",
+			"/usr/sbin/rsyslogd",
+			"-n",
+		}))
+	})
 })

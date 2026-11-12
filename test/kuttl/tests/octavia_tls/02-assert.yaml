@@ -99,8 +99,11 @@ spec:
             weight: 100
       containers:
       - command:
-        - /usr/sbin/httpd
+        - /usr/bin/dumb-init
         args:
+        - --single-child
+        - --
+        - /usr/sbin/httpd
         - -DFOREGROUND
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -168,6 +171,10 @@ spec:
           readOnly: true
           subPath: tls.key
       - command:
+        - /usr/bin/dumb-init
+        args:
+        - --single-child
+        - --
         - /usr/bin/octavia-driver-agent
         - --config-dir
         - /etc/octavia/octavia.conf.d

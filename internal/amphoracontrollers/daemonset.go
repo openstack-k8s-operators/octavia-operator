@@ -179,6 +179,11 @@ func DaemonSet(
 						{
 							Name: serviceName,
 							Command: []string{
+								"/usr/bin/dumb-init",
+							},
+							Args: []string{
+								"--single-child",
+								"--",
 								"/usr/bin/" + controllerBinaryName(instance.Spec.Role),
 								"--config-dir", "/etc/octavia/octavia.conf.d",
 							},
