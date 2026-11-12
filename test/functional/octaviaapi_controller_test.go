@@ -24,12 +24,14 @@ import (
 	. "github.com/onsi/gomega"    //revive:disable:dot-imports
 	"gopkg.in/ini.v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/utils/ptr"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	keystonev1 "github.com/openstack-k8s-operators/keystone-operator/api/v1beta1"
 	"github.com/openstack-k8s-operators/lib-common/modules/common/condition"
+	"github.com/openstack-k8s-operators/lib-common/modules/common/service"
 
 	//revive:disable-next-line:dot-imports
 	. "github.com/openstack-k8s-operators/lib-common/modules/common/test/helpers"
@@ -297,6 +299,140 @@ var _ = Describe("OctaviaAPI controller", func() {
 			Expect(conf).Should(
 				ContainSubstring(fmt.Sprintf(
 					"transport_url=%s\n", string(transportURLSecret.Data["transport_url"]))))
+		})
+
+		When("the endpoints are LoadBalancers with endpointURL set", func() {
+			var lbServices []types.NamespacedName
+
+			BeforeEach(func() {
+				lbServices = []types.NamespacedName{
+					{Namespace: namespace, Name: "octavia-public"},
+					{Namespace: namespace, Name: "octavia-internal"},
+				}
+				Eventually(func(g Gomega) {
+					instance := GetOctaviaAPI(octaviaAPIName)
+					instance.Spec.Override.Service = map[service.Endpoint]service.RoutedOverrideSpec{
+						service.EndpointPublic: {
+							EndpointURL: ptr.To("https://octavia.example.com:9876"),
+							OverrideSpec: service.OverrideSpec{
+								Spec: &service.OverrideServiceSpec{Type: corev1.ServiceTypeLoadBalancer},
+							},
+						},
+						service.EndpointInternal: {
+							EndpointURL: ptr.To("https://octavia-int.example.com:9876"),
+							OverrideSpec: service.OverrideSpec{
+								Spec: &service.OverrideServiceSpec{Type: corev1.ServiceTypeLoadBalancer},
+							},
+						},
+					}
+					g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				// The controller stops at the first LoadBalancer without an IP, so
+				// give every Service an IP, tolerating not-yet-created ones.
+				Eventually(func(g Gomega) {
+					for _, n := range lbServices {
+						svc := &corev1.Service{}
+						g.Expect(k8sClient.Get(ctx, n, svc)).To(Succeed())
+						g.Expect(svc.Spec.Type).To(Equal(corev1.ServiceTypeLoadBalancer))
+						if len(svc.Status.LoadBalancer.Ingress) == 0 {
+							svc.Status.LoadBalancer.Ingress = []corev1.LoadBalancerIngress{{IP: "1.1.1.1"}}
+							g.Expect(k8sClient.Status().Update(ctx, svc)).To(Succeed())
+						}
+					}
+				}, timeout, interval).Should(Succeed())
+			})
+
+			It("renders ServerName/ServerAlias from the endpointURL", func() {
+				Eventually(func(g Gomega) {
+					secret := th.GetSecret(types.NamespacedName{
+						Namespace: namespace,
+						Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
+					httpd := string(secret.Data["httpd.conf"])
+					for _, ep := range []struct{ host, name string }{
+						{"octavia.example.com", "octavia-public"},
+						{"octavia-int.example.com", "octavia-internal"},
+					} {
+						g.Expect(httpd).To(ContainSubstring(fmt.Sprintf(
+							"ServerName %s\n    ServerAlias %s.%s.svc\n", ep.host, ep.name, namespace)))
+					}
+				}, timeout, interval).Should(Succeed())
+			})
+
+			It("names every Service port after its endpoint and keeps object names", func() {
+				for _, n := range lbServices {
+					svc := th.GetService(n)
+					Expect(svc.Spec.Ports).To(HaveLen(1))
+					Expect(svc.Spec.Ports[0].Name).To(Equal(svc.Labels["endpoint"]))
+				}
+				Expect(th.GetService(lbServices[0]).Spec.Ports[0].Name).To(Equal("public"))
+				Expect(th.GetService(lbServices[1]).Spec.Ports[0].Name).To(Equal("internal"))
+			})
+
+			It("registers dnsmasq hostname only on the internal LoadBalancer", func() {
+				Expect(th.GetService(lbServices[0]).Annotations).NotTo(HaveKey(service.AnnotationHostnameKey))
+				Expect(th.GetService(lbServices[1]).Annotations).To(HaveKeyWithValue(
+					service.AnnotationHostnameKey, fmt.Sprintf("octavia-internal.%s.svc", namespace)))
+			})
+
+			It("drops a stale dnsmasq hostname annotation when the public Service becomes ClusterIP", func() {
+				// simulate a registration left on the public LoadBalancer by a previous release
+				Eventually(func(g Gomega) {
+					svc := th.GetService(lbServices[0])
+					svc.Annotations[service.AnnotationHostnameKey] = "octavia-public.stale.svc"
+					g.Expect(k8sClient.Update(ctx, svc)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					instance := GetOctaviaAPI(octaviaAPIName)
+					override := instance.Spec.Override.Service[service.EndpointPublic]
+					override.Spec = nil
+					instance.Spec.Override.Service[service.EndpointPublic] = override
+					g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					svc := th.GetService(lbServices[0])
+					g.Expect(svc.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+					g.Expect(svc.Annotations).NotTo(HaveKey(service.AnnotationHostnameKey))
+				}, timeout, interval).Should(Succeed())
+			})
+
+			It("drops the dnsmasq hostname annotation when the internal endpoint is switched to ClusterIP", func() {
+				Eventually(func(g Gomega) {
+					instance := GetOctaviaAPI(octaviaAPIName)
+					override := instance.Spec.Override.Service[service.EndpointInternal]
+					override.Spec = nil
+					instance.Spec.Override.Service[service.EndpointInternal] = override
+					g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+				}, timeout, interval).Should(Succeed())
+
+				Eventually(func(g Gomega) {
+					svc := th.GetService(lbServices[1])
+					g.Expect(svc.Spec.Type).To(Equal(corev1.ServiceTypeClusterIP))
+					g.Expect(svc.Annotations).NotTo(HaveKey(service.AnnotationHostnameKey))
+				}, timeout, interval).Should(Succeed())
+			})
+		})
+
+		It("keeps the default vhost ServerName when the public endpointURL is set without a LoadBalancer (Route)", func() {
+			Eventually(func(g Gomega) {
+				instance := GetOctaviaAPI(octaviaAPIName)
+				instance.Spec.Override.Service = map[service.Endpoint]service.RoutedOverrideSpec{
+					service.EndpointPublic: {EndpointURL: ptr.To("https://octavia-route.example.com:9876")},
+				}
+				g.Expect(k8sClient.Update(ctx, instance)).To(Succeed())
+			}, timeout, interval).Should(Succeed())
+
+			Eventually(func(g Gomega) {
+				secret := th.GetSecret(types.NamespacedName{
+					Namespace: namespace,
+					Name:      fmt.Sprintf("%s-config-data", octaviaAPIName.Name)})
+				httpd := string(secret.Data["httpd.conf"])
+				// the router sends no SNI, so the route host must not become a ServerName
+				g.Expect(httpd).NotTo(ContainSubstring("octavia-route.example.com"))
+				g.Expect(httpd).To(ContainSubstring("ServerName octavia-public." + namespace + ".svc"))
+			}, timeout, interval).Should(Succeed())
 		})
 
 		It("includes region_name in config when KeystoneAPI has region set", func() {

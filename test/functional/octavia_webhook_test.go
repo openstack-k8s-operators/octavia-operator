@@ -75,4 +75,70 @@ var _ = Describe("Octavia webhook", func() {
 				ContainSubstring("use \"spec.messagingBus.cluster\" instead"))
 		}, timeout, interval).Should(Succeed())
 	})
+
+	DescribeTable("validates octaviaAPI service override",
+		func(endpoint string, override map[string]any, errSubstr string) {
+			spec := GetDefaultOctaviaSpec()
+			spec["octaviaAPI"] = map[string]any{
+				"override": map[string]any{
+					"service": map[string]any{endpoint: override},
+				},
+			}
+			raw := map[string]any{
+				"apiVersion": "octavia.openstack.org/v1beta1",
+				"kind":       "Octavia",
+				"metadata": map[string]any{
+					"name":      "octavia-override-webhook-test",
+					"namespace": namespace,
+				},
+				"spec": spec,
+			}
+			obj := &unstructured.Unstructured{Object: raw}
+			_, err := controllerutil.CreateOrPatch(
+				ctx, k8sClient, obj, func() error { return nil })
+			if errSubstr == "" {
+				Expect(err).ShouldNot(HaveOccurred())
+				DeferCleanup(func() { _ = k8sClient.Delete(ctx, obj) })
+				return
+			}
+			Expect(err).Should(HaveOccurred())
+			var statusError *k8s_errors.StatusError
+			Expect(errors.As(err, &statusError)).To(BeTrue())
+			Expect(statusError.ErrStatus.Message).To(ContainSubstring(errSubstr))
+		},
+		Entry("public bare port name accepted", "public", portOverride("public", 443), ""),
+		Entry("internal bare port name accepted", "internal", portOverride("internal", 443), ""),
+		Entry("public wrong port name rejected", "public", portOverride("octavia-public", 443), `must be "public"`),
+		Entry("internal wrong port name rejected", "internal", portOverride("octavia-internal", 443), `must be "internal"`),
+		Entry("public FQDN endpointURL accepted", "public",
+			map[string]any{"endpointURL": "https://octavia.example.com:9876"}, ""),
+		Entry("internal FQDN endpointURL accepted", "internal",
+			map[string]any{"endpointURL": "https://octavia-int.example.com:9876"}, ""),
+		Entry("public short name endpointURL rejected", "public",
+			map[string]any{"endpointURL": "https://octavia:9876"}, "endpointURL"),
+		Entry("internal short name endpointURL rejected", "internal",
+			map[string]any{"endpointURL": "https://octavia:9876"}, "endpointURL"),
+		Entry("public missing scheme rejected", "public",
+			map[string]any{"endpointURL": "octavia.example.com:9876"}, "endpointURL"),
+		Entry("public IP literal rejected", "public",
+			map[string]any{"endpointURL": "https://192.168.1.1:9876"}, "endpointURL"),
+		Entry("internal IP literal rejected", "internal",
+			map[string]any{"endpointURL": "https://192.168.1.1:9876"}, "endpointURL"),
+		Entry("public port differing from endpointURL port rejected", "public",
+			map[string]any{
+				"endpointURL": "https://octavia.example.com:9876",
+				"spec":        map[string]any{"ports": []any{map[string]any{"name": "public", "port": 443}}},
+			}, "endpointURL"),
+		Entry("internal port matching endpointURL port accepted", "internal",
+			map[string]any{
+				"endpointURL": "https://octavia-int.example.com:8443",
+				"spec":        map[string]any{"ports": []any{map[string]any{"name": "internal", "port": 8443}}},
+			}, ""),
+	)
 })
+
+func portOverride(name string, port int) map[string]any {
+	return map[string]any{
+		"spec": map[string]any{"ports": []any{map[string]any{"name": name, "port": port}}},
+	}
+}
