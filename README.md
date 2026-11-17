@@ -62,6 +62,8 @@ Further information can be found [here](install_yamls_setup/README.md) in the
 
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and DCO information.
+
 This project accepts pull requests on Github and follows
 the [Kubernetes code review process](https://github.com/kubernetes/community/blob/master/contributors/guide/owners.md#the-code-review-process)
 for integration.
