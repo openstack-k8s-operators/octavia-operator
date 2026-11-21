@@ -101,8 +101,11 @@ spec:
       automountServiceAccountToken: false
       containers:
       - command:
-        - /usr/sbin/httpd
+        - /usr/bin/dumb-init
         args:
+        - --single-child
+        - --
+        - /usr/sbin/httpd
         - -DFOREGROUND
         imagePullPolicy: IfNotPresent
         livenessProbe:
@@ -131,6 +134,10 @@ spec:
           runAsGroup: 42437
           runAsNonRoot: true
       - command:
+        - /usr/bin/dumb-init
+        args:
+        - --single-child
+        - --
         - /usr/bin/octavia-driver-agent
         - --config-dir
         - /etc/octavia/octavia.conf.d
