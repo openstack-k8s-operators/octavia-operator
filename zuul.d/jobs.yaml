@@ -17,7 +17,7 @@
 - job:
     name: octavia-s2i-test
     timeout: 18000
-    parent: s2i-test-base
+    parent: s2i-test-base-2comp
     nodeset: centos-10-2x-centos-9-xxl-crc-cloud-ocp-4-22-1-3xl
     description: |
       Validate an Octavia deployment.
