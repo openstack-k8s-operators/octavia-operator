@@ -196,9 +196,14 @@ func Deployment(
 						{
 							Name: serviceName,
 							Command: []string{
-								"/usr/sbin/httpd",
+								"/usr/bin/dumb-init",
 							},
-							Args:            []string{"-DFOREGROUND"},
+							Args: []string{
+								"--single-child",
+								"--",
+								"/usr/sbin/httpd",
+								"-DFOREGROUND",
+							},
 							Image:           instance.Spec.ContainerImage,
 							SecurityContext: pod.RestrictiveSecurityContext(users.OctaviaUID, users.OctaviaGID),
 							Env:             env.MergeEnvs([]corev1.EnvVar{}, envVars),
@@ -210,6 +215,11 @@ func Deployment(
 						{
 							Name: fmt.Sprintf("%s-provider-agent", serviceName),
 							Command: []string{
+								"/usr/bin/dumb-init",
+							},
+							Args: []string{
+								"--single-child",
+								"--",
 								"/usr/bin/octavia-driver-agent",
 								"--config-dir", "/etc/octavia/octavia.conf.d",
 							},
